@@ -1,0 +1,180 @@
+<div class="row sectionBlockLayout" style="display: flex; flex-wrap: wrap; padding: 8px; margin: 0px;">
+  <div class="container" style="display: flex; flex-wrap: wrap;">
+    <div class="col-lg-12 columnBlockLayout" style="flex-grow: 1; min-width: 300px; display: flex; flex-direction: column;">
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+        <h2 style="margin: 0;">Управление задачами</h2>
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <select class="form-select form-select-sm" style="border-radius: 8px; max-width: 200px;">
+            <option>Все стажёры</option>
+            <option>Сидоров А.</option>
+            <option>Козлова М.</option>
+          </select>
+          <button type="button" class="btn btn-primary btn-sm" style="border-radius: 8px;" data-bs-toggle="modal" data-bs-target="#addTaskModal">
+            <i class="bi bi-plus-circle"></i> Новая задача
+          </button>
+        </div>
+      </div>
+
+      <!-- Kanban-доска -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+
+        <!-- Нужно сделать -->
+        <div class="kanban-col" data-status="todo" style="background: #f8f9fa; border-radius: 12px; padding: 16px; min-height: 400px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h6 style="margin: 0; font-weight: 600; color: #555;">Нужно сделать</h6>
+            <span class="badge bg-secondary" style="border-radius: 20px;" id="count-todo">2</span>
+          </div>
+          <div id="lane-todo">
+            <div class="kanban-card" draggable="true" data-status="todo" style="background: #fff; border-radius: 10px; border: 1px solid #e1e4e8; padding: 14px; margin-bottom: 10px; cursor: grab;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                <strong style="font-size: 13px; line-height: 1.4;">Пройти инструктаж по ТБ</strong>
+                <span class="badge bg-danger" style="border-radius: 20px; font-size: 10px; flex-shrink: 0; margin-left: 6px;">Срочно</span>
+              </div>
+              <p style="font-size: 12px; color: #888; margin: 0 0 10px 0;">Сидоров А.</p>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <small style="color: #aaa; font-size: 11px;"><i class="bi bi-calendar3"></i> 16.04.2026</small>
+                <div style="display: flex; gap: 4px;">
+                  <button type="button" class="btn btn-xs" style="padding: 2px 6px; font-size: 11px; border-radius: 6px; border: 1px solid #dee2e6;" onclick="moveCard(this, 'inprogress')">→ В работу</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="kanban-card" draggable="true" data-status="todo" style="background: #fff; border-radius: 10px; border: 1px solid #e1e4e8; padding: 14px; margin-bottom: 10px; cursor: grab;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                <strong style="font-size: 13px; line-height: 1.4;">Изучить регламент компании</strong>
+                <span class="badge bg-warning text-dark" style="border-radius: 20px; font-size: 10px; flex-shrink: 0; margin-left: 6px;">Обычная</span>
+              </div>
+              <p style="font-size: 12px; color: #888; margin: 0 0 10px 0;">Козлова М.</p>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <small style="color: #aaa; font-size: 11px;"><i class="bi bi-calendar3"></i> 18.04.2026</small>
+                <button type="button" class="btn btn-xs" style="padding: 2px 6px; font-size: 11px; border-radius: 6px; border: 1px solid #dee2e6;" onclick="moveCard(this, 'inprogress')">→ В работу</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- В работе -->
+        <div class="kanban-col" data-status="inprogress" style="background: #f0f7ff; border-radius: 12px; padding: 16px; min-height: 400px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h6 style="margin: 0; font-weight: 600; color: #0078d4;">В работе</h6>
+            <span class="badge" style="background: #0078d4; border-radius: 20px;" id="count-inprogress">1</span>
+          </div>
+          <div id="lane-inprogress">
+            <div class="kanban-card" draggable="true" data-status="inprogress" style="background: #fff; border-radius: 10px; border: 1px solid #c3daf6; padding: 14px; margin-bottom: 10px; cursor: grab;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                <strong style="font-size: 13px; line-height: 1.4;">Познакомиться с командой</strong>
+                <span class="badge bg-info" style="border-radius: 20px; font-size: 10px; flex-shrink: 0; margin-left: 6px;">В процессе</span>
+              </div>
+              <p style="font-size: 12px; color: #888; margin: 0 0 10px 0;">Назаров Б.</p>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <small style="color: #aaa; font-size: 11px;"><i class="bi bi-calendar3"></i> 17.04.2026</small>
+                <button type="button" class="btn btn-xs" style="padding: 2px 6px; font-size: 11px; border-radius: 6px; background: #e8f5e9; border: 1px solid #c3efd3; color: #27ae60;" onclick="moveCard(this, 'done')">✓ Завершить</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Завершено -->
+        <div class="kanban-col" data-status="done" style="background: #f0fff4; border-radius: 12px; padding: 16px; min-height: 400px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h6 style="margin: 0; font-weight: 600; color: #27ae60;">Завершено</h6>
+            <span class="badge bg-success" style="border-radius: 20px;" id="count-done">1</span>
+          </div>
+          <div id="lane-done">
+            <div class="kanban-card" draggable="true" data-status="done" style="background: #fff; border-radius: 10px; border: 1px solid #c3efd3; padding: 14px; margin-bottom: 10px; opacity: 0.75;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                <strong style="font-size: 13px; line-height: 1.4; text-decoration: line-through; color: #aaa;">Получить пропуск</strong>
+                <span class="badge bg-success" style="border-radius: 20px; font-size: 10px; flex-shrink: 0; margin-left: 6px;">Готово</span>
+              </div>
+              <p style="font-size: 12px; color: #aaa; margin: 0;">Алиева Д.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно: Новая задача -->
+<div class="modal fade" id="addTaskModal" tabindex="-1" aria-labelledby="addTaskModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius: 12px;">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addTaskModalLabel">Новая задача</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Название задачи <span style="color: #e74c3c;">*</span></label>
+          <input type="text" class="form-control" id="new-task-title" placeholder="Кратко опишите задачу" style="border-radius: 8px;">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Назначить стажёру</label>
+          <select class="form-select" style="border-radius: 8px;">
+            <option>Сидоров А.</option>
+            <option>Козлова М.</option>
+            <option>Назаров Б.</option>
+            <option>Алиева Д.</option>
+          </select>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Срок</label>
+            <input type="date" class="form-control" style="border-radius: 8px;">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Приоритет</label>
+            <select class="form-select" style="border-radius: 8px;">
+              <option>Обычная</option>
+              <option>Срочно</option>
+              <option>Низкий</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="border-radius: 8px;">Отмена</button>
+        <button type="button" class="btn btn-primary" style="border-radius: 8px;" onclick="addTask()">Создать</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function moveCard(btn, targetStatus) {
+  var card = btn.closest('.kanban-card');
+  var targetLane = document.getElementById('lane-' + targetStatus);
+  if (targetLane) {
+    card.dataset.status = targetStatus;
+    targetLane.appendChild(card);
+    btn.closest('.kanban-card').querySelectorAll('button').forEach(function(b) { b.style.display = 'none'; });
+    updateCounts();
+  }
+}
+
+function updateCounts() {
+  ['todo', 'inprogress', 'done'].forEach(function(s) {
+    var lane = document.getElementById('lane-' + s);
+    var el = document.getElementById('count-' + s);
+    if (lane && el) el.textContent = lane.querySelectorAll('.kanban-card').length;
+  });
+}
+
+function addTask() {
+  var title = document.getElementById('new-task-title').value.trim();
+  if (!title) { alert('Введите название задачи'); return; }
+  var card = document.createElement('div');
+  card.className = 'kanban-card';
+  card.setAttribute('draggable', 'true');
+  card.dataset.status = 'todo';
+  card.style.cssText = 'background: #fff; border-radius: 10px; border: 1px solid #e1e4e8; padding: 14px; margin-bottom: 10px; cursor: grab;';
+  card.innerHTML = '<strong style="font-size:13px;">' + title + '</strong>';
+  document.getElementById('lane-todo').appendChild(card);
+  document.getElementById('new-task-title').value = '';
+  var modal = bootstrap.Modal.getInstance(document.getElementById('addTaskModal'));
+  if (modal) modal.hide();
+  updateCounts();
+}
+</script>

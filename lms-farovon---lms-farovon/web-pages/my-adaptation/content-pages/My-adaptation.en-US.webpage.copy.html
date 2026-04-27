@@ -1,0 +1,110 @@
+<div class="row sectionBlockLayout" style="display: flex; flex-wrap: wrap; padding: 8px; margin: 0px;">
+  <div class="container" style="display: flex; flex-wrap: wrap;">
+    <div class="col-lg-12 columnBlockLayout" style="flex-grow: 1; min-width: 300px; display: flex; flex-direction: column;">
+
+      <!-- Приветственная карточка -->
+      <div class="card mb-4" style="border-radius: 12px; border: none; background: linear-gradient(135deg, #0078d4 0%, #005a9e 100%); color: #fff; padding: 24px;">
+        <h2 style="margin-bottom: 8px;">Привет, {{ user.fullname | default: 'Новый сотрудник' }}!</h2>
+        <p style="margin: 0; opacity: 0.9;">Добро пожаловать в программу адаптации компании "Фаровон".<br>Отслеживайте свой прогресс и выполняйте задания.</p>
+      </div>
+
+      <!-- Прогресс адаптации -->
+      <div class="card mb-4" style="border-radius: 12px; padding: 20px; border: 1px solid #e1e4e8;">
+        <h5 style="margin-bottom: 16px;"><i class="bi bi-bar-chart-fill" style="color: #0078d4;"></i> Прогресс адаптации</h5>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+          <span style="font-size: 14px; color: #344054;">Общий прогресс</span>
+          <span style="font-size: 14px; font-weight: 600; color: #0078d4;" id="overall-progress-label">0%</span>
+        </div>
+        <div class="progress" style="height: 10px; border-radius: 6px; background: #e9ecef;">
+          <div class="progress-bar" role="progressbar" id="overall-progress-bar"
+               style="width: 0%; background: #0078d4; border-radius: 6px;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+      </div>
+
+      <!-- Карточки этапов адаптации -->
+      <h5 style="margin-bottom: 16px;">Этапы адаптации</h5>
+      <div class="row g-3" id="adaptation-stages">
+
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 adaptation-stage-card" data-stage="onboarding" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 16px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+              <span style="width: 36px; height: 36px; border-radius: 50%; background: #e8f4fd; display: flex; align-items: center; justify-content: center;">
+                <i class="bi bi-clipboard-check" style="color: #0078d4;"></i>
+              </span>
+              <strong>Адаптация (день 1)</strong>
+            </div>
+            <p style="font-size: 13px; color: #666; margin-bottom: 12px;">Проверка документов, оформление, инструктаж ТБ.</p>
+            <a href="/onboarding" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">Открыть</a>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 adaptation-stage-card" data-stage="about" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 16px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+              <span style="width: 36px; height: 36px; border-radius: 50%; background: #fff3e0; display: flex; align-items: center; justify-content: center;">
+                <i class="bi bi-building" style="color: #e67e22;"></i>
+              </span>
+              <strong>О компании</strong>
+            </div>
+            <p style="font-size: 13px; color: #666; margin-bottom: 12px;">Миссия, ценности, руководство и корпоративная культура.</p>
+            <a href="/about-company" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">Открыть</a>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 adaptation-stage-card" data-stage="tasks" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 16px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+              <span style="width: 36px; height: 36px; border-radius: 50%; background: #f3e5f5; display: flex; align-items: center; justify-content: center;">
+                <i class="bi bi-list-task" style="color: #8e44ad;"></i>
+              </span>
+              <strong>Мои задания</strong>
+            </div>
+            <p style="font-size: 13px; color: #666; margin-bottom: 12px;">Список задач на период адаптации.</p>
+            <a href="/my-tasks" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">Открыть</a>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 adaptation-stage-card" data-stage="mentor" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 16px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+              <span style="width: 36px; height: 36px; border-radius: 50%; background: #e8f5e9; display: flex; align-items: center; justify-content: center;">
+                <i class="bi bi-person-video2" style="color: #27ae60;"></i>
+              </span>
+              <strong>Мой наставник</strong>
+            </div>
+            <p style="font-size: 13px; color: #666; margin-bottom: 12px;">Контакт вашего наставника и запись на встречу.</p>
+            <a href="/my-mentor" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">Открыть</a>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 adaptation-stage-card" data-stage="kb" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 16px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+              <span style="width: 36px; height: 36px; border-radius: 50%; background: #fce4ec; display: flex; align-items: center; justify-content: center;">
+                <i class="bi bi-journal-bookmark" style="color: #e91e63;"></i>
+              </span>
+              <strong>База знаний</strong>
+            </div>
+            <p style="font-size: 13px; color: #666; margin-bottom: 12px;">Учебные материалы, регламенты и инструкции.</p>
+            <a href="/knowledge-base" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">Открыть</a>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 adaptation-stage-card" data-stage="calendar" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 16px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+              <span style="width: 36px; height: 36px; border-radius: 50%; background: #e3f2fd; display: flex; align-items: center; justify-content: center;">
+                <i class="bi bi-calendar3" style="color: #1565c0;"></i>
+              </span>
+              <strong>Календарь</strong>
+            </div>
+            <p style="font-size: 13px; color: #666; margin-bottom: 12px;">Мероприятия и ключевые даты периода адаптации.</p>
+            <a href="/calendar" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">Открыть</a>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>

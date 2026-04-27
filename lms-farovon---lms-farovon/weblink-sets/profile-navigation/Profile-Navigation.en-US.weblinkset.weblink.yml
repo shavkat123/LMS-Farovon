@@ -1,0 +1,22 @@
+- adx_disablepagevalidation: false
+  adx_displayimageonly: false
+  adx_displayorder: 1
+  adx_displaypagechildlinks: false
+  adx_name: Мой профиль
+  adx_openinnewwindow: false
+  adx_pageid: 4ecfddf9-a538-f111-88b5-7ced8d76b3cc
+  adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_robotsfollowlink: true
+  adx_weblinkid: 3f60e5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_weblinksetid: df30e0ff-a538-f111-88b5-7ced8d76b3cc
+- adx_disablepagevalidation: false
+  adx_displayimageonly: false
+  adx_displayorder: 2
+  adx_displaypagechildlinks: false
+  adx_name: Мои стажёры
+  adx_openinnewwindow: false
+  adx_pageid: 9d5fe5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_robotsfollowlink: false
+  adx_weblinkid: 52cfddf9-a538-f111-88b5-7ced8d76b3cc
+  adx_weblinksetid: df30e0ff-a538-f111-88b5-7ced8d76b3cc

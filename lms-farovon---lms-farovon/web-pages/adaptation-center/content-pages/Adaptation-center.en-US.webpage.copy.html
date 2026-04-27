@@ -1,0 +1,227 @@
+<div class="row sectionBlockLayout" style="display: flex; flex-wrap: wrap; padding: 8px; margin: 0px;">
+  <div class="container" style="display: flex; flex-wrap: wrap;">
+    <div class="col-lg-12 columnBlockLayout" style="flex-grow: 1; min-width: 300px; display: flex; flex-direction: column;">
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+        <h2 style="margin: 0;">Центр адаптации</h2>
+        <button type="button" class="btn btn-primary" style="border-radius: 8px;" data-bs-toggle="modal" data-bs-target="#addProgramModal">
+          <i class="bi bi-plus-circle"></i> Добавить программу
+        </button>
+      </div>
+
+      <!-- Вкладки -->
+      <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-programs" type="button">Программы адаптации</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-mentors" type="button">Наставники</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-interns" type="button">Стажёры</button></li>
+      </ul>
+
+      <div class="tab-content">
+
+        <!-- Программы адаптации -->
+        <div class="tab-pane fade show active" id="tab-programs">
+          <div class="row g-3">
+
+            <div class="col-md-6 col-lg-4">
+              <div class="card h-100" style="border-radius: 12px; border: 1px solid #e1e4e8; overflow: hidden;">
+                <div style="padding: 16px; border-bottom: 1px solid #f0f0f0;">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <h6 style="margin: 0 0 4px 0;">Программа адаптации — Новый сотрудник</h6>
+                    <span class="badge bg-success" style="border-radius: 20px; font-size: 11px;">Активна</span>
+                  </div>
+                  <p style="font-size: 12px; color: #888; margin: 6px 0 0 0;">Длительность: 30 дней · 8 этапов</p>
+                </div>
+                <div style="padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;">
+                  <div style="font-size: 13px; color: #555;">
+                    <i class="bi bi-people" style="color: #0078d4;"></i> 12 стажёров
+                  </div>
+                  <div style="display: flex; gap: 6px;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" style="border-radius: 8px;" title="Редактировать"><i class="bi bi-pencil"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" style="border-radius: 8px;" title="Удалить"><i class="bi bi-trash"></i></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
+              <div class="card h-100" style="border-radius: 12px; border: 1px solid #e1e4e8; overflow: hidden;">
+                <div style="padding: 16px; border-bottom: 1px solid #f0f0f0;">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <h6 style="margin: 0 0 4px 0;">Программа для технических специалистов</h6>
+                    <span class="badge bg-warning text-dark" style="border-radius: 20px; font-size: 11px;">Черновик</span>
+                  </div>
+                  <p style="font-size: 12px; color: #888; margin: 6px 0 0 0;">Длительность: 45 дней · 5 этапов</p>
+                </div>
+                <div style="padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;">
+                  <div style="font-size: 13px; color: #555;">
+                    <i class="bi bi-people" style="color: #0078d4;"></i> 0 стажёров
+                  </div>
+                  <div style="display: flex; gap: 6px;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" style="border-radius: 8px;" title="Редактировать"><i class="bi bi-pencil"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" style="border-radius: 8px;" title="Удалить"><i class="bi bi-trash"></i></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
+              <div class="card h-100" style="border-radius: 12px; border: 2px dashed #dee2e6; display: flex; align-items: center; justify-content: center; min-height: 140px; cursor: pointer; transition: border-color 0.15s;"
+                   onmouseover="this.style.borderColor='#0078d4'" onmouseout="this.style.borderColor='#dee2e6'"
+                   data-bs-toggle="modal" data-bs-target="#addProgramModal">
+                <div style="text-align: center; color: #aaa;">
+                  <i class="bi bi-plus-circle" style="font-size: 2rem; display: block; margin-bottom: 8px;"></i>
+                  <span style="font-size: 14px;">Создать программу</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Наставники -->
+        <div class="tab-pane fade" id="tab-mentors">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle" style="border-radius: 12px; overflow: hidden;">
+              <thead style="background: #f8f9fa;">
+                <tr>
+                  <th>Наставник</th>
+                  <th>Подразделение</th>
+                  <th>Стажёры</th>
+                  <th>Средний прогресс</th>
+                  <th>Рейтинг</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <div style="width: 36px; height: 36px; border-radius: 50%; background: #e8f4fd; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i class="bi bi-person" style="color: #0078d4;"></i>
+                      </div>
+                      <span>Иванов Иван И.</span>
+                    </div>
+                  </td>
+                  <td style="font-size: 14px; color: #555;">Производство</td>
+                  <td><span class="badge bg-primary" style="border-radius: 20px;">3</span></td>
+                  <td>
+                    <div class="progress" style="height: 6px; border-radius: 4px; width: 80px;">
+                      <div class="progress-bar" style="width: 72%;" role="progressbar"></div>
+                    </div>
+                    <small style="color: #888;">72%</small>
+                  </td>
+                  <td><i class="bi bi-star-fill" style="color: #f39c12; font-size: 12px;"></i> 4.8</td>
+                  <td><button type="button" class="btn btn-sm btn-outline-secondary" style="border-radius: 8px;">Профиль</button></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <div style="width: 36px; height: 36px; border-radius: 50%; background: #f0fff4; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i class="bi bi-person" style="color: #27ae60;"></i>
+                      </div>
+                      <span>Петрова Анна С.</span>
+                    </div>
+                  </td>
+                  <td style="font-size: 14px; color: #555;">HR</td>
+                  <td><span class="badge bg-primary" style="border-radius: 20px;">5</span></td>
+                  <td>
+                    <div class="progress" style="height: 6px; border-radius: 4px; width: 80px;">
+                      <div class="progress-bar bg-success" style="width: 89%;" role="progressbar"></div>
+                    </div>
+                    <small style="color: #888;">89%</small>
+                  </td>
+                  <td><i class="bi bi-star-fill" style="color: #f39c12; font-size: 12px;"></i> 4.9</td>
+                  <td><button type="button" class="btn btn-sm btn-outline-secondary" style="border-radius: 8px;">Профиль</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Стажёры -->
+        <div class="tab-pane fade" id="tab-interns">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+            <div class="input-group" style="max-width: 280px;">
+              <span class="input-group-text" style="background: #f8f9fa;"><i class="bi bi-search" style="color: #888;"></i></span>
+              <input type="text" class="form-control" placeholder="Поиск стажёра...">
+            </div>
+            <select class="form-select" style="max-width: 200px; border-radius: 8px;">
+              <option>Все программы</option>
+              <option>Программа: Новый сотрудник</option>
+            </select>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle">
+              <thead style="background: #f8f9fa;">
+                <tr>
+                  <th>Стажёр</th>
+                  <th>Программа</th>
+                  <th>Наставник</th>
+                  <th>Прогресс</th>
+                  <th>Дата начала</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Сидоров Александр</td>
+                  <td style="font-size: 13px;">Новый сотрудник</td>
+                  <td style="font-size: 13px;">Иванов И.И.</td>
+                  <td>
+                    <div class="progress" style="height: 6px; border-radius: 4px; width: 80px;">
+                      <div class="progress-bar" style="width: 45%;" role="progressbar"></div>
+                    </div>
+                    <small style="color: #888;">45%</small>
+                  </td>
+                  <td style="font-size: 13px; color: #555;">14.04.2026</td>
+                  <td><button type="button" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">Детали</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно: Добавить программу -->
+<div class="modal fade" id="addProgramModal" tabindex="-1" aria-labelledby="addProgramModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" style="border-radius: 12px;">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addProgramModalLabel">Новая программа адаптации</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Название программы <span style="color: #e74c3c;">*</span></label>
+          <input type="text" class="form-control" placeholder="Введите название" style="border-radius: 8px;">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Описание</label>
+          <textarea class="form-control" rows="3" placeholder="Описание программы..." style="border-radius: 8px;"></textarea>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Длительность (дней)</label>
+            <input type="number" class="form-control" value="30" min="1" style="border-radius: 8px;">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Целевая роль</label>
+            <select class="form-select" style="border-radius: 8px;">
+              <option>Новый сотрудник</option>
+              <option>Наставник</option>
+              <option>Все роли</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="border-radius: 8px;">Отмена</button>
+        <button type="button" class="btn btn-primary" style="border-radius: 8px;">Создать программу</button>
+      </div>
+    </div>
+  </div>
+</div>

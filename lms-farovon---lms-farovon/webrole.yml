@@ -1,0 +1,28 @@
+- adx_anonymoususersrole: true
+  adx_authenticatedusersrole: false
+  adx_name: Anonymous Users
+  adx_webroleid: 2106e5ed-a538-f111-88b5-7ced8d76b3cc
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: true
+  adx_name: Authenticated Users
+  adx_webroleid: 2ccfddf9-a538-f111-88b5-7ced8d76b3cc
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: false
+  adx_name: Administrators
+  adx_webroleid: 3b5fe5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: false
+  adx_name: HR
+  adx_webroleid: a1b2c3d4-1111-2222-3333-000000000001
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: false
+  adx_name: Наставник
+  adx_webroleid: a1b2c3d4-1111-2222-3333-000000000002
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: false
+  adx_name: Руководитель
+  adx_webroleid: a1b2c3d4-1111-2222-3333-000000000003
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: false
+  adx_name: Новый сотрудник
+  adx_webroleid: a1b2c3d4-1111-2222-3333-000000000004

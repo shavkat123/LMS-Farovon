@@ -1,0 +1,175 @@
+<div class="row sectionBlockLayout" style="display: flex; flex-wrap: wrap; padding: 8px; margin: 0px;">
+  <div class="container" style="display: flex; flex-wrap: wrap;">
+    <div class="col-lg-12 columnBlockLayout" style="flex-grow: 1; min-width: 300px; display: flex; flex-direction: column;">
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+        <h2 style="margin: 0;">Отчёты</h2>
+        <div style="display: flex; gap: 8px;">
+          <select class="form-select form-select-sm" style="border-radius: 8px; min-width: 140px;">
+            <option>Апрель 2026</option>
+            <option>Март 2026</option>
+            <option>Февраль 2026</option>
+          </select>
+          <button type="button" class="btn btn-sm btn-outline-secondary" style="border-radius: 8px;">
+            <i class="bi bi-download"></i> Экспорт
+          </button>
+        </div>
+      </div>
+
+      <!-- Сводные KPI -->
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+          <div class="card text-center" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px;">
+            <div style="font-size: 32px; font-weight: 700; color: #0078d4;">12</div>
+            <div style="font-size: 13px; color: #666;">Активных стажёров</div>
+            <div style="font-size: 11px; color: #27ae60; margin-top: 4px;"><i class="bi bi-arrow-up"></i> +3 в этом месяце</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="card text-center" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px;">
+            <div style="font-size: 32px; font-weight: 700; color: #27ae60;">68%</div>
+            <div style="font-size: 13px; color: #666;">Средний прогресс</div>
+            <div style="font-size: 11px; color: #27ae60; margin-top: 4px;"><i class="bi bi-arrow-up"></i> +5% к прошлому месяцу</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="card text-center" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px;">
+            <div style="font-size: 32px; font-weight: 700; color: #e67e22;">4</div>
+            <div style="font-size: 13px; color: #666;">Завершили адаптацию</div>
+            <div style="font-size: 11px; color: #888; margin-top: 4px;">В этом месяце</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="card text-center" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px;">
+            <div style="font-size: 32px; font-weight: 700; color: #8e44ad;">4.7</div>
+            <div style="font-size: 13px; color: #666;">Ср. оценка наставников</div>
+            <div style="font-size: 11px; color: #27ae60; margin-top: 4px;"><i class="bi bi-star-fill" style="color: #f39c12;"></i> из 5</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Три колонки отчётов -->
+      <div class="row g-4">
+
+        <!-- Прогресс стажёров -->
+        <div class="col-lg-4">
+          <div class="card h-100" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px;">
+            <h5 style="margin-bottom: 16px;"><i class="bi bi-person-check" style="color: #0078d4;"></i> Прогресс стажёров</h5>
+            {% assign interns = '' | split: '' %}
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                  <span>Сидоров А.</span><span style="color: #0078d4; font-weight: 600;">45%</span>
+                </div>
+                <div class="progress" style="height: 6px; border-radius: 4px;">
+                  <div class="progress-bar" style="width: 45%;" role="progressbar"></div>
+                </div>
+              </div>
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                  <span>Козлова М.</span><span style="color: #27ae60; font-weight: 600;">82%</span>
+                </div>
+                <div class="progress" style="height: 6px; border-radius: 4px;">
+                  <div class="progress-bar bg-success" style="width: 82%;" role="progressbar"></div>
+                </div>
+              </div>
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                  <span>Назаров Б.</span><span style="color: #e67e22; font-weight: 600;">30%</span>
+                </div>
+                <div class="progress" style="height: 6px; border-radius: 4px;">
+                  <div class="progress-bar bg-warning" style="width: 30%;" role="progressbar"></div>
+                </div>
+              </div>
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                  <span>Алиева Д.</span><span style="color: #27ae60; font-weight: 600;">100%</span>
+                </div>
+                <div class="progress" style="height: 6px; border-radius: 4px;">
+                  <div class="progress-bar bg-success" style="width: 100%;" role="progressbar"></div>
+                </div>
+              </div>
+            </div>
+            <a href="/users" class="btn btn-sm btn-outline-primary mt-3" style="border-radius: 8px;">Все стажёры</a>
+          </div>
+        </div>
+
+        <!-- Прогресс подразделений -->
+        <div class="col-lg-4">
+          <div class="card h-100" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px;">
+            <h5 style="margin-bottom: 16px;"><i class="bi bi-building" style="color: #8e44ad;"></i> Прогресс подразделений</h5>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                  <span>Производство</span><span style="color: #0078d4; font-weight: 600;">58%</span>
+                </div>
+                <div class="progress" style="height: 6px; border-radius: 4px;">
+                  <div class="progress-bar" style="width: 58%;" role="progressbar"></div>
+                </div>
+                <small style="color: #888; font-size: 11px;">4 стажёра</small>
+              </div>
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                  <span>HR</span><span style="color: #27ae60; font-weight: 600;">91%</span>
+                </div>
+                <div class="progress" style="height: 6px; border-radius: 4px;">
+                  <div class="progress-bar bg-success" style="width: 91%;" role="progressbar"></div>
+                </div>
+                <small style="color: #888; font-size: 11px;">2 стажёра</small>
+              </div>
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                  <span>Маркетинг</span><span style="color: #e67e22; font-weight: 600;">43%</span>
+                </div>
+                <div class="progress" style="height: 6px; border-radius: 4px;">
+                  <div class="progress-bar bg-warning" style="width: 43%;" role="progressbar"></div>
+                </div>
+                <small style="color: #888; font-size: 11px;">3 стажёра</small>
+              </div>
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                  <span>ИТ</span><span style="color: #0078d4; font-weight: 600;">75%</span>
+                </div>
+                <div class="progress" style="height: 6px; border-radius: 4px;">
+                  <div class="progress-bar" style="width: 75%;" role="progressbar"></div>
+                </div>
+                <small style="color: #888; font-size: 11px;">3 стажёра</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Прогресс наставников -->
+        <div class="col-lg-4">
+          <div class="card h-100" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px;">
+            <h5 style="margin-bottom: 16px;"><i class="bi bi-person-video2" style="color: #27ae60;"></i> Наставники</h5>
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: #e8f4fd; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #0078d4; font-size: 12px; flex-shrink: 0;">ИИ</div>
+                <div style="flex: 1;">
+                  <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                    <span>Иванов И.И.</span>
+                    <span><i class="bi bi-star-fill" style="color: #f39c12; font-size: 11px;"></i> 4.8</span>
+                  </div>
+                  <div style="font-size: 11px; color: #888;">3 стажёра · ср. прогресс 72%</div>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: #f0fff4; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #27ae60; font-size: 12px; flex-shrink: 0;">ПА</div>
+                <div style="flex: 1;">
+                  <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                    <span>Петрова А.С.</span>
+                    <span><i class="bi bi-star-fill" style="color: #f39c12; font-size: 11px;"></i> 4.9</span>
+                  </div>
+                  <div style="font-size: 11px; color: #888;">5 стажёров · ср. прогресс 89%</div>
+                </div>
+              </div>
+            </div>
+            <a href="/adaptation-center" class="btn btn-sm btn-outline-primary mt-3" style="border-radius: 8px;">Все наставники</a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,167 @@
+<div class="row sectionBlockLayout" style="display: flex; flex-wrap: wrap; padding: 8px; margin: 0px;">
+  <div class="container" style="display: flex; flex-wrap: wrap;">
+    <div class="col-lg-12 columnBlockLayout" style="flex-grow: 1; min-width: 300px; display: flex; flex-direction: column;">
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h2 style="margin: 0 0 4px 0;">База знаний</h2>
+          <p style="color: #666; margin: 0; font-size: 14px;">Учебные материалы, регламенты и инструкции</p>
+        </div>
+        <div class="input-group" style="max-width: 280px;">
+          <span class="input-group-text" style="border-radius: 8px 0 0 8px; background: #f8f9fa;">
+            <i class="bi bi-search" style="color: #888;"></i>
+          </span>
+          <input type="text" class="form-control" id="kb-search" placeholder="Поиск материалов..." style="border-radius: 0 8px 8px 0;">
+        </div>
+      </div>
+
+      <!-- Категории -->
+      <div style="display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap;">
+        <button class="btn btn-sm btn-primary kb-cat active" data-cat="all" style="border-radius: 20px;">Все</button>
+        <button class="btn btn-sm btn-outline-secondary kb-cat" data-cat="policy" style="border-radius: 20px;">Регламенты</button>
+        <button class="btn btn-sm btn-outline-secondary kb-cat" data-cat="instructions" style="border-radius: 20px;">Инструкции</button>
+        <button class="btn btn-sm btn-outline-secondary kb-cat" data-cat="training" style="border-radius: 20px;">Обучение</button>
+        <button class="btn btn-sm btn-outline-secondary kb-cat" data-cat="forms" style="border-radius: 20px;">Формы/шаблоны</button>
+      </div>
+
+      <div class="row g-3" id="kb-grid">
+
+        <div class="col-md-6 col-lg-4 kb-item" data-cat="policy">
+          <div class="card h-100" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px; cursor: pointer; transition: box-shadow 0.15s;"
+               onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow=''">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+              <div style="width: 40px; height: 40px; border-radius: 8px; background: #e8f4fd; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <i class="bi bi-file-text" style="color: #0078d4;"></i>
+              </div>
+              <div>
+                <strong style="font-size: 14px;">Правила внутреннего трудового распорядка</strong>
+              </div>
+            </div>
+            <p style="font-size: 12px; color: #888; margin: 0 0 12px 0;">Регламент · Обновлено: 01.04.2026</p>
+            <a href="#" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">
+              <i class="bi bi-download"></i> Открыть
+            </a>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4 kb-item" data-cat="policy">
+          <div class="card h-100" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px; cursor: pointer; transition: box-shadow 0.15s;"
+               onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow=''">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+              <div style="width: 40px; height: 40px; border-radius: 8px; background: #e8f4fd; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <i class="bi bi-file-text" style="color: #0078d4;"></i>
+              </div>
+              <div>
+                <strong style="font-size: 14px;">Кодекс корпоративной этики</strong>
+              </div>
+            </div>
+            <p style="font-size: 12px; color: #888; margin: 0 0 12px 0;">Регламент · Обновлено: 01.01.2026</p>
+            <a href="#" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">
+              <i class="bi bi-download"></i> Открыть
+            </a>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4 kb-item" data-cat="instructions">
+          <div class="card h-100" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px; cursor: pointer; transition: box-shadow 0.15s;"
+               onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow=''">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+              <div style="width: 40px; height: 40px; border-radius: 8px; background: #f3e5f5; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <i class="bi bi-card-checklist" style="color: #8e44ad;"></i>
+              </div>
+              <div>
+                <strong style="font-size: 14px;">Инструкция по использованию портала</strong>
+              </div>
+            </div>
+            <p style="font-size: 12px; color: #888; margin: 0 0 12px 0;">Инструкция · Обновлено: 15.04.2026</p>
+            <a href="#" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">
+              <i class="bi bi-download"></i> Открыть
+            </a>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4 kb-item" data-cat="training">
+          <div class="card h-100" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px; cursor: pointer; transition: box-shadow 0.15s;"
+               onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow=''">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+              <div style="width: 40px; height: 40px; border-radius: 8px; background: #e8f5e9; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <i class="bi bi-play-circle" style="color: #27ae60;"></i>
+              </div>
+              <div>
+                <strong style="font-size: 14px;">Вводный курс для новых сотрудников</strong>
+              </div>
+            </div>
+            <p style="font-size: 12px; color: #888; margin: 0 0 12px 0;">Обучение · Обновлено: 01.04.2026</p>
+            <a href="/adaptation-center" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">
+              <i class="bi bi-arrow-right-circle"></i> Начать курс
+            </a>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4 kb-item" data-cat="forms">
+          <div class="card h-100" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px; cursor: pointer; transition: box-shadow 0.15s;"
+               onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow=''">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+              <div style="width: 40px; height: 40px; border-radius: 8px; background: #fff3e0; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <i class="bi bi-file-earmark-word" style="color: #e67e22;"></i>
+              </div>
+              <div>
+                <strong style="font-size: 14px;">Заявление на отпуск (шаблон)</strong>
+              </div>
+            </div>
+            <p style="font-size: 12px; color: #888; margin: 0 0 12px 0;">Форма/шаблон · Обновлено: 01.03.2026</p>
+            <a href="#" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">
+              <i class="bi bi-download"></i> Скачать
+            </a>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4 kb-item" data-cat="instructions">
+          <div class="card h-100" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px; cursor: pointer; transition: box-shadow 0.15s;"
+               onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow=''">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+              <div style="width: 40px; height: 40px; border-radius: 8px; background: #fce4ec; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <i class="bi bi-shield-check" style="color: #e74c3c;"></i>
+              </div>
+              <div>
+                <strong style="font-size: 14px;">Инструктаж по технике безопасности</strong>
+              </div>
+            </div>
+            <p style="font-size: 12px; color: #888; margin: 0 0 12px 0;">Инструкция · Обновлено: 01.01.2026</p>
+            <a href="#" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">
+              <i class="bi bi-download"></i> Открыть
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  function filterKB(cat, query) {
+    document.querySelectorAll('.kb-item').forEach(function(item) {
+      var catMatch = cat === 'all' || item.dataset.cat === cat;
+      var textMatch = !query || item.textContent.toLowerCase().includes(query.toLowerCase());
+      item.style.display = (catMatch && textMatch) ? '' : 'none';
+    });
+  }
+
+  document.querySelectorAll('.kb-cat').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.kb-cat').forEach(function(b) {
+        b.classList.remove('btn-primary','active'); b.classList.add('btn-outline-secondary');
+      });
+      this.classList.add('btn-primary','active'); this.classList.remove('btn-outline-secondary');
+      filterKB(this.dataset.cat, document.getElementById('kb-search').value);
+    });
+  });
+
+  document.getElementById('kb-search').addEventListener('input', function() {
+    var activeTag = document.querySelector('.kb-cat.active');
+    filterKB(activeTag ? activeTag.dataset.cat : 'all', this.value);
+  });
+})();
+</script>

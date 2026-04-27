@@ -1,0 +1,74 @@
+<div class="row sectionBlockLayout" style="display: flex; flex-wrap: wrap; padding: 8px; margin: 0px;">
+  <div class="container" style="display: flex; flex-wrap: wrap;">
+    <div class="col-lg-12 columnBlockLayout" style="flex-grow: 1; min-width: 300px; display: flex; flex-direction: column;">
+
+      <h2 style="margin-bottom: 24px;">Мой наставник</h2>
+
+      <!-- Карточка наставника -->
+      <div class="card mb-4" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 24px;">
+        {% assign mentor_contacts = entities['contacts'] | where: 'adx_username', user.username | first %}
+        <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+          <div style="width: 80px; height: 80px; border-radius: 50%; background: #e8f4fd; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <i class="bi bi-person-video2" style="font-size: 2.5rem; color: #0078d4;"></i>
+          </div>
+          <div>
+            <h5 style="margin: 0 0 4px 0;" id="mentor-name">Наставник не назначен</h5>
+            <p style="margin: 0 0 4px 0; color: #666; font-size: 14px;" id="mentor-position">—</p>
+            <p style="margin: 0; color: #666; font-size: 14px;" id="mentor-department">—</p>
+          </div>
+        </div>
+        <hr style="margin: 20px 0;">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label style="font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px;">Email</label>
+            <p style="margin: 4px 0 0 0; font-weight: 500;" id="mentor-email">—</p>
+          </div>
+          <div class="col-md-6">
+            <label style="font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px;">Телефон</label>
+            <p style="margin: 4px 0 0 0; font-weight: 500;" id="mentor-phone">—</p>
+          </div>
+        </div>
+        <hr style="margin: 20px 0;">
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <a href="#schedule-meeting" class="btn btn-primary" style="border-radius: 8px;">
+            <i class="bi bi-calendar-plus"></i> Записаться на встречу
+          </a>
+          <a href="#send-message" class="btn btn-outline-secondary" style="border-radius: 8px;">
+            <i class="bi bi-chat-dots"></i> Написать сообщение
+          </a>
+        </div>
+      </div>
+
+      <!-- График встреч -->
+      <div class="card mb-4" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px;">
+        <h5 style="margin-bottom: 16px;"><i class="bi bi-calendar3" style="color: #0078d4;"></i> Запланированные встречи</h5>
+        <div id="meetings-list">
+          <div style="text-align: center; padding: 32px; color: #aaa;">
+            <i class="bi bi-calendar-x" style="font-size: 2rem; display: block; margin-bottom: 8px;"></i>
+            <p style="margin: 0;">Запланированных встреч нет</p>
+          </div>
+        </div>
+        <button class="btn btn-outline-primary btn-sm mt-2" style="border-radius: 8px;" id="schedule-meeting">
+          <i class="bi bi-plus-circle"></i> Запросить встречу
+        </button>
+      </div>
+
+      <!-- Форма сообщения -->
+      <div class="card" id="send-message" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px;">
+        <h5 style="margin-bottom: 16px;"><i class="bi bi-chat-dots" style="color: #0078d4;"></i> Написать наставнику</h5>
+        <div class="mb-3">
+          <label class="form-label">Тема</label>
+          <input type="text" class="form-control" placeholder="Укажите тему сообщения" style="border-radius: 8px;">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Сообщение</label>
+          <textarea class="form-control" rows="4" placeholder="Напишите ваш вопрос или сообщение..." style="border-radius: 8px;"></textarea>
+        </div>
+        <button class="btn btn-primary" style="border-radius: 8px;">
+          <i class="bi bi-send"></i> Отправить
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>

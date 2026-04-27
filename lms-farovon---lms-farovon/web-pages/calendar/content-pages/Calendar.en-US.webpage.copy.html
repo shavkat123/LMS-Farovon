@@ -1,0 +1,130 @@
+<div class="row sectionBlockLayout" style="display: flex; flex-wrap: wrap; padding: 8px; margin: 0px;">
+  <div class="container" style="display: flex; flex-wrap: wrap;">
+    <div class="col-lg-12 columnBlockLayout" style="flex-grow: 1; min-width: 300px; display: flex; flex-direction: column;">
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+        <h2 style="margin: 0;">Календарь</h2>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-sm btn-outline-secondary" id="cal-prev" style="border-radius: 8px;"><i class="bi bi-chevron-left"></i></button>
+          <span id="cal-month-label" style="font-weight: 600; font-size: 16px; min-width: 160px; text-align: center; line-height: 32px;"></span>
+          <button class="btn btn-sm btn-outline-secondary" id="cal-next" style="border-radius: 8px;"><i class="bi bi-chevron-right"></i></button>
+        </div>
+      </div>
+
+      <!-- Легенда -->
+      <div style="display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; font-size: 13px;">
+        <span><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:#0078d4; margin-right:6px;"></span>Мероприятие</span>
+        <span><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:#27ae60; margin-right:6px;"></span>Встреча</span>
+        <span><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:#e67e22; margin-right:6px;"></span>Дедлайн</span>
+      </div>
+
+      <!-- Сетка календаря -->
+      <div class="card" style="border-radius: 12px; border: 1px solid #e1e4e8; overflow: hidden; margin-bottom: 24px;">
+        <div id="cal-grid" style="display: grid; grid-template-columns: repeat(7, 1fr);">
+          <div style="padding: 8px; text-align: center; font-size: 12px; font-weight: 600; color: #888; background: #f8f9fa; border-bottom: 1px solid #e1e4e8;">Пн</div>
+          <div style="padding: 8px; text-align: center; font-size: 12px; font-weight: 600; color: #888; background: #f8f9fa; border-bottom: 1px solid #e1e4e8;">Вт</div>
+          <div style="padding: 8px; text-align: center; font-size: 12px; font-weight: 600; color: #888; background: #f8f9fa; border-bottom: 1px solid #e1e4e8;">Ср</div>
+          <div style="padding: 8px; text-align: center; font-size: 12px; font-weight: 600; color: #888; background: #f8f9fa; border-bottom: 1px solid #e1e4e8;">Чт</div>
+          <div style="padding: 8px; text-align: center; font-size: 12px; font-weight: 600; color: #888; background: #f8f9fa; border-bottom: 1px solid #e1e4e8;">Пт</div>
+          <div style="padding: 8px; text-align: center; font-size: 12px; font-weight: 600; color: #e74c3c; background: #f8f9fa; border-bottom: 1px solid #e1e4e8;">Сб</div>
+          <div style="padding: 8px; text-align: center; font-size: 12px; font-weight: 600; color: #e74c3c; background: #f8f9fa; border-bottom: 1px solid #e1e4e8;">Вс</div>
+        </div>
+        <div id="cal-days" style="display: grid; grid-template-columns: repeat(7, 1fr);"></div>
+      </div>
+
+      <!-- Ближайшие события -->
+      <h5 style="margin-bottom: 16px;">Ближайшие события</h5>
+      <div id="upcoming-events">
+        <div class="card mb-3" style="border-radius: 12px; border-left: 4px solid #0078d4; border-top: 1px solid #e1e4e8; border-right: 1px solid #e1e4e8; border-bottom: 1px solid #e1e4e8; padding: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <strong>Встреча с наставником</strong>
+              <p style="font-size: 13px; color: #666; margin: 4px 0 0 0;">Первая встреча, знакомство и постановка целей на период адаптации</p>
+            </div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <span class="badge" style="background: #e8f4fd; color: #0078d4; border-radius: 20px;">16 апр 2026</span><br>
+              <small style="color: #888; font-size: 11px;">10:00 – 11:00</small>
+            </div>
+          </div>
+        </div>
+        <div class="card mb-3" style="border-radius: 12px; border-left: 4px solid #e67e22; border-top: 1px solid #e1e4e8; border-right: 1px solid #e1e4e8; border-bottom: 1px solid #e1e4e8; padding: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <strong>Сдача проверочного теста</strong>
+              <p style="font-size: 13px; color: #666; margin: 4px 0 0 0;">Тест по разделу «О компании» — проходной балл 75%</p>
+            </div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <span class="badge" style="background: #fff3e0; color: #e67e22; border-radius: 20px;">18 апр 2026</span><br>
+              <small style="color: #888; font-size: 11px;">До конца дня</small>
+            </div>
+          </div>
+        </div>
+        <div class="card mb-3" style="border-radius: 12px; border-left: 4px solid #27ae60; border-top: 1px solid #e1e4e8; border-right: 1px solid #e1e4e8; border-bottom: 1px solid #e1e4e8; padding: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <strong>Корпоративный тимбилдинг</strong>
+              <p style="font-size: 13px; color: #666; margin: 4px 0 0 0;">Командный выезд, участие для всех сотрудников</p>
+            </div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <span class="badge" style="background: #e8f5e9; color: #27ae60; border-radius: 20px;">26 апр 2026</span><br>
+              <small style="color: #888; font-size: 11px;">09:00 – 18:00</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var events = {
+    '2026-04-16': { label: 'Встреча с наставником', color: '#0078d4' },
+    '2026-04-18': { label: 'Тест «О компании»', color: '#e67e22' },
+    '2026-04-26': { label: 'Тимбилдинг', color: '#27ae60' }
+  };
+
+  var cur = new Date(2026, 3, 1);
+  var months = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+  function render() {
+    document.getElementById('cal-month-label').textContent = months[cur.getMonth()] + ' ' + cur.getFullYear();
+    var grid = document.getElementById('cal-days');
+    grid.innerHTML = '';
+    var first = new Date(cur.getFullYear(), cur.getMonth(), 1);
+    var startDay = (first.getDay() + 6) % 7; // Mon=0
+    var daysInMonth = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate();
+    var today = new Date();
+
+    for (var i = 0; i < startDay; i++) {
+      var blank = document.createElement('div');
+      blank.style.cssText = 'border: 1px solid #f0f0f0; min-height: 48px;';
+      grid.appendChild(blank);
+    }
+    for (var d = 1; d <= daysInMonth; d++) {
+      var key = cur.getFullYear() + '-' + String(cur.getMonth()+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      var isToday = (d === today.getDate() && cur.getMonth() === today.getMonth() && cur.getFullYear() === today.getFullYear());
+      var ev = events[key];
+      var cell = document.createElement('div');
+      cell.style.cssText = 'border: 1px solid #f0f0f0; min-height: 48px; padding: 6px; position: relative;' + (isToday ? 'background:#e8f4fd;' : '');
+      cell.innerHTML = '<div style="font-size:13px; font-weight:' + (isToday?'700':'400') + '; color:' + (isToday?'#0078d4':'#333') + ';">' + d + '</div>';
+      if (ev) {
+        cell.innerHTML += '<div style="font-size:10px; background:' + ev.color + '; color:#fff; border-radius:4px; padding:2px 4px; margin-top:2px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">' + ev.label + '</div>';
+      }
+      grid.appendChild(cell);
+    }
+  }
+
+  document.getElementById('cal-prev').addEventListener('click', function() {
+    cur = new Date(cur.getFullYear(), cur.getMonth() - 1, 1);
+    render();
+  });
+  document.getElementById('cal-next').addEventListener('click', function() {
+    cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+    render();
+  });
+
+  render();
+})();
+</script>

@@ -1,0 +1,60 @@
+- adx_name: Grant Change to Content
+  adx_right: 1
+  adx_scope: 1
+  adx_webpageaccesscontrolruleid: 145fe5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_name: Restrict Read on Home
+  adx_right: 2
+  adx_scope: 2
+  adx_webpageaccesscontrolrule_webrole:
+  - 3b5fe5f3-a538-f111-88b5-7ced8d76b3cc
+  - e330e0ff-a538-f111-88b5-7ced8d76b3cc
+  adx_webpageaccesscontrolruleid: 1c06e5ed-a538-f111-88b5-7ced8d76b3cc
+  adx_webpageid: a060e5f3-a538-f111-88b5-7ced8d76b3cc
+  statecode: 1
+  statuscode: 2
+- adx_name: Grant Change to Administrators
+  adx_right: 1
+  adx_scope: 1
+  adx_webpageaccesscontrolrule_webrole:
+  - 3b5fe5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_webpageaccesscontrolruleid: 1f60e5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_webpageid: a060e5f3-a538-f111-88b5-7ced8d76b3cc
+  statecode: 1
+  statuscode: 2
+- adx_name: Restrict Read on Duplicate Course
+  adx_right: 2
+  adx_scope: 1
+  adx_webpageaccesscontrolrule_webrole:
+  - e330e0ff-a538-f111-88b5-7ced8d76b3cc
+  adx_webpageaccesscontrolruleid: 79cfddf9-a538-f111-88b5-7ced8d76b3cc
+  adx_webpageid: 66cfddf9-a538-f111-88b5-7ced8d76b3cc
+- adx_name: Restrict Read on C1 Courses Home
+  adx_right: 2
+  adx_scope: 1
+  adx_webpageaccesscontrolrule_webrole:
+  - 2ccfddf9-a538-f111-88b5-7ced8d76b3cc
+  - 3b5fe5f3-a538-f111-88b5-7ced8d76b3cc
+  - e330e0ff-a538-f111-88b5-7ced8d76b3cc
+  adx_webpageaccesscontrolruleid: c25fe5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_webpageid: 2a5fe5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_name: Restrict Read on My Registrations
+  adx_right: 2
+  adx_scope: 1
+  adx_webpageaccesscontrolrule_webrole:
+  - 2ccfddf9-a538-f111-88b5-7ced8d76b3cc
+  adx_webpageaccesscontrolruleid: d060e5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_webpageid: ba60e5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_name: Restrict Read on Edit Course
+  adx_right: 2
+  adx_scope: 1
+  adx_webpageaccesscontrolrule_webrole:
+  - e330e0ff-a538-f111-88b5-7ced8d76b3cc
+  adx_webpageaccesscontrolruleid: ec5ee5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_webpageid: 4a60e5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_name: Restrict Read on Create Course
+  adx_right: 2
+  adx_scope: 1
+  adx_webpageaccesscontrolrule_webrole:
+  - e330e0ff-a538-f111-88b5-7ced8d76b3cc
+  adx_webpageaccesscontrolruleid: f35fe5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_webpageid: d805e5ed-a538-f111-88b5-7ced8d76b3cc

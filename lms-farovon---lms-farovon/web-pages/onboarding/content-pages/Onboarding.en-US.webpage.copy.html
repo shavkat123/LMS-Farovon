@@ -1,0 +1,79 @@
+<div class="row sectionBlockLayout" style="display: flex; flex-wrap: wrap; padding: 8px; margin: 0px; text-align: center; min-height: 150px;">
+  <div class="container" style="display: flex; flex-wrap: wrap;">
+    <div class="col-lg-12 columnBlockLayout" style="flex-grow: 1; min-width: 300px; display: flex; flex-direction: column; align-items: center;">
+      <h2>Добро пожаловать в команду компании Фаровон!</h2>
+      <p>Мы очень рады приветствовать вас в нашей организации и с нетерпением ждем возможности работать с вами.</p>
+    </div>
+  </div>
+</div>
+<div class="row sectionBlockLayout" style="display: flex; flex-wrap: wrap; padding: 8px; margin: 0px;">
+  <div class="container" style="display: flex; flex-wrap: wrap;">
+    <div class="col-lg-12 columnBlockLayout" style="flex-grow: 1; min-width: 300px; display: flex; flex-direction: column;">
+      <div id="onboarding-steps">
+        <div id="step-1" class="onboarding-step">
+          <h3>Шаг 1. Приветствие</h3>
+          <p>Добро пожаловать в компанию "Фаровон"! Мы рады видеть вас в нашей команде.</p>
+          <button class="btn btn-primary" id="btn-step-1">Продолжить</button>
+        </div>
+        <div id="step-2" class="onboarding-step" style="display:none;">
+          <h3>Шаг 2. Проверка документов</h3>
+          <p>Сегодня вы должны были взять с собой определенные документы. Проверьте по чек-листу, всё ли у вас есть:</p>
+          <ul style="list-style: none; padding: 0;">
+            <li><label><input type="checkbox"> Паспорт (оригинал)</label></li>
+            <li><label><input type="checkbox"> ИНН (копия)</label></li>
+            <li><label><input type="checkbox"> Медицинская книжка и справка № 38 (оригинал)</label></li>
+            <li><label><input type="checkbox"> Диплом или справка с места обучения (копия)</label></li>
+            <li><label><input type="checkbox"> Фотографии 3x4 см (4 шт.)</label></li>
+            <li><label><input type="checkbox"> Справка с место жительства (оригинал)</label></li>
+            <li><label><input type="checkbox"> ИТС (справка о несудимости)</label></li>
+          </ul>
+          <button class="btn btn-primary" id="btn-step-2">Продолжить</button>
+        </div>
+        <div id="step-3" class="onboarding-step" style="display:none;">
+          <h3>Шаг 3. Визит в отдел кадров</h3>
+          <p>Подойдите к кабинету отдела кадров, предоставьте документы, подпишите договор. Затем пришлите фото договора нам.</p>
+          <input type="file" id="contract-photo" accept="image/*" class="form-control" style="margin-bottom: 10px;">
+          <button class="btn btn-primary" id="btn-step-3">Продолжить</button>
+        </div>
+        <div id="step-4" class="onboarding-step" style="display:none;">
+          <h3>Шаг 4. Инструктаж по технике безопасности</h3>
+          <p>Пройдите к кабинету ТБ (техника безопасности) для прохождения инструктажа. Сфотографируйтесь с Инженером ТБ и отправьте нам фото.</p>
+          <input type="file" id="tb-photo" accept="image/*" class="form-control" style="margin-bottom: 10px;">
+          <button class="btn btn-primary" id="btn-step-4">Продолжить</button>
+        </div>
+        <div id="step-5" class="onboarding-step" style="display:none;">
+          <h3>Шаг 5. Подписка на Telegram-канал</h3>
+          <p>Если у Вас есть Telegram, подпишитесь на наш канал "Farovon's life" — здесь вы найдете все новости, события и активности нашей компании.</p>
+          <a href="#" target="_blank" class="btn btn-outline-primary" style="margin-bottom: 10px;">Открыть канал Farovon's life</a>
+          <br>
+          <button class="btn btn-primary" id="btn-step-5">Продолжить</button>
+        </div>
+        <div id="step-6" class="onboarding-step" style="display:none;">
+          <h3>Шаг 6. О компании</h3>
+          <p>Ознакомьтесь с информацией о миссии, видении, ценностях, руководстве и корпоративной этике компании "Фаровон".</p>
+          <button class="btn btn-primary" id="btn-step-6">Продолжить</button>
+        </div>
+        <div id="step-7" class="onboarding-step" style="display:none;">
+          <h3>Шаг 7. Проверочный тест</h3>
+          <p>Пройдите короткий тест по изученной информации о компании. Проходной балл — 75%.</p>
+          <button class="btn btn-primary" id="btn-step-7">Начать тест</button>
+        </div>
+        <div id="step-8" class="onboarding-step" style="display:none;">
+          <h3>Поздравляем!</h3>
+          <p>Вы успешно ознакомились с основной информацией о компании "Фаровон". Добро пожаловать в большую семью!</p>
+          <a href="/my-adaptation" class="btn btn-success">Перейти к моей адаптации</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  document.querySelectorAll('[id^="btn-step-"]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var currentStep = parseInt(this.id.replace('btn-step-', ''));
+      document.getElementById('step-' + currentStep).style.display = 'none';
+      var nextStep = document.getElementById('step-' + (currentStep + 1));
+      if (nextStep) nextStep.style.display = 'block';
+    });
+  });
+</script>

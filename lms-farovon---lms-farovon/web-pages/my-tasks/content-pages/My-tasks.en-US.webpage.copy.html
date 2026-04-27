@@ -1,0 +1,146 @@
+<div class="row sectionBlockLayout" style="display: flex; flex-wrap: wrap; padding: 8px; margin: 0px;">
+  <div class="container" style="display: flex; flex-wrap: wrap;">
+    <div class="col-lg-12 columnBlockLayout" style="flex-grow: 1; min-width: 300px; display: flex; flex-direction: column;">
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+        <h2 style="margin: 0;">Мои задания</h2>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-sm btn-outline-secondary filter-btn active" data-filter="all" style="border-radius: 20px;">Все</button>
+          <button class="btn btn-sm btn-outline-secondary filter-btn" data-filter="todo" style="border-radius: 20px;">К выполнению</button>
+          <button class="btn btn-sm btn-outline-secondary filter-btn" data-filter="inprogress" style="border-radius: 20px;">В работе</button>
+          <button class="btn btn-sm btn-outline-secondary filter-btn" data-filter="done" style="border-radius: 20px;">Выполнено</button>
+        </div>
+      </div>
+
+      <!-- Прогресс -->
+      <div class="card mb-4" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 14px; color: #444;">Выполнено заданий</span>
+          <span style="font-size: 14px; font-weight: 600; color: #0078d4;" id="tasks-progress-label">0 / 0</span>
+        </div>
+        <div class="progress" style="height: 8px; border-radius: 6px;">
+          <div class="progress-bar bg-success" id="tasks-progress-bar" style="width: 0%; border-radius: 6px;" role="progressbar"></div>
+        </div>
+      </div>
+
+      <!-- Список задач -->
+      <div id="tasks-list">
+
+        <div class="task-item card mb-3" data-status="todo" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 16px;">
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <input type="checkbox" class="form-check-input task-check mt-1" style="width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;">
+            <div style="flex: 1;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
+                <strong class="task-title">Пройти вводный инструктаж</strong>
+                <span class="badge bg-warning text-dark" style="border-radius: 20px; font-size: 11px;">День 1</span>
+              </div>
+              <p style="font-size: 13px; color: #666; margin: 6px 0 0 0;">Посетить отдел ТБ и пройти обязательный инструктаж по технике безопасности.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="task-item card mb-3" data-status="todo" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 16px;">
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <input type="checkbox" class="form-check-input task-check mt-1" style="width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;">
+            <div style="flex: 1;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
+                <strong class="task-title">Ознакомиться с корпоративными ценностями</strong>
+                <span class="badge bg-warning text-dark" style="border-radius: 20px; font-size: 11px;">День 1–3</span>
+              </div>
+              <p style="font-size: 13px; color: #666; margin: 6px 0 0 0;">Прочитать раздел «О компании» и пройти проверочный тест.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="task-item card mb-3" data-status="todo" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 16px;">
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <input type="checkbox" class="form-check-input task-check mt-1" style="width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;">
+            <div style="flex: 1;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
+                <strong class="task-title">Познакомиться с наставником</strong>
+                <span class="badge bg-info text-white" style="border-radius: 20px; font-size: 11px;">День 1</span>
+              </div>
+              <p style="font-size: 13px; color: #666; margin: 6px 0 0 0;">Открыть раздел «Мой наставник» и запросить первую встречу.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="task-item card mb-3" data-status="todo" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 16px;">
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <input type="checkbox" class="form-check-input task-check mt-1" style="width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;">
+            <div style="flex: 1;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
+                <strong class="task-title">Подписаться на Telegram-канал</strong>
+                <span class="badge bg-warning text-dark" style="border-radius: 20px; font-size: 11px;">До конца недели</span>
+              </div>
+              <p style="font-size: 13px; color: #666; margin: 6px 0 0 0;">Подписаться на корпоративный канал «Farovon's life».</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="task-item card mb-3" data-status="todo" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 16px;">
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <input type="checkbox" class="form-check-input task-check mt-1" style="width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;">
+            <div style="flex: 1;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
+                <strong class="task-title">Изучить базу знаний</strong>
+                <span class="badge bg-secondary" style="border-radius: 20px; font-size: 11px;">1-я неделя</span>
+              </div>
+              <p style="font-size: 13px; color: #666; margin: 6px 0 0 0;">Ознакомиться с ключевыми регламентами и инструкциями в базе знаний.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  function updateProgress() {
+    var all = document.querySelectorAll('.task-check');
+    var done = document.querySelectorAll('.task-check:checked');
+    var pct = all.length ? Math.round(done.length / all.length * 100) : 0;
+    var bar = document.getElementById('tasks-progress-bar');
+    var lbl = document.getElementById('tasks-progress-label');
+    if (bar) bar.style.width = pct + '%';
+    if (lbl) lbl.textContent = done.length + ' / ' + all.length;
+  }
+
+  document.querySelectorAll('.task-check').forEach(function(cb) {
+    cb.addEventListener('change', function() {
+      var card = this.closest('.task-item');
+      var title = card.querySelector('.task-title');
+      if (this.checked) {
+        card.style.opacity = '0.6';
+        if (title) title.style.textDecoration = 'line-through';
+      } else {
+        card.style.opacity = '1';
+        if (title) title.style.textDecoration = 'none';
+      }
+      updateProgress();
+    });
+  });
+
+  document.querySelectorAll('.filter-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+      this.classList.add('active');
+      var filter = this.dataset.filter;
+      document.querySelectorAll('.task-item').forEach(function(item) {
+        if (filter === 'all') {
+          item.style.display = '';
+        } else if (filter === 'done') {
+          item.style.display = item.querySelector('.task-check:checked') ? '' : 'none';
+        } else {
+          item.style.display = !item.querySelector('.task-check:checked') ? '' : 'none';
+        }
+      });
+    });
+  });
+
+  updateProgress();
+})();
+</script>

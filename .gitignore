@@ -1,0 +1,17 @@
+# Claude Code local state
+.claude/
+
+# OS / editor
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
+
+# Node (на случай вспомогательных скриптов)
+node_modules/
+
+# Power Pages / Power Platform — локальные кэши и временные файлы
+.pac/
+*.log
+*.bak
+*.tmp

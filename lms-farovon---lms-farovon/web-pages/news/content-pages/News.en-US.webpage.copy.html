@@ -1,0 +1,98 @@
+<div class="row sectionBlockLayout" style="display: flex; flex-wrap: wrap; padding: 8px; margin: 0px;">
+  <div class="container" style="display: flex; flex-wrap: wrap;">
+    <div class="col-lg-12 columnBlockLayout" style="flex-grow: 1; min-width: 300px; display: flex; flex-direction: column;">
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+        <h2 style="margin: 0;">Новости</h2>
+        <div class="input-group" style="max-width: 280px;">
+          <span class="input-group-text" style="border-radius: 8px 0 0 8px; background: #f8f9fa; border-color: #dee2e6;">
+            <i class="bi bi-search" style="color: #888;"></i>
+          </span>
+          <input type="text" class="form-control" id="news-search" placeholder="Поиск новостей..." style="border-radius: 0 8px 8px 0;">
+        </div>
+      </div>
+
+      <!-- Теги -->
+      <div style="display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap;">
+        <button class="btn btn-sm btn-primary news-tag active" data-tag="all" style="border-radius: 20px;">Все</button>
+        <button class="btn btn-sm btn-outline-secondary news-tag" data-tag="company" style="border-radius: 20px;">Компания</button>
+        <button class="btn btn-sm btn-outline-secondary news-tag" data-tag="hr" style="border-radius: 20px;">HR</button>
+        <button class="btn btn-sm btn-outline-secondary news-tag" data-tag="events" style="border-radius: 20px;">Мероприятия</button>
+      </div>
+
+      <!-- Список новостей -->
+      <div id="news-list">
+
+        <div class="card mb-3 news-item" data-tag="hr" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px; cursor: pointer; transition: box-shadow 0.15s;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+            <span class="badge" style="background: #e8f4fd; color: #0078d4; border-radius: 20px; font-size: 11px; padding: 4px 10px;">HR</span>
+            <span style="font-size: 12px; color: #888;">15 апреля 2026</span>
+          </div>
+          <h5 style="margin-bottom: 8px;">Добро пожаловать в команду Фаровон!</h5>
+          <p style="font-size: 14px; color: #555; margin: 0;">Рады приветствовать новых сотрудников, присоединившихся к нашей команде в этом месяце. Ознакомьтесь с программой адаптации и не стесняйтесь задавать вопросы своему наставнику.</p>
+        </div>
+
+        <div class="card mb-3 news-item" data-tag="company" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px; cursor: pointer; transition: box-shadow 0.15s;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+            <span class="badge" style="background: #f0fff4; color: #27ae60; border-radius: 20px; font-size: 11px; padding: 4px 10px;">Компания</span>
+            <span style="font-size: 12px; color: #888;">10 апреля 2026</span>
+          </div>
+          <h5 style="margin-bottom: 8px;">Итоги первого квартала 2026</h5>
+          <p style="font-size: 14px; color: #555; margin: 0;">Компания успешно завершила первый квартал. Подробные итоги и планы на следующий период — в этом материале.</p>
+        </div>
+
+        <div class="card mb-3 news-item" data-tag="events" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px; cursor: pointer; transition: box-shadow 0.15s;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+            <span class="badge" style="background: #fff3e0; color: #e67e22; border-radius: 20px; font-size: 11px; padding: 4px 10px;">Мероприятия</span>
+            <span style="font-size: 12px; color: #888;">5 апреля 2026</span>
+          </div>
+          <h5 style="margin-bottom: 8px;">Корпоративный тимбилдинг — апрель 2026</h5>
+          <p style="font-size: 14px; color: #555; margin: 0;">В конце апреля состоится командный выезд. Регистрация открыта в разделе «Календарь».</p>
+        </div>
+
+        <div class="card mb-3 news-item" data-tag="hr" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px; cursor: pointer; transition: box-shadow 0.15s;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+            <span class="badge" style="background: #e8f4fd; color: #0078d4; border-radius: 20px; font-size: 11px; padding: 4px 10px;">HR</span>
+            <span style="font-size: 12px; color: #888;">1 апреля 2026</span>
+          </div>
+          <h5 style="margin-bottom: 8px;">Обновлена программа баллов и поощрений</h5>
+          <p style="font-size: 14px; color: #555; margin: 0;">В разделе «Магазин» теперь доступны новые категории товаров. Зарабатывайте баллы и обменивайте их на подарки!</p>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  document.querySelectorAll('.news-item').forEach(function(item) {
+    item.addEventListener('mouseover', function() { this.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; });
+    item.addEventListener('mouseout', function() { this.style.boxShadow = ''; });
+  });
+
+  function filterNews(tag, query) {
+    document.querySelectorAll('.news-item').forEach(function(item) {
+      var tagMatch = tag === 'all' || item.dataset.tag === tag;
+      var textMatch = !query || item.textContent.toLowerCase().includes(query.toLowerCase());
+      item.style.display = (tagMatch && textMatch) ? '' : 'none';
+    });
+  }
+
+  document.querySelectorAll('.news-tag').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.news-tag').forEach(function(b) {
+        b.classList.remove('btn-primary', 'active'); b.classList.add('btn-outline-secondary');
+      });
+      this.classList.add('btn-primary', 'active'); this.classList.remove('btn-outline-secondary');
+      filterNews(this.dataset.tag, document.getElementById('news-search').value);
+    });
+  });
+
+  document.getElementById('news-search').addEventListener('input', function() {
+    var activeTag = document.querySelector('.news-tag.active');
+    filterNews(activeTag ? activeTag.dataset.tag : 'all', this.value);
+  });
+})();
+</script>

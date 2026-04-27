@@ -1,0 +1,34 @@
+{% assign nav = weblinks["User Portal Navigation"] %}
+{% if nav %}
+<nav class="user-portal-sidebar" aria-label="Навигация сотрудника">
+  <ul class="nav flex-column user-portal-nav" style="list-style:none; padding:0; margin:0;">
+
+    {% assign icons = "person-check,newspaper,building,list-task,calendar3,person-video2,journal-bookmark,telephone-inbound,chat-dots,shop" | split: "," %}
+
+    {% for link in nav.weblinks %}
+    {% assign icon = icons[forloop.index0] %}
+    {% assign is_active = false %}
+    {% if page.url == link.url %}
+      {% assign is_active = true %}
+    {% endif %}
+
+    <li class="nav-item" style="margin-bottom: 2px;">
+      <a href="{{ link.url | escape }}"
+         class="nav-link d-flex align-items-center gap-2{% if is_active %} active{% endif %}"
+         aria-label="{{ link.name | escape }}"
+         {% if link.open_in_new_window %}target="_blank"{% endif %}
+         style="border-radius: 8px; padding: 10px 16px; color: {% if is_active %}#fff{% else %}#344054{% endif %}; background: {% if is_active %}#0078d4{% else %}transparent{% endif %}; font-weight: {% if is_active %}600{% else %}400{% endif %}; transition: background 0.15s;">
+        <i class="bi bi-{{ icon }}" aria-hidden="true" style="font-size: 1.1rem; min-width: 20px;"></i>
+        <span>{{ link.name | escape }}</span>
+      </a>
+    </li>
+    {% endfor %}
+
+  </ul>
+</nav>
+<style>
+  .user-portal-sidebar .nav-link:hover {
+    background: #f0f4ff !important;
+    color: #0078d4 !important;
+  }
+</style>

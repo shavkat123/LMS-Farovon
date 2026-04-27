@@ -1,0 +1,221 @@
+<div class="row sectionBlockLayout" style="display: flex; flex-wrap: wrap; padding: 8px; margin: 0px;">
+  <div class="container" style="display: flex; flex-wrap: wrap;">
+    <div class="col-lg-12 columnBlockLayout" style="flex-grow: 1; min-width: 300px; display: flex; flex-direction: column;">
+
+      <h2 style="margin-bottom: 8px;">Настройки</h2>
+      <p style="color: #666; margin-bottom: 24px;">Системные настройки платформы — только для Администраторов и HR</p>
+
+      <div class="row g-4">
+
+        <!-- Левая навигация настроек -->
+        <div class="col-lg-3">
+          <div class="list-group" style="border-radius: 12px; overflow: hidden;">
+            <button type="button" class="list-group-item list-group-item-action active settings-nav" data-target="general" style="border: none; text-align: left;">
+              <i class="bi bi-gear" style="margin-right: 8px;"></i> Общие
+            </button>
+            <button type="button" class="list-group-item list-group-item-action settings-nav" data-target="roles" style="border: none; text-align: left;">
+              <i class="bi bi-shield-lock" style="margin-right: 8px;"></i> Роли и доступы
+            </button>
+            <button type="button" class="list-group-item list-group-item-action settings-nav" data-target="notifications" style="border: none; text-align: left;">
+              <i class="bi bi-bell" style="margin-right: 8px;"></i> Уведомления
+            </button>
+            <button type="button" class="list-group-item list-group-item-action settings-nav" data-target="shop" style="border: none; text-align: left;">
+              <i class="bi bi-shop" style="margin-right: 8px;"></i> Магазин
+            </button>
+            <button type="button" class="list-group-item list-group-item-action settings-nav" data-target="audit" style="border: none; text-align: left;">
+              <i class="bi bi-journal-text" style="margin-right: 8px;"></i> Журнал аудита
+            </button>
+          </div>
+        </div>
+
+        <!-- Правая панель -->
+        <div class="col-lg-9">
+
+          <!-- Общие -->
+          <div class="settings-panel" id="panel-general">
+            <div class="card" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 24px;">
+              <h5 style="margin-bottom: 20px;">Общие настройки</h5>
+              <div class="mb-4">
+                <label class="form-label fw-semibold">Название платформы</label>
+                <input type="text" class="form-control" value="LMS Farovon" style="border-radius: 8px; max-width: 400px;">
+              </div>
+              <div class="mb-4">
+                <label class="form-label fw-semibold">Язык по умолчанию</label>
+                <select class="form-select" style="border-radius: 8px; max-width: 200px;">
+                  <option selected>Русский</option>
+                  <option>Узбекский</option>
+                  <option>English</option>
+                </select>
+              </div>
+              <div class="mb-4">
+                <label class="form-label fw-semibold">Длительность адаптации (дней по умолчанию)</label>
+                <input type="number" class="form-control" value="30" min="1" max="365" style="border-radius: 8px; max-width: 120px;">
+              </div>
+              <div class="mb-4">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="enable-shop" checked>
+                  <label class="form-check-label" for="enable-shop">Включить магазин баллов</label>
+                </div>
+              </div>
+              <div class="mb-4">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="enable-feedback" checked>
+                  <label class="form-check-label" for="enable-feedback">Включить обратную связь</label>
+                </div>
+              </div>
+              <button type="button" class="btn btn-primary" style="border-radius: 8px;">Сохранить</button>
+            </div>
+          </div>
+
+          <!-- Роли и доступы -->
+          <div class="settings-panel" id="panel-roles" style="display: none;">
+            <div class="card" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 24px;">
+              <h5 style="margin-bottom: 20px;">Роли и права доступа</h5>
+              <div class="table-responsive">
+                <table class="table align-middle">
+                  <thead style="background: #f8f9fa;">
+                    <tr>
+                      <th>Роль</th>
+                      <th>Портал сотрудника</th>
+                      <th>CMS-панель</th>
+                      <th>Управление пользователями</th>
+                      <th>Настройки</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><span class="badge" style="background:#e8f4fd;color:#0078d4;border-radius:20px;">Новый сотрудник</span></td>
+                      <td><i class="bi bi-check-circle-fill text-success"></i></td>
+                      <td><i class="bi bi-x-circle text-danger"></i></td>
+                      <td><i class="bi bi-x-circle text-danger"></i></td>
+                      <td><i class="bi bi-x-circle text-danger"></i></td>
+                    </tr>
+                    <tr>
+                      <td><span class="badge" style="background:#e8f5e9;color:#27ae60;border-radius:20px;">Наставник</span></td>
+                      <td><i class="bi bi-check-circle-fill text-success"></i></td>
+                      <td><i class="bi bi-check-circle-fill text-success"></i></td>
+                      <td><i class="bi bi-x-circle text-danger"></i></td>
+                      <td><i class="bi bi-x-circle text-danger"></i></td>
+                    </tr>
+                    <tr>
+                      <td><span class="badge" style="background:#fff3e0;color:#e67e22;border-radius:20px;">Руководитель</span></td>
+                      <td><i class="bi bi-check-circle-fill text-success"></i></td>
+                      <td><i class="bi bi-check-circle-fill text-success"></i></td>
+                      <td><i class="bi bi-check-circle-fill text-success"></i></td>
+                      <td><i class="bi bi-x-circle text-danger"></i></td>
+                    </tr>
+                    <tr>
+                      <td><span class="badge" style="background:#fce4ec;color:#e74c3c;border-radius:20px;">HR</span></td>
+                      <td><i class="bi bi-check-circle-fill text-success"></i></td>
+                      <td><i class="bi bi-check-circle-fill text-success"></i></td>
+                      <td><i class="bi bi-check-circle-fill text-success"></i></td>
+                      <td><i class="bi bi-check-circle-fill text-success"></i></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Уведомления -->
+          <div class="settings-panel" id="panel-notifications" style="display: none;">
+            <div class="card" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 24px;">
+              <h5 style="margin-bottom: 20px;">Настройки уведомлений</h5>
+              <div class="mb-3">
+                <div class="form-check form-switch mb-2">
+                  <input class="form-check-input" type="checkbox" id="notif-new-intern" checked>
+                  <label class="form-check-label" for="notif-new-intern">Новый стажёр зарегистрирован</label>
+                </div>
+                <div class="form-check form-switch mb-2">
+                  <input class="form-check-input" type="checkbox" id="notif-task-done" checked>
+                  <label class="form-check-label" for="notif-task-done">Задача выполнена</label>
+                </div>
+                <div class="form-check form-switch mb-2">
+                  <input class="form-check-input" type="checkbox" id="notif-feedback" checked>
+                  <label class="form-check-label" for="notif-feedback">Новое обращение (обратная связь)</label>
+                </div>
+                <div class="form-check form-switch mb-2">
+                  <input class="form-check-input" type="checkbox" id="notif-adaptation-done">
+                  <label class="form-check-label" for="notif-adaptation-done">Стажёр завершил адаптацию</label>
+                </div>
+              </div>
+              <button type="button" class="btn btn-primary" style="border-radius: 8px;">Сохранить</button>
+            </div>
+          </div>
+
+          <!-- Магазин -->
+          <div class="settings-panel" id="panel-shop" style="display: none;">
+            <div class="card" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 24px;">
+              <h5 style="margin-bottom: 20px;">Настройки магазина баллов</h5>
+              <div class="mb-4">
+                <label class="form-label fw-semibold">Баллов за выполнение задачи</label>
+                <input type="number" class="form-control" value="10" style="border-radius: 8px; max-width: 120px;">
+              </div>
+              <div class="mb-4">
+                <label class="form-label fw-semibold">Баллов за завершение адаптации</label>
+                <input type="number" class="form-control" value="100" style="border-radius: 8px; max-width: 120px;">
+              </div>
+              <div class="mb-4">
+                <label class="form-label fw-semibold">Баллов за отзыв наставника (оценка 5)</label>
+                <input type="number" class="form-control" value="50" style="border-radius: 8px; max-width: 120px;">
+              </div>
+              <button type="button" class="btn btn-primary" style="border-radius: 8px;">Сохранить</button>
+            </div>
+          </div>
+
+          <!-- Журнал аудита -->
+          <div class="settings-panel" id="panel-audit" style="display: none;">
+            <div class="card" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 24px;">
+              <h5 style="margin-bottom: 20px;">Журнал аудита</h5>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                  <thead style="background: #f8f9fa; font-size: 12px;">
+                    <tr>
+                      <th>Дата / Время</th>
+                      <th>Пользователь</th>
+                      <th>Действие</th>
+                      <th>Объект</th>
+                    </tr>
+                  </thead>
+                  <tbody style="font-size: 13px;">
+                    <tr>
+                      <td style="color: #888;">15.04.2026 14:32</td>
+                      <td>Петрова А.С. (HR)</td>
+                      <td><span class="badge bg-success" style="border-radius:20px;font-size:10px;">Создание</span></td>
+                      <td>Пользователь: Сидоров А.</td>
+                    </tr>
+                    <tr>
+                      <td style="color: #888;">15.04.2026 12:10</td>
+                      <td>Иванов И.И. (Наставник)</td>
+                      <td><span class="badge bg-primary" style="border-radius:20px;font-size:10px;">Изменение</span></td>
+                      <td>Задача: Пройти инструктаж</td>
+                    </tr>
+                    <tr>
+                      <td style="color: #888;">14.04.2026 09:55</td>
+                      <td>Петрова А.С. (HR)</td>
+                      <td><span class="badge bg-warning text-dark" style="border-radius:20px;font-size:10px;">Изменение</span></td>
+                      <td>Настройки: баллы за задачу</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.settings-nav').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.settings-nav').forEach(function(b) { b.classList.remove('active'); });
+    this.classList.add('active');
+    document.querySelectorAll('.settings-panel').forEach(function(p) { p.style.display = 'none'; });
+    var target = document.getElementById('panel-' + this.dataset.target);
+    if (target) target.style.display = 'block';
+  });
+});
+</script>

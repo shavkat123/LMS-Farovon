@@ -1,0 +1,127 @@
+<div class="row sectionBlockLayout" style="display: flex; flex-wrap: wrap; padding: 8px; margin: 0px;">
+  <div class="container" style="display: flex; flex-wrap: wrap;">
+    <div class="col-lg-12 columnBlockLayout" style="flex-grow: 1; min-width: 300px; display: flex; flex-direction: column;">
+
+      <h2 style="margin-bottom: 8px;">Обратная связь</h2>
+      <p style="color: #666; margin-bottom: 24px;">Поделитесь впечатлениями о процессе адаптации или задайте вопрос</p>
+
+      <!-- Типы обращений -->
+      <div style="display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap;">
+        <button class="btn btn-sm btn-primary fb-type active" data-type="adaptation" style="border-radius: 20px;">Адаптация</button>
+        <button class="btn btn-sm btn-outline-secondary fb-type" data-type="question" style="border-radius: 20px;">Вопрос</button>
+        <button class="btn btn-sm btn-outline-secondary fb-type" data-type="suggestion" style="border-radius: 20px;">Предложение</button>
+        <button class="btn btn-sm btn-outline-secondary fb-type" data-type="complaint" style="border-radius: 20px;">Жалоба</button>
+      </div>
+
+      <div class="row g-4">
+        <!-- Форма -->
+        <div class="col-lg-7">
+          <div class="card" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 24px;">
+            <h5 style="margin-bottom: 20px;">Новое обращение</h5>
+            <input type="hidden" id="fb-type-value" value="adaptation">
+
+            <div class="mb-3">
+              <label class="form-label">Тема <span style="color: #e74c3c;">*</span></label>
+              <input type="text" class="form-control" id="fb-subject" placeholder="Кратко опишите суть обращения" style="border-radius: 8px;">
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Сообщение <span style="color: #e74c3c;">*</span></label>
+              <textarea class="form-control" id="fb-message" rows="5" placeholder="Подробно опишите вашу ситуацию или вопрос..." style="border-radius: 8px;"></textarea>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Оценка процесса адаптации</label>
+              <div style="display: flex; gap: 8px;" id="rating-stars">
+                {% for i in (1..5) %}
+                <i class="bi bi-star rating-star" data-val="{{ i }}" style="font-size: 1.8rem; cursor: pointer; color: #ddd; transition: color 0.15s;"></i>
+                {% endfor %}
+              </div>
+              <input type="hidden" id="fb-rating" value="0">
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Анонимно?</label>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="fb-anonymous">
+                <label class="form-check-label" for="fb-anonymous">Отправить анонимно</label>
+              </div>
+            </div>
+
+            <button class="btn btn-primary" id="fb-submit" style="border-radius: 8px; width: 100%;">
+              <i class="bi bi-send"></i> Отправить обращение
+            </button>
+            <div id="fb-success" style="display: none; margin-top: 12px;" class="alert alert-success">
+              Ваше обращение отправлено! Мы ответим в ближайшее время.
+            </div>
+          </div>
+        </div>
+
+        <!-- История обращений -->
+        <div class="col-lg-5">
+          <div class="card" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 24px;">
+            <h5 style="margin-bottom: 16px;">Мои обращения</h5>
+            <div style="text-align: center; padding: 32px 0; color: #aaa;">
+              <i class="bi bi-chat-square-text" style="font-size: 2.5rem; display: block; margin-bottom: 12px;"></i>
+              <p style="margin: 0; font-size: 14px;">Обращений пока нет</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Тип обращения
+  document.querySelectorAll('.fb-type').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.fb-type').forEach(function(b) {
+        b.classList.remove('btn-primary', 'active');
+        b.classList.add('btn-outline-secondary');
+      });
+      this.classList.add('btn-primary', 'active');
+      this.classList.remove('btn-outline-secondary');
+      document.getElementById('fb-type-value').value = this.dataset.type;
+    });
+  });
+
+  // Звёздный рейтинг
+  var stars = document.querySelectorAll('.rating-star');
+  stars.forEach(function(star, idx) {
+    star.addEventListener('mouseover', function() {
+      stars.forEach(function(s, i) {
+        s.className = i <= idx ? 'bi bi-star-fill rating-star' : 'bi bi-star rating-star';
+        s.style.color = i <= idx ? '#f39c12' : '#ddd';
+      });
+    });
+    star.addEventListener('mouseout', function() {
+      var cur = parseInt(document.getElementById('fb-rating').value);
+      stars.forEach(function(s, i) {
+        s.className = i < cur ? 'bi bi-star-fill rating-star' : 'bi bi-star rating-star';
+        s.style.color = i < cur ? '#f39c12' : '#ddd';
+      });
+    });
+    star.addEventListener('click', function() {
+      document.getElementById('fb-rating').value = idx + 1;
+    });
+  });
+
+  // Отправка
+  document.getElementById('fb-submit').addEventListener('click', function() {
+    var subj = document.getElementById('fb-subject').value.trim();
+    var msg = document.getElementById('fb-message').value.trim();
+    if (!subj || !msg) {
+      alert('Пожалуйста, заполните тему и сообщение.');
+      return;
+    }
+    document.getElementById('fb-success').style.display = 'block';
+    document.getElementById('fb-subject').value = '';
+    document.getElementById('fb-message').value = '';
+    document.getElementById('fb-rating').value = '0';
+    stars.forEach(function(s) { s.className = 'bi bi-star rating-star'; s.style.color = '#ddd'; });
+  });
+})();
+</script>
