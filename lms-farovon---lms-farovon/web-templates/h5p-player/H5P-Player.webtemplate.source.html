@@ -40,8 +40,8 @@
   <div id="h5p-container-{{ contentid }}" class="h5p-container"></div>
 </div>
 
-<link rel="stylesheet" href="/h5p.css">
-<script src="/main.bundle.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/h5p-standalone@3.8.2/dist/styles/h5p.css">
+<script src="https://cdn.jsdelivr.net/npm/h5p-standalone@3.8.2/dist/main.bundle.js"></script>
 <script>
 (function() {
   var contentId = '{{ contentid }}';
@@ -69,8 +69,8 @@
     container,
     {
       h5pJsonPath: h5pContentBase,
-      frameJs: '/frame.bundle.js',
-      frameCss: '/h5p.css'
+      frameJs: 'https://cdn.jsdelivr.net/npm/h5p-standalone@3.8.2/dist/frame.bundle.js',
+      frameCss: 'https://cdn.jsdelivr.net/npm/h5p-standalone@3.8.2/dist/styles/h5p.css'
     }
   ).then(function() {
     if (window.H5P && window.H5P.externalDispatcher) {
