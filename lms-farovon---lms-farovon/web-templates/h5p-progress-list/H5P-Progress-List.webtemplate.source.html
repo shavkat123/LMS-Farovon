@@ -1,0 +1,51 @@
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Administrators' %}
+<div class="alert alert-danger">Доступ запрещён</div>
+{% else %}
+
+<h2>Прогресс по H5P урокам</h2>
+
+{% fetchxml progress %}
+<fetch top="200">
+  <entity name="new_h5pprogress">
+    <attribute name="new_name" />
+    <attribute name="new_user" />
+    <attribute name="new_h5pcontent" />
+    <attribute name="new_scorescaled" />
+    <attribute name="new_completion" />
+    <attribute name="new_success" />
+    <attribute name="new_lastupdated" />
+    <order attribute="new_lastupdated" descending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% if progress.results.entities.size > 0 %}
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Стажёр</th>
+      <th>Урок</th>
+      <th>Балл</th>
+      <th>Завершён</th>
+      <th>Успешно</th>
+      <th>Обновлено</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in progress.results.entities %}
+    <tr>
+      <td>{{ p.new_user.name }}</td>
+      <td>{{ p.new_h5pcontent.name }}</td>
+      <td>{% if p.new_scorescaled %}{{ p.new_scorescaled | times: 100 | round }}%{% else %}—{% endif %}</td>
+      <td>{% if p.new_completion %}<span class="badge bg-success">Да</span>{% else %}<span class="badge bg-secondary">Нет</span>{% endif %}</td>
+      <td>{% if p.new_success %}<span class="badge bg-success">Да</span>{% else %}<span class="badge bg-secondary">—</span>{% endif %}</td>
+      <td>{{ p.new_lastupdated | date: 'dd.MM.yyyy HH:mm' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="alert alert-info">Записей о прогрессе пока нет</div>
+{% endif %}
+
+{% endunless %}

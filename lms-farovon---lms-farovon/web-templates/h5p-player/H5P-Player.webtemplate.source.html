@@ -1,0 +1,145 @@
+{% if request.params['id'] and request.IsPreview != true %}
+{% assign contentid = request.params['id'] | xml_escape %}
+
+{% fetchxml h5pcontent %}
+<fetch top="1">
+  <entity name="new_h5pcontent">
+    <attribute name="new_name" />
+    <attribute name="new_description" />
+    <attribute name="new_h5pfile" />
+    <attribute name="new_librarytype" />
+    <attribute name="new_durationseconds" />
+    <filter type="and">
+      <condition attribute="new_h5pcontentid" operator="eq" value="{{contentid}}" />
+      <condition attribute="new_isactive" operator="eq" value="1" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% if h5pcontent.results.entities.size > 0 %}
+{% assign content = h5pcontent.results.entities[0] %}
+
+<div class="h5p-player-wrapper">
+  <h2>{{ content.new_name }}</h2>
+  {% if content.new_description %}<p class="h5p-description">{{ content.new_description }}</p>{% endif %}
+  <div id="h5p-container-{{contentid}}" class="h5p-container"></div>
+</div>
+
+<link rel="stylesheet" href="/h5p.css">
+<script src="/main.bundle.js"></script>
+<script>
+(function() {
+  var contentId = '{{contentid}}';
+  var userId = '{{ user.contactid }}';
+
+  // ============================================================
+  // TODO: РЕШИТЬ КАК ХОСТИТЬ РАСПАКОВАННЫЙ H5P-КОНТЕНТ
+  // h5p-standalone v3.8.2 требует ПАПКУ с h5p.json, content/content.json
+  // и library-зависимостями. Сам .h5p файл (ZIP) библиотека не парсит.
+  // Уже загруженный в Dataverse new_h5pfile нужно где-то распаковать.
+  //
+  // Возможные варианты:
+  //   (a) Azure Blob Storage: распаковать .h5p при upload через Power
+  //       Automate flow, выложить файлы по пути <storageUrl>/<contentId>/.
+  //       Заменить h5pContentBase ниже на Azure Blob URL.
+  //   (b) Pre-extracted web-files: вручную распаковать каждый .h5p файл
+  //       и закоммитить содержимое в lms-farovon---lms-farovon/web-files/
+  //       с виртуальной иерархией. Громоздко.
+  //   (c) Custom Power Automate HTTP endpoint: возвращает h5p.json
+  //       по запросу, на лету извлекая из .h5p в Dataverse.
+  //
+  // До решения — h5pContentBase указывает на placeholder URL,
+  // который вернёт 404, плеер покажет ошибку.
+  // ============================================================
+  var h5pContentBase = '/h5p-content/' + contentId;
+
+  if (!window.H5PStandalone) {
+    document.getElementById('h5p-container-' + contentId).innerHTML =
+      '<div class="alert alert-danger">H5PStandalone library не загружена</div>';
+    return;
+  }
+
+  var lastSentAt = 0;
+  var THROTTLE_MS = 5000;
+
+  new H5PStandalone.H5P(
+    document.getElementById('h5p-container-' + contentId),
+    {
+      h5pJsonPath: h5pContentBase,
+      frameJs: '/frame.bundle.js',
+      frameCss: '/h5p.css'
+    }
+  ).then(function() {
+    if (window.H5P && window.H5P.externalDispatcher) {
+      window.H5P.externalDispatcher.on('xAPI', function(event) {
+        var now = Date.now();
+        if (now - lastSentAt < THROTTLE_MS) return;
+        lastSentAt = now;
+        sendXAPIToWebApi(contentId, userId, event.data.statement);
+      });
+    }
+  }).catch(function(err) {
+    console.error('H5P init failed:', err);
+    document.getElementById('h5p-container-' + contentId).innerHTML =
+      '<div class="alert alert-danger">Не удалось загрузить интерактивный контент. ' +
+      'Проверьте, что распакованный H5P доступен по адресу ' + h5pContentBase + '</div>';
+  });
+
+  function sendXAPIToWebApi(contentId, userId, statement) {
+    if (!userId) return;
+    var token = document.querySelector('input[name="__RequestVerificationToken"]');
+    var headers = { 'Content-Type': 'application/json' };
+    if (token) headers['__RequestVerificationToken'] = token.value;
+
+    var body = {
+      'new_user@odata.bind': '/contacts(' + userId + ')',
+      'new_h5pcontent@odata.bind': '/new_h5pcontents(' + contentId + ')',
+      'new_name': 'xAPI ' + new Date().toISOString(),
+      'new_xapistatements': JSON.stringify(statement),
+      'new_lastupdated': new Date().toISOString()
+    };
+    if (statement.result) {
+      if (statement.result.score) {
+        body.new_scoreraw = statement.result.score.raw;
+        body.new_scoremax = statement.result.score.max;
+        body.new_scorescaled = statement.result.score.scaled;
+      }
+      if (typeof statement.result.completion !== 'undefined') {
+        body.new_completion = !!statement.result.completion;
+      }
+      if (typeof statement.result.success !== 'undefined') {
+        body.new_success = !!statement.result.success;
+      }
+      if (statement.result.duration) {
+        body.new_durationseconds = parseISODurationSeconds(statement.result.duration);
+      }
+    }
+
+    fetch('/_api/new_h5pprogresses', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(body)
+    }).then(function(r) {
+      if (!r.ok) console.warn('xAPI save failed:', r.status);
+    }).catch(function(e) {
+      console.error('xAPI save failed:', e);
+    });
+  }
+
+  function parseISODurationSeconds(iso) {
+    var m = /PT(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?/.exec(iso || '');
+    if (!m) return null;
+    var h = parseInt(m[1] || '0', 10);
+    var min = parseInt(m[2] || '0', 10);
+    var s = parseFloat(m[3] || '0');
+    return Math.round(h * 3600 + min * 60 + s);
+  }
+})();
+</script>
+{% else %}
+<div class="alert alert-warning">H5P контент не найден или не активен</div>
+{% endif %}
+{% else %}
+<div class="alert alert-info">Укажите id контента в URL: ?id=&lt;guid&gt;</div>
+{% endif %}

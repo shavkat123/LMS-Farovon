@@ -1,0 +1,19 @@
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Administrators' %}
+<div class="alert alert-danger">Доступ запрещён</div>
+{% else %}
+
+<h2>Загрузка H5P контента</h2>
+
+{% entityform name:'H5P Upload Form' %}
+
+<div class="alert alert-info mt-3">
+  <strong>Как создать .h5p файл:</strong>
+  <ol class="mb-0">
+    <li>Скачайте Lumi Desktop с <a href="https://lumi.education" target="_blank" rel="noopener">lumi.education</a></li>
+    <li>Создайте Interactive Video с вопросами в нужных моментах</li>
+    <li>Экспортируйте как <code>.h5p</code> файл</li>
+    <li>Загрузите файл через форму выше</li>
+  </ol>
+</div>
+
+{% endunless %}

@@ -1,0 +1,14 @@
+adx_append: false
+adx_appendto: false
+adx_contactrelationship: contact_new_h5pprogress_new_user
+adx_create: true
+adx_delete: false
+adx_entitylogicalname: new_h5pprogress
+adx_entityname: H5P Progress Self
+adx_entitypermission_webrole:
+- 2ccfddf9-a538-f111-88b5-7ced8d76b3cc
+- a1b2c3d4-1111-2222-3333-000000000004
+adx_entitypermissionid: dfed8e6c-dde6-4681-8be2-e8c7b00314c8
+adx_read: true
+adx_scope: 756150001
+adx_write: true
