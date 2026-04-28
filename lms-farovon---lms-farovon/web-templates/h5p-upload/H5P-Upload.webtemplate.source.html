@@ -7,13 +7,15 @@
 {% entityform name:'H5P Upload Form' %}
 
 <div class="alert alert-info mt-3">
-  <strong>Как создать .h5p файл:</strong>
+  <strong>Как загрузить H5P контент — два шага:</strong>
   <ol class="mb-0">
-    <li>Скачайте Lumi Desktop с <a href="https://lumi.education" target="_blank" rel="noopener">lumi.education</a></li>
-    <li>Создайте Interactive Video с вопросами в нужных моментах</li>
-    <li>Экспортируйте как <code>.h5p</code> файл</li>
-    <li>Загрузите файл через форму выше</li>
+    <li>Заполните форму выше (название, описание, тип) и нажмите <strong>Загрузить</strong> — создаётся запись в Dataverse.</li>
+    <li>Откройте созданную запись в <a href="https://make.powerapps.com" target="_blank" rel="noopener">make.powerapps.com</a> (таблица H5P Content), перейдите на вкладку <strong>Documents</strong> и загрузите <code>.h5p</code> файл — он попадёт в SharePoint. Power Automate flow автоматически извлечёт содержимое и контент станет доступен в плеере.</li>
   </ol>
+</div>
+<div class="alert alert-secondary mt-2">
+  <strong>Как создать .h5p файл:</strong>
+  скачайте <a href="https://lumi.education" target="_blank" rel="noopener">Lumi Desktop</a>, создайте Interactive Video и экспортируйте как <code>.h5p</code>.
 </div>
 
 {% endunless %}

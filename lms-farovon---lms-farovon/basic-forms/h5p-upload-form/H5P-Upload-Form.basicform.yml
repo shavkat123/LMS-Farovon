@@ -1,6 +1,6 @@
 adx_appendquerystring: false
 adx_associatecurrentportaluser: true
-adx_attachfile: true
+adx_attachfile: false
 adx_attachfileallowmultiple: false
 adx_attachfilerequired: false
 adx_attachfilerestrictaccept: false

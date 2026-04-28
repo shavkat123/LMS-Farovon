@@ -6,40 +6,54 @@
   <entity name="new_h5pcontent">
     <attribute name="new_name" />
     <attribute name="new_description" />
-    <attribute name="new_sharepointurl" />
-    <attribute name="new_filename" />
-    <attribute name="new_filesize" />
     <attribute name="new_librarytype" />
     <attribute name="new_durationseconds" />
     <filter type="and">
-      <condition attribute="new_h5pcontentid" operator="eq" value="{{contentid}}" />
+      <condition attribute="new_h5pcontentid" operator="eq" value="{{ contentid }}" />
       <condition attribute="new_isactive" operator="eq" value="1" />
     </filter>
   </entity>
 </fetch>
 {% endfetchxml %}
 
+{% fetchxml spdoc %}
+<fetch top="1">
+  <entity name="sharepointdocumentlocation">
+    <attribute name="absoluteurl" />
+    <attribute name="name" />
+    <filter type="and">
+      <condition attribute="regardingobjectid" operator="eq" value="{{ contentid }}" />
+      <condition attribute="statecode" operator="eq" value="0" />
+    </filter>
+    <order attribute="createdon" descending="false" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
 {% if h5pcontent.results.entities.size > 0 %}
 {% assign content = h5pcontent.results.entities[0] %}
+{% assign spdocloc = spdoc.results.entities[0] %}
 
 <div class="h5p-player-wrapper">
   <h2>{{ content.new_name }}</h2>
   {% if content.new_description %}<p class="h5p-description">{{ content.new_description }}</p>{% endif %}
-  <div id="h5p-container-{{contentid}}" class="h5p-container"></div>
+  <div id="h5p-container-{{ contentid }}" class="h5p-container"></div>
 </div>
 
 <link rel="stylesheet" href="/h5p.css">
 <script src="/main.bundle.js"></script>
 <script>
 (function() {
-  var contentId = '{{contentid}}';
+  var contentId = '{{ contentid }}';
   var userId = '{{ user.contactid }}';
-  var h5pContentBase = '{{ content.new_sharepointurl | xml_escape }}';
+  var h5pContentBase = '{{ spdocloc.absoluteurl | xml_escape }}';
 
   var container = document.getElementById('h5p-container-' + contentId);
 
   if (!h5pContentBase) {
-    container.innerHTML = '<div class="alert alert-warning">H5P контент ещё обрабатывается. Попробуйте через несколько минут.</div>';
+    container.innerHTML =
+      '<div class="alert alert-warning">H5P файл ещё не загружен. ' +
+      'Загрузите .h5p через Documents tab в записи, затем обновите страницу.</div>';
     return;
   }
 
@@ -71,7 +85,7 @@
     console.error('H5P init failed:', err);
     container.innerHTML =
       '<div class="alert alert-danger">Не удалось загрузить интерактивный контент. ' +
-      'Убедитесь, что файл обработан (new_sharepointurl заполнено) и SharePoint доступен.</div>';
+      'Убедитесь, что .h5p обработан (файлы извлечены в SharePoint) и SharePoint доступен из браузера.</div>';
   });
 
   function sendXAPIToWebApi(contentId, userId, statement) {

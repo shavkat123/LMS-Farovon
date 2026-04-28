@@ -1,0 +1,12 @@
+adx_append: false
+adx_appendto: false
+adx_create: false
+adx_delete: false
+adx_entitylogicalname: sharepointdocumentlocation
+adx_entityname: H5P SharePoint Location Read
+adx_entitypermissionid: a1b2c3d4-1111-2222-3333-000000000010
+adx_parententitypermission: 98fe6d23-dd3d-40d3-9891-7ba2bffeb0fc
+adx_parentrelationship: new_h5pcontent_SharePointDocumentLocations
+adx_read: true
+adx_scope: 756150003
+adx_write: false

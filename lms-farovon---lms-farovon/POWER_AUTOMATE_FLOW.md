@@ -4,93 +4,97 @@
 
 В составе H5P интеграции нужны **два flow**:
 
-1. **`H5P File to SharePoint`** — при загрузке `.h5p` файла: аннотация → распаковка → SharePoint → обновление записи (§0)
+1. **`H5P Extract to SharePoint`** — при загрузке `.h5p` в SharePoint: распаковка ZIP → файлы в ту же папку → удаление оригинала (§0)
 2. **`H5P xAPI to Dataverse`** — при успешном прохождении урока: обновляет timestamp + уведомляет наставника (§1)
 
 ---
 
-## §0. Flow `H5P File to SharePoint` (загрузка и распаковка)
+## §0. Flow `H5P Extract to SharePoint`
 
 ### Архитектура
 
-При загрузке `.h5p` через форму на `/h5p-upload` Power Pages сохраняет файл как **аннотацию (Notes)** на записи `new_h5pcontent`. Flow перехватывает эту аннотацию, распаковывает `.h5p` (ZIP-архив) и загружает все файлы в **SharePoint Document Library**. Плеер на `/h5p-lesson?id=<contentId>` читает распакованные файлы напрямую из SharePoint по URL в поле `new_sharepointurl`.
+SharePoint Document Management включён для таблицы `new_h5pcontent` (site: `https://farovon.sharepoint.com/sites/dait`). При загрузке `.h5p` файла через Documents tab в make.powerapps.com (или напрямую в SharePoint) этот flow:
+
+1. Обнаруживает новый `.h5p` файл в библиотеке SharePoint
+2. Скачивает его содержимое
+3. Извлекает ZIP (`.h5p` — это обычный ZIP-архив)
+4. Загружает распакованные файлы (`h5p.json`, `content/`, библиотеки) в ту же папку SharePoint
+5. Удаляет оригинальный `.h5p` файл
+
+После этого плеер на `/h5p-lesson?id=<contentId>` читает `sharepointdocumentlocation.absoluteurl` (адрес папки записи в SharePoint), откуда h5p-standalone напрямую загружает `h5p.json`, `content/content.json` и библиотеки.
 
 ```text
-Пользователь → Basic Form (attach .h5p)
-  → Dataverse: создаётся annotation на new_h5pcontent
-  → [этот Flow срабатывает]
-  → Извлекает ZIP в SharePoint: /sites/LMS-Content/h5p-content/<contentId>/h5p.json ...
-  → Обновляет new_h5pcontent.new_sharepointurl = "<base URL папки>"
-  → Удаляет аннотацию
-  → H5P Player читает h5p.json, content/content.json и библиотеки прямо из SharePoint
+HR → Documents tab → uploads test.h5p
+  → [Flow срабатывает на файл в SharePoint]
+  → Скачивает test.h5p, распаковывает ZIP
+  → Загружает h5p.json, content/, H5P.InteractiveVideo-1.27/ … в ту же папку
+  → Удаляет test.h5p
+  → Плеер: fetch("<absoluteurl>/h5p.json") → OK
 ```
 
 ### Предварительные требования
 
-1. **SharePoint Document Management** включён для таблицы `new_h5pcontent`:
+1. SharePoint Document Management включён для `new_h5pcontent`, site: `https://farovon.sharepoint.com/sites/dait` — **уже выполнено**.
 
-   - make.powerapps.com → Tables → H5P Content → Settings → Document management: включить
-   - SharePoint site: `https://<your-tenant>.sharepoint.com/sites/LMS-Content`
-   - Library `new_h5pcontent` создаётся автоматически при включении
+2. **Имя библиотеки** — проверьте в SharePoint (`https://farovon.sharepoint.com/sites/dait`) как называется библиотека, созданная для `new_h5pcontent`. Обычно это логическое имя сущности или её отображаемое имя.
 
-2. **Connector для распаковки ZIP** — выбрать один из двух вариантов:
+3. **CORS / аутентификация**: h5p-standalone делает браузерные `fetch()` к SharePoint URL из `absoluteurl`. Для этого:
 
-   - **Вариант E1 (Encodian, рекомендуется)**: premium connector, есть action "Extract Archive". Требует лицензию Encodian (~$10/мес или есть в некоторых E5 планах).
-   - **Вариант E2 (Azure Function)**: бесплатный Consumption tier + небольшая Function (см. Приложение A).
+   - Пользователь портала должен быть аутентифицирован в том же AAD-тенанте (уже есть)
+   - Браузер должен иметь активную сессию SharePoint — при SSO это происходит автоматически
+   - Если возникают ошибки 401/CORS: открыть `https://farovon.sharepoint.com` один раз для установки сессии
 
-3. **CORS в SharePoint**: чтобы h5p-standalone мог делать `fetch()` из браузера к SharePoint, нужно добавить домен Power Pages в список разрешённых источников SharePoint.
+4. **Connector для распаковки ZIP** — выбрать один вариант:
 
-   - SharePoint Admin Center → Sharing → Allow sharing with external users OR
-   - Настроить через PowerShell: `Set-SPOSite -Identity <site> -AllowDownloadingNonWebViewableFiles $true`
-   - Альтернатива без CORS: проксировать запросы через Power Pages Liquid (сложнее).
+   - **Вариант E1 (Encodian)**: premium connector, action "Extract Archive"
+   - **Вариант E2 (Azure Function)**: бесплатный Consumption tier (см. Приложение A)
 
 ### Шаг 1. Создать flow
 
-1. [make.powerautomate.com](https://make.powerautomate.com) → выбрать окружение **genunmanagedenv**
+1. [make.powerautomate.com](https://make.powerautomate.com) → окружение **genunmanagedenv**
 2. **+ Create** → **Automated cloud flow**
-3. **Name**: `H5P File to SharePoint`
-4. **Trigger**: `When a row is added, modified, or deleted` (Microsoft Dataverse)
-   - **Change type**: Added
-   - **Table name**: `Notes` (`annotation`)
-   - **Scope**: Organization
+3. **Name**: `H5P Extract to SharePoint`
+4. **Trigger**: `When a file is created or modified (properties only)` (SharePoint)
+   - **Site Address**: `https://farovon.sharepoint.com/sites/dait`
+   - **Library Name**: `<имя библиотеки new_h5pcontent>` — проверить в SharePoint
 
-### Шаг 2. Проверить тип родительской записи
+### Шаг 2. Фильтр: только .h5p файлы
 
 Добавить **Condition**:
 
 ```text
-triggerOutputs()?['body/objecttypecode']  is equal to  new_h5pcontent
+endsWith(triggerOutputs()?['body/{FilenameWithExtension}'], '.h5p')  is equal to  true
 ```
 
-- **If No**: добавить action **Terminate** (Status: Succeeded) — аннотация к другой таблице, игнорируем.
+- **If No**: **Terminate** (Status: Succeeded) — файл другого типа, игнорируем.
 
-### Шаг 3. Получить содержимое аннотации (ветка If Yes)
+### Шаг 3. Скачать содержимое файла (ветка If Yes)
 
-3.1. **Get a row by ID** — table `Notes`, Row ID = `triggerOutputs()?['body/annotationid']`
+3.1. **SharePoint: Get file content using path**
 
-- В response получаем `documentbody` (base64), `filename`, `filesize`, `_objectid_value`.
+- **Site Address**: `https://farovon.sharepoint.com/sites/dait`
+- **File Path**: `triggerOutputs()?['body/{FullPath}']`
 
-3.2. Записать переменные:
+Результат: `body/body` — бинарное содержимое файла (base64 или поток).
 
-- **Initialize variable** — Name: `contentId`, Type: String, Value: `outputs('Get_annotation')?['body/_objectid_value']`
-- **Initialize variable** — Name: `spBaseUrl`, Type: String, Value: `https://<your-tenant>.sharepoint.com/sites/LMS-Content/h5p-content/@{variables('contentId')}`
+3.2. Записать переменную:
 
-### Шаг 4E1. Распаковать ZIP через Encodian
+- **Initialize variable** — Name: `folderPath`, Type: String
+- Value: `replace(triggerOutputs()?['body/{FullPath}'], concat('/', triggerOutputs()?['body/{FilenameWithExtension}']), '')`
 
-*(Используйте этот шаг ИЛИ Шаг 4E2)*
+### Шаг 4E1. Извлечь ZIP через Encodian
 
-4.1. **Encodian: Decode Base64 to File**
+> Используйте этот шаг ИЛИ Шаг 4E2
 
-- File: `outputs('Get_annotation')?['body/documentbody']`
+4.1. **Encodian: Extract Archive**
 
-4.2. **Encodian: Extract Archive**
+- File: `outputs('Get_file_content')?['body/body']`
 
-- File: результат предыдущего шага
-- В результате — массив `entries` с полями `Name` (путь внутри архива) и `Content` (base64 файла).
+В результате — массив `entries` с полями `Name` (путь внутри архива) и `Content` (base64).
 
-### Шаг 4E2. Распаковать ZIP через Azure Function
+### Шаг 4E2. Извлечь ZIP через Azure Function
 
-*(Используйте этот шаг ИЛИ Шаг 4E1)*
+> Используйте этот шаг ИЛИ Шаг 4E1
 
 4.1. **HTTP** action:
 
@@ -101,41 +105,33 @@ triggerOutputs()?['body/objecttypecode']  is equal to  new_h5pcontent
 
   ```json
   {
-    "base64": "@{outputs('Get_annotation')?['body/documentbody']}"
+    "base64": "@{base64(outputs('Get_file_content')?['body/body'])}"
   }
   ```
 
-Response: массив `[{ "name": "h5p.json", "content": "<base64>" }, ...]`
+Response: `[{ "name": "h5p.json", "content": "<base64>" }, ...]`
 
-См. **Приложение A** для кода Azure Function.
-
-### Шаг 5. Загрузить распакованные файлы в SharePoint
+### Шаг 5. Загрузить извлечённые файлы в SharePoint
 
 **Apply to each** по массиву `entries` из шага 4:
 
 5.1. **SharePoint: Create file**
 
-- **Site Address**: `https://<your-tenant>.sharepoint.com/sites/LMS-Content`
-- **Folder Path**: `/h5p-content/@{variables('contentId')}/@{items('Apply_to_each')?['Name']}`
-  *(SharePoint автоматически создаёт подпапки)*
+- **Site Address**: `https://farovon.sharepoint.com/sites/dait`
+- **Folder Path**: `@{variables('folderPath')}/@{replace(items('Apply_to_each')?['Name'], last(split(items('Apply_to_each')?['Name'], '/')), '')}`
 - **File Name**: `@{last(split(items('Apply_to_each')?['Name'], '/'))}`
 - **File Content**: `@{base64ToBinary(items('Apply_to_each')?['Content'])}`
 
-### Шаг 6. Обновить запись new_h5pcontent
+### Шаг 6. Удалить оригинальный .h5p файл
 
-**Update a row** — table `H5P Content` (`new_h5pcontent`), Row ID = `variables('contentId')`:
+Добавить действие **SharePoint: Delete file**:
 
-- `new_sharepointurl`: `@{variables('spBaseUrl')}`
-- `new_filename`: `outputs('Get_annotation')?['body/filename']`
-- `new_filesize`: `outputs('Get_annotation')?['body/filesize']`
+- **Site Address**: `https://farovon.sharepoint.com/sites/dait`
+- **File Identifier**: `triggerOutputs()?['body/{Id}']`
 
-### Шаг 7. Удалить аннотацию
+### Шаг 7. Сохранить и активировать
 
-**Delete a row** — table `Notes`, Row ID = `triggerOutputs()?['body/annotationid']`
-
-### Шаг 8. Сохранить и активировать
-
-**Save** → **Test** (загрузить тестовый `.h5p` через форму) → проверить в SharePoint что файлы появились → проверить что `new_sharepointurl` заполнено → **Turn on**.
+**Save** → **Test** (загрузить тестовый `.h5p` через Documents tab) → проверить в SharePoint что в папке записи появились `h5p.json`, `content/` и библиотеки → **Turn on**.
 
 ---
 
@@ -143,9 +139,9 @@ Response: массив `[{ "name": "h5p.json", "content": "<base64>" }, ...]`
 
 Этот flow срабатывает когда новая запись `new_h5pprogress` создаётся (через xAPI POST из плеера) и отправляет email наставнику если стажёр успешно прошёл урок.
 
-### Шаг 1. Создать flow
+### §1 Шаг 1. Создать flow
 
-1. [make.powerautomate.com](https://make.powerautomate.com) → выбрать окружение **genunmanagedenv**
+1. [make.powerautomate.com](https://make.powerautomate.com) → окружение **genunmanagedenv**
 2. **+ Create** → **Automated cloud flow**
 3. **Name**: `H5P xAPI to Dataverse`
 4. **Trigger**: `When a row is added, modified, or deleted` (Microsoft Dataverse)
@@ -239,11 +235,10 @@ module.exports = async function (context, req) {
 
 ## Чек-лист после настройки
 
-- [ ] SharePoint Document Management включён для `new_h5pcontent`, site: `/sites/LMS-Content`
-- [ ] CORS настроен: Power Pages домен разрешён в SharePoint для cross-origin fetch
+- [ ] Проверено имя библиотеки SharePoint для `new_h5pcontent` (используется в триггере flow)
 - [ ] Выбран вариант распаковки: **Encodian** (E1) или **Azure Function** (E2)
-- [ ] Flow `H5P File to SharePoint` создан, протестирован и включён
-- [ ] После тестовой загрузки проверено: `new_sharepointurl` заполнено, файлы есть в SharePoint
+- [ ] Flow `H5P Extract to SharePoint` создан, протестирован и включён
+- [ ] End-to-end тест: загрузить `.h5p` через Documents tab → в SharePoint появились `h5p.json` и `content/` → открыть `/h5p-lesson?id=<guid>` → контент воспроизводится
 - [ ] Flow `H5P xAPI to Dataverse` создан, протестирован и включён
 - [ ] Создана колонка mentor lookup на `contact` (или решено использовать `parentcustomerid`)
-- [ ] End-to-end тест: HR загружает `.h5p` → плеер открывается → стажёр проходит → наставник получает email
+- [ ] End-to-end тест: стажёр проходит урок → наставник получает email
