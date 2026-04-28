@@ -836,6 +836,10 @@ adx_pagetemplate:
   DisplayName: Search
   CheckSum: 7070b694e1aa38b70dd794bbb6538e186e3aaf297c84a68bf2c4fdad92270c14
   IsDeleted: false
+- RecordId: e1b2c3d4-3333-4444-5555-aaaaaaaaaaaa
+  DisplayName: User Portal Page
+  CheckSum: bb13fcc3fac2b75cb26a41337c54d4dc5fc962437628f6580685cb7b4f45c493
+  IsDeleted: false
 - RecordId: f4e8ee78-eb70-493d-b43d-4f52e922a532
   DisplayName: AI Search PageTemplate
   CheckSum: 90a0a5bd9a6156177fc24a3c677cf7b8464d5f58b2604c852bdb2c2f8e9a6ff4
@@ -1389,8 +1393,8 @@ adx_weblink:
   CheckSum: 4fcc4e756979d64cf3023cb4381ccdd33652e3d247cc1ad911d66669df8ba8d6
   IsDeleted: false
 - RecordId: 1f06e5ed-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: Home
-  CheckSum: 26aff52448d4e7c5dccf9b7637802dbc6ed644f722765068784d8e63890718b8
+  DisplayName: Главная
+  CheckSum: 8c49de5597de217d47502c84758df4fb47f535bccd8b81d0811775bf85e5fc4a
   IsDeleted: false
 - RecordId: 2d62d8fc-7284-4f7b-a5ba-f50c6038eed6
   DisplayName: View Course Details
@@ -1405,8 +1409,8 @@ adx_weblink:
   CheckSum: de570261a8bc6bc1187edf1076195a0074e887bf56c84991d8d8d6458c149fb5
   IsDeleted: false
 - RecordId: 3f60e5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: My profile
-  CheckSum: bb14bf1a06f83ccdc6ea6e76c71c84f2dd8a137f585d66d83fb0df84e6928421
+  DisplayName: Мой профиль
+  CheckSum: 0a9289b77d71270eb87897b8b4c90310357f18996fb4058bb26ff32958b571f1
   IsDeleted: false
 - RecordId: 435fe5f3-a538-f111-88b5-7ced8d76b3cc
   DisplayName: My Attendees
@@ -1417,8 +1421,8 @@ adx_weblink:
   CheckSum: 049fb4d2fd9d71ab3cf91561c818a4a9582997f995cade3835074812b2049375
   IsDeleted: false
 - RecordId: 52cfddf9-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: My Attendees
-  CheckSum: c76f83bbe56ac7dfe7e8e819a1ae120f76b3351e59d698930a193de92459e5a0
+  DisplayName: Мои стажёры
+  CheckSum: 8a1f0e191c49b7df5c6d83e515546ca72759b091f969a8746bb4f2bff1f94b42
   IsDeleted: false
 - RecordId: 64cfddf9-a538-f111-88b5-7ced8d76b3cc
   DisplayName: C1 Courses Home
@@ -1455,6 +1459,22 @@ adx_weblink:
 - RecordId: a3989803-cf66-48d5-98a4-827f663ef234
   DisplayName: '[Admin] Create Course'
   CheckSum: 46e0a3c74a38cce1fd1d1c4cbb36b409219e46bc1ff179400762f7ccb6072968
+  IsDeleted: false
+- RecordId: aa01e5ed-a538-f111-88b5-7ced8d76b3cc
+  DisplayName: Управление задачами
+  CheckSum: b4dd28cabf7a8fc43695eb4d8d20dc9150493ac3d7b39e6238027356a5af713f
+  IsDeleted: false
+- RecordId: aa02e5ed-a538-f111-88b5-7ced8d76b3cc
+  DisplayName: Мероприятия
+  CheckSum: cba0220ee15e740c5fd775086001bd6fb329bd24fb3d0c58ea1cecddbd5d4e0a
+  IsDeleted: false
+- RecordId: aa03e5ed-a538-f111-88b5-7ced8d76b3cc
+  DisplayName: Пользователи
+  CheckSum: c88bbe2119571628f4ddb85c2a10ced7254b677a328bfa2a470b321dfa491858
+  IsDeleted: false
+- RecordId: aa04e5ed-a538-f111-88b5-7ced8d76b3cc
+  DisplayName: Отчёты
+  CheckSum: 6b2e7e2546b5ba6c803784f2072efbb9e99ae4a1a30f128570527038a1cad29b
   IsDeleted: false
 - RecordId: b37b9bce-eebf-42e3-833f-06efef45faad
   DisplayName: My Registrations
@@ -1493,8 +1513,8 @@ adx_weblink:
   CheckSum: c8733ddf53aebae751dce7f13ce63484dacb124abdfc1c522cc8887addf6a0b1
   IsDeleted: false
 - RecordId: ee05e5ed-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: My registrations
-  CheckSum: 40fda49c1e24327bb33af28b8378d13d6a448a4bde6b1e2b35be462c16c0b96a
+  DisplayName: Центр адаптации
+  CheckSum: 3b09856509bf0810e4ea2571ca9f86cc87c844898252db6055f2e9466b464802
   IsDeleted: false
 - RecordId: f0c68d74-2db8-4f98-a150-c3ec5654a594
   DisplayName: '[Admin] Courses Home'
@@ -1547,44 +1567,44 @@ adx_webpage:
   CheckSum: aa62ddcf01f9305a35dad0d87576d4a1575720e1968fa00d1f5fa4c2494e383c
   IsDeleted: false
 - RecordId: 0661e5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: Access Denied
-  CheckSum: f84a842c9d47f954ba0b9764024610070ed902f59934ab5306d9418174dc0055
+  DisplayName: Доступ запрещён
+  CheckSum: 3eaf31dc99e4d51beef1d93fb1a618c3f7f49029507fc494a657fe862cefb4bd
   IsDeleted: false
 - RecordId: 0b61e5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: View Course Details
-  CheckSum: 66e9d3eb218d3d63909bf3e3c256749f8585326f6ced7dfe3b19503da5268712
+  DisplayName: Детали программы
+  CheckSum: 0e3529536c646a697c502d625ced14a6db03e2b2744203a29f7e01e5990fc9b7
   IsDeleted: false
 - RecordId: 115fe5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: My Registrations
-  CheckSum: 1e28305a178112abb6ac863d1d5a2171841b76d854c3aead21b48901efb46608
+  DisplayName: Мои регистрации
+  CheckSum: 58f384a56aa391f99454e520b5f97ee48e04b64309d11763c14790c0ec4d04ad
   IsDeleted: false
 - RecordId: 15cfddf9-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: Contact us
-  CheckSum: cf7e0f2d819f19521d00d42febb52a2fa2d5bb7997f79d6681be9a44ab124bc7
+  DisplayName: Обратная связь
+  CheckSum: 83d7fa9b8e7c0c95bfc93f8c633b35ad3a821159e9365f8b7c2368bfe8e095fd
   IsDeleted: false
 - RecordId: 2a5fe5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: '[Admin] Courses Home'
-  CheckSum: 656fd554b5eaa8a3f58f833bcc7ec44021c9865e40cd68a0e4f4c746bf46ef96
+  DisplayName: '[Админ] Мои программы'
+  CheckSum: 9794d93f9c5ff51a33e686610450caf9a50e96bf406561949ca89ddbea0531ed
   IsDeleted: false
 - RecordId: 4a60e5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: '[Admin] Edit Course'
-  CheckSum: 3920c37b49a4d63df5431fd3bc365782c950844f66476a05834a1db52798597d
+  DisplayName: '[Админ] Редактировать программу'
+  CheckSum: f5f9907757ed745f8c5756468ba6e5c8c8c0a510f4ea0bf5dd19d9507ea94283
   IsDeleted: false
 - RecordId: 4ecfddf9-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: Profile
-  CheckSum: e494ae6c3e113cb7ea6b4ac831622da64d8bc99bb30c6e0bbc3251981a5d1df6
+  DisplayName: Профиль
+  CheckSum: 4f2db93af963b4078f55db15be7544cbc12c9b3e4146bb9020cdfce5116890e0
   IsDeleted: false
 - RecordId: 5ccfddf9-a538-f111-88b5-7ced8d76b3cc
   DisplayName: Unregister Attendee
   CheckSum: 628ec00024b97ae104d109b7722a96614faebdcaa43e3f5e525edbc160b31296
   IsDeleted: false
 - RecordId: 6460e5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: '[Admin] Delete-Course'
-  CheckSum: b0849cd2fba9a89e1e82d8a3278cfe166b780d02b534299763f53af04a54c189
+  DisplayName: '[Админ] Удалить программу'
+  CheckSum: e4f400cc2495f64eb77f861db870398eb2b5bef2959cfa17921ab60574f0e83e
   IsDeleted: false
 - RecordId: 66cfddf9-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: '[Admin] Duplicate Course'
-  CheckSum: 11f793e58bd9f0729831749a4aeff9658e5b8517c48c2b1e51a011d1d6b9bfe7
+  DisplayName: '[Админ] Дублировать программу'
+  CheckSum: a7f94a7c76af2d77dc6d50bb728613707e0b94ee5ba49534d7a8c49cacf7b6a0
   IsDeleted: false
 - RecordId: 6a5fe5f3-a538-f111-88b5-7ced8d76b3cc
   DisplayName: Add Attendee Profile
@@ -1595,92 +1615,228 @@ adx_webpage:
   CheckSum: ea0ba982f0590a9251645eb336e21ea59f1ae1998f4a5f9025e7c2d47eff18e2
   IsDeleted: false
 - RecordId: 77cfddf9-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: '[Admin] Edit Course'
-  CheckSum: f9250ce5f73fb40ba86fd3020a72e9b35abfb859e133cf1afee0b471e3918760
+  DisplayName: '[Админ] Редактировать программу'
+  CheckSum: 2cce6793309c2dab1b2a488d5107a1ac7303af0327cd040ec9a6e5832f14a5eb
   IsDeleted: false
 - RecordId: 7f5fe5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: Access Denied
-  CheckSum: d71e480e6ae0623cf7cb22f05e7b4fbe29a77b64c09ab474d1dbf615c6735683
+  DisplayName: Доступ запрещён
+  CheckSum: c8a0bf96f4f5d200f651003a5645c75b8acf5461fc6fc81e7fea56ef2a0ac6db
   IsDeleted: false
 - RecordId: 8dcfddf9-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: '[Admin] Delete-Course'
-  CheckSum: 2d0c7c7ed4e3ec354d6d5a19cb3107b74a9deb4c3f66aedf8ebb852b2178ce4f
+  DisplayName: '[Админ] Удалить программу'
+  CheckSum: c6125638e50e1c65fcddb3b4b9d0b778bcff71cf5a9de1a844d7ed3917b6647f
   IsDeleted: false
 - RecordId: 925fe5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: Contact us
-  CheckSum: 5d8dd780cd9175f52ce35582045c7d0a966ecf95ade963c907940c3e85e144ea
+  DisplayName: Обратная связь
+  CheckSum: 20f206445f35088078307044b73c0a0f3c4be10277acaa14220e261ca459c9b9
   IsDeleted: false
 - RecordId: 955fe5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: Page Not Found
-  CheckSum: 92fcd291e24a06b787c2088733cec59a7bbb370038a49bf10ebf89b7c8d000cf
+  DisplayName: Страница не найдена
+  CheckSum: 3cbca20e14f52f466f14809209cae2124be5b9cf25a0b859444ba7ab7f9929ea
   IsDeleted: false
 - RecordId: 9d5fe5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: My Attendees
-  CheckSum: 0751392350693345834287df62660a971f03b8a8c5cf2c309c3c22c5dfabb3b1
+  DisplayName: Мои стажёры
+  CheckSum: 2445b7da625f8d021217f6e12f1314bb02e2218a524aedbff52c7db65e552ef4
   IsDeleted: false
 - RecordId: 9f60e5f3-a538-f111-88b5-7ced8d76b3cc
   DisplayName: Edit Attendee Profile
   CheckSum: 5c2a19a34a5befea4aff2c9c019257880171174818f389d09ae64c29c97bece0
   IsDeleted: false
 - RecordId: 9fcfddf9-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: My Attendees
-  CheckSum: 0466c23796471fca2e81cecd05022176aa6c03741a2030d7c46d2f25ce6a4948
+  DisplayName: Мои стажёры
+  CheckSum: 5395343dd62a7c2d6f903470ba59b19d0536136bc341bed70e6a91bf5f358f29
   IsDeleted: false
 - RecordId: a060e5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: Home
-  CheckSum: 2ad64997cdf129717bf738dbeef97224741634897eaba984c323e725fee30a05
+  DisplayName: Главная
+  CheckSum: 037e51fc31d5176c9937e3c1c3de33703b870727855841097f4f7f4152f6d8ae
   IsDeleted: false
 - RecordId: a3cfddf9-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: '[Admin] Create Course'
-  CheckSum: 91f2ede497aa2b0721e60dbd417486b6b2f9d10cf7d0943f7637d7f7d050c7f4
+  DisplayName: '[Админ] Создать программу'
+  CheckSum: 7be75124d0b95e464e29ffc990c8d3b1181e701ee117ca06c69d9e74364f032e
   IsDeleted: false
 - RecordId: aa05e5ed-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: '[Admin] Courses Home'
-  CheckSum: 0fd6badc2bbb8e98155833083a415374206c21f3163b44721b80bf568b37cb50
+  DisplayName: '[Админ] Мои программы'
+  CheckSum: 2f80c1135b6696acf96c6fceadf9c1891f4253c82176c448a52a6485fccb9fc0
+  IsDeleted: false
+- RecordId: b1b2c3d4-2222-3333-4444-000000000001
+  DisplayName: Центр адаптации
+  CheckSum: 95f7cbf90371537e37c505607bd6f0cb0eb705c3005cda173085efb1e3875023
+  IsDeleted: false
+- RecordId: b1b2c3d4-2222-3333-4444-000000000002
+  DisplayName: Управление задачами
+  CheckSum: d05b31ea5e276b661ffe230de799dfe6f4632739178a839fe5e4c51619d272d1
+  IsDeleted: false
+- RecordId: b1b2c3d4-2222-3333-4444-000000000003
+  DisplayName: Мероприятия
+  CheckSum: 89c71a8142b91ff1e07d2f8c19b6b6e28cb829e6e9dd74327c827de42105d897
+  IsDeleted: false
+- RecordId: b1b2c3d4-2222-3333-4444-000000000004
+  DisplayName: Управление пользователями
+  CheckSum: d5254d1660e940ec1f2f0b2a4b91ae83640c919a8ab0327702c54fd25ba599c5
+  IsDeleted: false
+- RecordId: b1b2c3d4-2222-3333-4444-000000000005
+  DisplayName: База знаний
+  CheckSum: 18362fde59b1d50e31c82c334b06a59c87f31401ef1663c1c0f5ea19cab6ccd1
+  IsDeleted: false
+- RecordId: b1b2c3d4-2222-3333-4444-000000000006
+  DisplayName: Отчёты
+  CheckSum: cb30f58a9fe75b9bfdf424fb5baafa539ba56d9e8f4439bb66619e45485fa22a
+  IsDeleted: false
+- RecordId: b1b2c3d4-2222-3333-4444-000000000007
+  DisplayName: Настройки
+  CheckSum: 60f4103b272b243182bb7fd46eab4a1ed735706c9b9a8583a142368d210c49d0
+  IsDeleted: false
+- RecordId: b1b2c3d4-2222-3333-4444-000000000011
+  DisplayName: Центр адаптации
+  CheckSum: 1965a8f0e27f1a5bbe6ea00bb38c11e796c0684d36500f83fdb98cb265f8b8d4
+  IsDeleted: false
+- RecordId: b1b2c3d4-2222-3333-4444-000000000012
+  DisplayName: Управление задачами
+  CheckSum: 54d4dcc154e14a21467147981fc39ad8de6e9d2cd47a79b2fffdde14af3e96e0
+  IsDeleted: false
+- RecordId: b1b2c3d4-2222-3333-4444-000000000013
+  DisplayName: Мероприятия
+  CheckSum: cc131acf559f957967b7f42b6b218747c20cb5af244680819c359087c668d40d
+  IsDeleted: false
+- RecordId: b1b2c3d4-2222-3333-4444-000000000014
+  DisplayName: Управление пользователями
+  CheckSum: e546278dd61ef5eb23f0c5071f7e29d34ef8cfe330c4d703953a2cef52a92301
+  IsDeleted: false
+- RecordId: b1b2c3d4-2222-3333-4444-000000000015
+  DisplayName: База знаний
+  CheckSum: 83a72bf3ea7c10c81544c518d200ca4c246cae9428487ea396bfe7282100bfa0
+  IsDeleted: false
+- RecordId: b1b2c3d4-2222-3333-4444-000000000016
+  DisplayName: Отчёты
+  CheckSum: 390fecec6705608d7942585aa8fb33843747bb2be5993f4204ff477d69141788
+  IsDeleted: false
+- RecordId: b1b2c3d4-2222-3333-4444-000000000017
+  DisplayName: Настройки
+  CheckSum: 55d1189f53145c0e15c20928d031e5a07a50782fd8964c19e6d1de74b23c329e
   IsDeleted: false
 - RecordId: b405e5ed-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: '[Admin] Duplicate Course'
-  CheckSum: 8ed02c9a9ee31a4fe15bc331ec0adb918c64344fe8ccf6d1f24d85f4aa71dcfe
+  DisplayName: '[Админ] Дублировать программу'
+  CheckSum: 6a5e82c6611e6b047d95d45e229afbaaa74e74755dd95a0517ee58ae8198937e
   IsDeleted: false
 - RecordId: b460e5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: Search
-  CheckSum: 2cf7657eee26a92dfcd039752fe8cfd7073525142f33d57b82e4f9c0941abf47
+  DisplayName: Поиск
+  CheckSum: 3ba0f25cec71a2778b7e1bcb8cf60b362d5e6e2bd4dcfcf411a1c049058dfa98
   IsDeleted: false
 - RecordId: b705e5ed-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: Profile
-  CheckSum: 15464fc7c7b8d037d0e54ae5fa103888108a50cb0605722b5888763ee7b07870
+  DisplayName: Профиль
+  CheckSum: d9371b017dcf26a29e11690fc2d83b1de67327d50489ae1ffda17b062268cadf
   IsDeleted: false
 - RecordId: ba60e5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: My Registrations
-  CheckSum: 554d972ebfe3df427f9e9376e0136c0bfe3c68d597d4a106fbbbe74778901aa5
+  DisplayName: Мои регистрации
+  CheckSum: 726edd5a1948dadb8c403c3fcc92f32a8a7bc0eb2d7b509cde8277247a8ad46c
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000000001
+  DisplayName: Онбординг
+  CheckSum: 424023a776f6625e897769698d2e5cc5b67115b80ebde28c575a7898444f19b8
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000000002
+  DisplayName: Моя адаптация
+  CheckSum: d9a562f873c520af253994e52da388d8c20ff42be94a11a5cf634dc15265a818
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000000003
+  DisplayName: Новости
+  CheckSum: c9adbfeee87a2bb463cf88a7f3db26f1f9d677dcbfcbb685200f0e993e6965cd
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000000004
+  DisplayName: О компании
+  CheckSum: 3cc3920d2ec637fe432754b387d10ea2af6a1207e77bb933db3336c734abfcc7
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000000005
+  DisplayName: Мои задания
+  CheckSum: 619ad9af71e7f4ab65d0aec3bbbbdb88ceaa9a62397ef5bd8374e733c6251973
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000000006
+  DisplayName: Календарь
+  CheckSum: c93c69e4a39f0ca32c2c454088946b9fa66cb6260e7ccb18aabd105905658af7
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000000007
+  DisplayName: Мой наставник
+  CheckSum: e4033bb3852b3f710fe2e3daee05d78d9fa2de17292b96da649a53bac68ea33e
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000000008
+  DisplayName: Полезные контакты
+  CheckSum: f47c4c7f859cbc67280948d76fb6e4bec5af2492428155f4a15c51f32b86e9fa
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000000009
+  DisplayName: Обратная связь
+  CheckSum: 9f62e23c08dbe1b499d744970f2f10ad635639fdd60390c58100d5dd92ef39a0
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000000010
+  DisplayName: Магазин
+  CheckSum: 7e46a926aa07ae302481fe24b72c8828916a1f611cb07ae087bed7c218593ea4
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000000011
+  DisplayName: Онбординг
+  CheckSum: ba229fff2e27d93d376419e7553b25d16db92a377209a342d1abe81d29c1ab37
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000001002
+  DisplayName: Моя адаптация
+  CheckSum: ceb1360f6636decb059a8244798a8a6523f1c0809ef0d485a344efe650614af4
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000001003
+  DisplayName: Новости
+  CheckSum: 2dc10b5a3b5170edb7cde7e0d96bef2f73e57d17d24652cb91ace950c9af9f4d
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000001004
+  DisplayName: О компании
+  CheckSum: 3322c3345d5b9f9b1e953a26846826b90c045f5f29fd72806c58ffa1fc0c61d8
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000001005
+  DisplayName: Мои задания
+  CheckSum: a4631457bdcb50c1e6547c32403b1e98da6102e2da680c16f66bcd74572a5b92
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000001006
+  DisplayName: Календарь
+  CheckSum: 04560036dea75cc9c8cd337bda82577e686b9fb427ddae1d19a05ac6d97caba1
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000001007
+  DisplayName: Мой наставник
+  CheckSum: 08133381a139a4557eccf0491faae84047475ec4d34f453ea920787c5d02e6e0
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000001008
+  DisplayName: Полезные контакты
+  CheckSum: f208d50a349cca39271a69ec09f98a32216631509eb6b6ec301baf47de7716ea
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000001009
+  DisplayName: Обратная связь
+  CheckSum: ec52ef0e6d807ac9c51974748c502df7eeecca499cbbc7f991ef19e88b70bd2d
+  IsDeleted: false
+- RecordId: c1c2c3d4-3333-4444-5555-000000001010
+  DisplayName: Магазин
+  CheckSum: a9d26564ef2a573192659645c7d113518cdb1697ed77b7445ee353369c8fcbf6
   IsDeleted: false
 - RecordId: cd5fe5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: Home
-  CheckSum: 85dabfea986b2243d733722025f1ff767843800fe0195183cb6266aa3edc7a4f
+  DisplayName: Главная
+  CheckSum: 4cdba8c74fef33f9722f6c3038bc6e9ed500e3b993ef85ff27725cc3ed16dea1
   IsDeleted: false
 - RecordId: d45ee5f3-a538-f111-88b5-7ced8d76b3cc
   DisplayName: Unregister Attendee
   CheckSum: edb8e3aea57c7838940b4f36274d48a3c5fe77a8f6d6fcd32383e33cab7b6d55
   IsDeleted: false
 - RecordId: d805e5ed-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: '[Admin] Create Course'
-  CheckSum: 71321a8495c7e2c4b7a5f0c3dd4c71e7870221953c175da4a0a9923c2b5cf1e2
+  DisplayName: '[Админ] Создать программу'
+  CheckSum: ce9a2f0b84bac8df283ab6ad2e8bfe45cf85eb67d6eb5c21bb89b8153e97ac30
   IsDeleted: false
 - RecordId: d860e5f3-a538-f111-88b5-7ced8d76b3cc
   DisplayName: Registration Success
-  CheckSum: 7325beecf72f469595d9c256d27214d07b1276a2c97559f02fb8789733798f60
+  CheckSum: 95e599200945131b0f2c732579a9cb4eb57da6c158cf008792da0224d9b86046
   IsDeleted: false
 - RecordId: e45ee5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: Page Not Found
-  CheckSum: 059a5326e3c807373ed76a25146cc35fbcadbc62cf90be1d2b2a6ba2604530ea
+  DisplayName: Страница не найдена
+  CheckSum: 9ca9fdcf3a720d4de47b1e7fe4dd1740d3c9867dad453b899324d6697610380d
   IsDeleted: false
 - RecordId: eb30e0ff-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: Search
-  CheckSum: ec915ea351e584205cfeb69646e19b9ea5a3e8cd2ae4f37df5083393ac412996
+  DisplayName: Поиск
+  CheckSum: c8b0f278730bcdfef5c0542918f756595a8d9987a8b8c602bb4e32bbd87a003e
   IsDeleted: false
 - RecordId: ec5fe5f3-a538-f111-88b5-7ced8d76b3cc
-  DisplayName: View Course Details
-  CheckSum: 46c34204c0171ecc4435eff86273c3bda855de10713884a602f1261a1c664ff1
+  DisplayName: Детали программы
+  CheckSum: 6b08e875a5f697690ec5de3011fa2abee006cc3210e72244bc76b5ceb950ddd7
   IsDeleted: false
 - RecordId: fa05e5ed-a538-f111-88b5-7ced8d76b3cc
   DisplayName: Add Attendee Profile
@@ -1761,10 +1917,26 @@ adx_webrole:
   DisplayName: Administrators
   CheckSum: 1007762f9327f1d29145b894a7ab6cc463ef6a2c6fd4a9ca6a671172ccfa39c4
   IsDeleted: false
+- RecordId: a1b2c3d4-1111-2222-3333-000000000001
+  DisplayName: HR
+  CheckSum: db9f5798cee7797c9cbc5206b884383db19c173c391131c6cd1479cc2bb34be4
+  IsDeleted: false
+- RecordId: a1b2c3d4-1111-2222-3333-000000000002
+  DisplayName: Наставник
+  CheckSum: 04d6598158c7bbb6be791629ce8b6af0c217a47da45f8e22dc2857a440ec39b3
+  IsDeleted: false
+- RecordId: a1b2c3d4-1111-2222-3333-000000000003
+  DisplayName: Руководитель
+  CheckSum: 1334514ee524bd9923d27f1942b6136028d59a69a2a8edca30311caaccfc4d17
+  IsDeleted: false
+- RecordId: a1b2c3d4-1111-2222-3333-000000000004
+  DisplayName: Новый сотрудник
+  CheckSum: ea531fa4226426f035be706d29b6b8d0ab4fa1698e8339880770580f300b0720
+  IsDeleted: false
 - RecordId: e330e0ff-a538-f111-88b5-7ced8d76b3cc
   DisplayName: C1 ASP
   CheckSum: 807c27ae4a9fc4e4209c318441b135d334edf1377a08775d5c250ddbcf82a682
-  IsDeleted: false
+  IsDeleted: true
 adx_website:
 - RecordId: ef30e0ff-a538-f111-88b5-7ced8d76b3cc
   DisplayName: LMS-farovon - LMS-farovon
@@ -1948,7 +2120,7 @@ adx_webtemplate:
   IsDeleted: false
 - RecordId: ca5fe5f3-a538-f111-88b5-7ced8d76b3cc
   DisplayName: Header
-  CheckSum: e1d172f7123176c09786fed96868e0f3fe72f71a7f515d65219b12885a232665
+  CheckSum: c24a153b433c1450f1afecd548fa83b1b1027d090e9175780645679e731b5449
   IsDeleted: false
 - RecordId: cc60e5f3-a538-f111-88b5-7ced8d76b3cc
   DisplayName: Footer
@@ -1985,6 +2157,14 @@ adx_webtemplate:
 - RecordId: e005e5ed-a538-f111-88b5-7ced8d76b3cc
   DisplayName: Course Catalog
   CheckSum: 70669cd1451ec299f6c79cef740ca9f4ef65b683253a388cd7c05ad69a3d7859
+  IsDeleted: false
+- RecordId: e1b2c3d4-1111-2222-3333-aaaaaaaaaaaa
+  DisplayName: User Portal Sidebar
+  CheckSum: 92f97f88e1fa9c97d9e86c4893c05cc47e7169785b286209644b6662f789160d
+  IsDeleted: false
+- RecordId: e1b2c3d4-2222-3333-4444-aaaaaaaaaaaa
+  DisplayName: User Portal Page
+  CheckSum: f058bb4a0cebc1415b0b3c125313adc57720372a5fc8b6658ae874f6716bcf00
   IsDeleted: false
 - RecordId: e205e5ed-a538-f111-88b5-7ced8d76b3cc
   DisplayName: Dropdown Filters
