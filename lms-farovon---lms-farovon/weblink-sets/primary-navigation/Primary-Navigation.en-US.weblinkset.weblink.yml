@@ -64,3 +64,25 @@
   adx_robotsfollowlink: true
   adx_weblinkid: ee05e5ed-a538-f111-88b5-7ced8d76b3cc
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_disablepagevalidation: false
+  adx_displayimageonly: false
+  adx_displayorder: 7
+  adx_displaypagechildlinks: false
+  adx_name: H5P Загрузка
+  adx_openinnewwindow: false
+  adx_pageid: ecf754b2-f16d-4480-a1a4-21f9665125e2
+  adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_robotsfollowlink: true
+  adx_weblinkid: aa05e5ed-a538-f111-88b5-7ced8d76b3cc
+  adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_disablepagevalidation: false
+  adx_displayimageonly: false
+  adx_displayorder: 8
+  adx_displaypagechildlinks: false
+  adx_name: H5P Прогресс
+  adx_openinnewwindow: false
+  adx_pageid: dfc6e113-3f41-429c-b39f-40988c26709a
+  adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_robotsfollowlink: true
+  adx_weblinkid: aa06e5ed-a538-f111-88b5-7ced8d76b3cc
+  adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
