@@ -86,3 +86,14 @@
   adx_robotsfollowlink: true
   adx_weblinkid: aa06e5ed-a538-f111-88b5-7ced8d76b3cc
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_disablepagevalidation: false
+  adx_displayimageonly: false
+  adx_displayorder: 9
+  adx_displaypagechildlinks: false
+  adx_name: H5P Уроки
+  adx_openinnewwindow: false
+  adx_pageid: cc10e5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_robotsfollowlink: true
+  adx_weblinkid: aa07e5ed-a538-f111-88b5-7ced8d76b3cc
+  adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc

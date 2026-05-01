@@ -1,0 +1,99 @@
+{% fetchxml h5plist %}
+<fetch>
+  <entity name="new_h5pcontent">
+    <attribute name="new_h5pcontentid" />
+    <attribute name="new_name" />
+    <attribute name="new_description" />
+    <attribute name="new_librarytype" />
+    <attribute name="new_durationseconds" />
+    <filter>
+      <condition attribute="new_isactive" operator="eq" value="1" />
+    </filter>
+    <order attribute="new_name" descending="false" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">H5P Уроки</h2>
+    {% if user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Administrators' %}
+    <a href="/h5p-upload" class="btn btn-primary btn-sm">+ Загрузить урок</a>
+    {% endif %}
+  </div>
+
+  {% if h5plist.results.entities.size == 0 %}
+  <div class="alert alert-info">Уроки пока не добавлены.</div>
+
+  {% else %}
+  <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+    {% for item in h5plist.results.entities %}
+    {% assign cid = item.new_h5pcontentid %}
+
+    {% comment %} Progress for current user {% endcomment %}
+    {% fetchxml myprogress %}
+    <fetch top="1">
+      <entity name="new_h5pprogress">
+        <attribute name="new_completion" />
+        <attribute name="new_scorescaled" />
+        <filter type="and">
+          <condition attribute="new_h5pcontentid" operator="eq" value="{{ cid }}" />
+          <condition attribute="new_userid" operator="eq" value="{{ user.contactid }}" />
+          <condition attribute="new_completion" operator="eq" value="1" />
+        </filter>
+        <order attribute="new_lastupdated" descending="true" />
+      </entity>
+    </fetch>
+    {% endfetchxml %}
+
+    {% assign completed = false %}
+    {% assign score = '' %}
+    {% if myprogress.results.entities.size > 0 %}
+      {% assign completed = true %}
+      {% assign prog = myprogress.results.entities[0] %}
+      {% if prog.new_scorescaled %}
+        {% assign score = prog.new_scorescaled | times: 100 | round %}
+      {% endif %}
+    {% endif %}
+
+    <div class="col">
+      <div class="card h-100 shadow-sm {% if completed %}border-success{% endif %}">
+        <div class="card-body d-flex flex-column">
+
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            {% if item.new_librarytype %}
+            <span class="badge bg-secondary">{{ item.new_librarytype.label }}</span>
+            {% endif %}
+            {% if completed %}
+            <span class="badge bg-success ms-auto">
+              ✓ Пройдено{% if score != '' %} · {{ score }}%{% endif %}
+            </span>
+            {% endif %}
+          </div>
+
+          <h5 class="card-title">{{ item.new_name }}</h5>
+
+          {% if item.new_description %}
+          <p class="card-text text-muted small flex-grow-1">
+            {{ item.new_description | truncate: 120 }}
+          </p>
+          {% endif %}
+
+          {% if item.new_durationseconds %}
+          <p class="card-text small text-muted mb-2">
+            ⏱ {{ item.new_durationseconds | divided_by: 60 }} мин
+          </p>
+          {% endif %}
+
+        </div>
+        <div class="card-footer bg-transparent border-top-0 pt-0">
+          <a href="/h5p-lesson?id={{ cid }}" class="btn btn-outline-primary w-100">
+            {% if completed %}Смотреть снова{% else %}Смотреть{% endif %}
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
