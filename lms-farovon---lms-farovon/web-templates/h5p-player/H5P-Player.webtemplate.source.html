@@ -248,7 +248,11 @@
       if (lower === 'script' && cspNonce) {
         try { el.nonce = cspNonce; } catch (e) {}
       }
-      var attr = ({ script: 'src', link: 'href' })[lower];
+      var attr = ({
+        script: 'src', link: 'href',
+        video : 'src', audio: 'src', source: 'src', track: 'src',
+        img   : 'src', iframe: 'src'
+      })[lower];
       if (attr) {
         var stored = '';
         Object.defineProperty(el, attr, {
