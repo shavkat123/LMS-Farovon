@@ -443,11 +443,27 @@
   }
 
   // ── xAPI → Dataverse ─────────────────────────────────────────────────────
+  // CSRF token cache — fetched once from Power Pages /_layout/tokenhtml endpoint.
+  var _csrfTokenPromise = null;
+  function getCsrfToken() {
+    if (_csrfTokenPromise) return _csrfTokenPromise;
+    _csrfTokenPromise = _fetch('/_layout/tokenhtml', { credentials: 'include' })
+      .then(function (r) { return r.ok ? r.text() : ''; })
+      .then(function (html) {
+        var m = html && html.match(/name="__RequestVerificationToken"[^>]*value="([^"]+)"/);
+        return m ? m[1] : '';
+      })
+      .catch(function () { return ''; });
+    return _csrfTokenPromise;
+  }
+
   function sendXAPI(cid, uid, stmt) {
     if (!uid) return;
-    var tok  = document.querySelector('input[name="__RequestVerificationToken"]');
+    getCsrfToken().then(function (tok) { sendXAPIWithToken(cid, uid, stmt, tok); });
+  }
+  function sendXAPIWithToken(cid, uid, stmt, tok) {
     var hdrs = { 'Content-Type': 'application/json' };
-    if (tok) hdrs['__RequestVerificationToken'] = tok.value;
+    if (tok) hdrs['__RequestVerificationToken'] = tok;
     var body = {
       'new_user@odata.bind'      : '/contacts(' + uid + ')',
       'new_h5pcontent@odata.bind': '/new_h5pcontents(' + cid + ')',
