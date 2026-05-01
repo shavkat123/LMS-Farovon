@@ -411,6 +411,9 @@
   // ── Init h5p-standalone ───────────────────────────────────────────────────
   function initH5P(h5pJsonPath) {
     console.log('[H5P] initH5P starting, path:', h5pJsonPath);
+    // Clear loading-spinner placeholder — h5p-standalone appends to container
+    // without clearing, so spinner would otherwise stay visible above the player.
+    container.innerHTML = '';
     var lastSent = 0;
     new H5PS.H5P(container, {
       h5pJsonPath : h5pJsonPath,
@@ -462,7 +465,10 @@
     _fetch('/_api/new_h5pprogresses', {
       method: 'POST', headers: hdrs, body: JSON.stringify(body)
     }).then(function (res) {
-      if (!res.ok) console.warn('[H5P] xAPI save failed:', res.status);
+      if (res.ok) return;
+      res.text().then(function (txt) {
+        console.warn('[H5P] xAPI save failed:', res.status, res.statusText, '— body:', txt.slice(0, 500));
+      });
     }).catch(function (e) { console.error('[H5P] xAPI save error:', e); });
   }
 

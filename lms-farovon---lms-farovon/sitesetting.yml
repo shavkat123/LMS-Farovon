@@ -11,6 +11,12 @@
 - adx_name: Webapi/msdynce_course/fields
   adx_sitesettingid: 0fcfddf9-a538-f111-88b5-7ced8d76b3cc
   adx_value: '*'
+- adx_name: Webapi/new_h5pprogress/enabled
+  adx_sitesettingid: 77f5a26e-b202-4e0b-b0a3-61c524aea74c
+  adx_value: 'true'
+- adx_name: Webapi/new_h5pprogress/fields
+  adx_sitesettingid: d693edf3-ff10-46e7-af6d-2f51450a778d
+  adx_value: 'new_user,new_h5pcontent,new_name,new_xapistatements,new_lastupdated,new_scoreraw,new_scoremax,new_scorescaled,new_completion,new_success,new_durationseconds'
 - adx_description: Setting controls whether attachments will be displayed on Knowledge articles
   adx_name: KnowledgeManagement/DisplayNotes
   adx_sitesettingid: 1906e5ed-a538-f111-88b5-7ced8d76b3cc
