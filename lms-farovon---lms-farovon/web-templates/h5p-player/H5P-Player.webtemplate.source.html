@@ -324,7 +324,7 @@
   coreScript.src = '/frame.bundle.js';
   coreScript.onload = function () {
     console.log('[H5P] frame.bundle.js loaded — H5P core ready in parent. H5P:', !!window.H5P, ', $:', typeof window.jQuery);
-    loadViaFlow('test5.h5p');
+    loadViaFlow(contentId + '.h5p');
   };
   coreScript.onerror = function () {
     console.error('[H5P] failed to load /frame.bundle.js');
