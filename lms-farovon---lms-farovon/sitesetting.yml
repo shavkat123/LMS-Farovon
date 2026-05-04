@@ -11,6 +11,12 @@
 - adx_name: Webapi/msdynce_course/fields
   adx_sitesettingid: 0fcfddf9-a538-f111-88b5-7ced8d76b3cc
   adx_value: '*'
+- adx_name: Webapi/new_h5pcontent/enabled
+  adx_sitesettingid: c7d8e9f0-1a2b-3c4d-5e6f-7890abcdef12
+  adx_value: 'true'
+- adx_name: Webapi/new_h5pcontent/fields
+  adx_sitesettingid: d8e9f012-3a4b-5c6d-7e8f-90abcdef1234
+  adx_value: '*'
 - adx_name: Webapi/new_h5pprogress/enabled
   adx_sitesettingid: 77f5a26e-b202-4e0b-b0a3-61c524aea74c
   adx_value: 'true'

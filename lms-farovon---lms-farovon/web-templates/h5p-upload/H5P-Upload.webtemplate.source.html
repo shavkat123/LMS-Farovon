@@ -33,12 +33,60 @@
 (function () {
   var recordId = null;
 
-  // Power Pages passes the GUID string directly as the second argument
-  $(document).on('saved.entityForm', function (e, entityId) {
-    if (entityId) {
-      recordId = String(entityId).replace(/[{}]/g, '');
-      document.getElementById('h5p-file-upload-section').style.display = '';
+  function revealStep2(rawId) {
+    if (recordId) return;
+    var id;
+    if (typeof rawId === 'string') {
+      id = rawId.replace(/[{}]/g, '').trim();
+    } else if (rawId && typeof rawId === 'object') {
+      var ref = rawId.entityReference || rawId;
+      id = String(ref.id || ref.Id || ref.entityId || '').replace(/[{}]/g, '').trim();
     }
+    if (!id || id.length < 10) return;
+    recordId = id;
+    var sec = document.getElementById('h5p-file-upload-section');
+    if (sec) sec.style.display = '';
+  }
+
+  function checkSuccessState() {
+    var successEl = document.querySelector('.alert-success');
+    console.log('[H5P-upload] checkSuccessState, successEl:', successEl ? successEl.innerText.slice(0, 80) : 'none');
+    if (successEl) {
+      fetchLatestRecordId();
+    }
+  }
+
+  // Запускаем и через DOMContentLoaded, и сразу если DOM уже готов
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(checkSuccessState, 500); });
+  } else {
+    setTimeout(checkSuccessState, 500);
+  }
+
+  function fetchLatestRecordId() {
+    console.log('[H5P-upload] fetchLatestRecordId called');
+    fetch('/_api/new_h5pcontents?$orderby=createdon desc&$top=1&$select=new_h5pcontentid', {
+      headers: {
+        'Accept': 'application/json',
+        'OData-MaxVersion': '4.0',
+        'OData-Version': '4.0'
+      }
+    })
+    .then(function (r) {
+      console.log('[H5P-upload] API status:', r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      console.log('[H5P-upload] API data:', JSON.stringify(data).slice(0, 200));
+      var rec = data.value && data.value[0];
+      if (rec) revealStep2(rec.new_h5pcontentid);
+    })
+    .catch(function (e) { console.log('[H5P-upload] API error:', e); });
+  }
+
+  // Резервный вариант: стандартное событие Power Pages (на случай AJAX-версии)
+  $(document).on('saved saved.entityForm', function (e, data) {
+    revealStep2(data);
   });
 
   document.getElementById('h5p-upload-btn').addEventListener('click', function () {
@@ -63,23 +111,37 @@
     reader.readAsArrayBuffer(file);
   });
 
-  function uploadFile(filename, buffer) {
+  function getToken() {
+    // Сначала пробуем токен из DOM (если форма ещё там)
     var tok = document.querySelector('input[name="__RequestVerificationToken"]');
-    var headers = {
-      'Content-Type': 'application/octet-stream',
-      'x-ms-file-name': encodeURIComponent(filename),
-      'OData-MaxVersion': '4.0',
-      'OData-Version': '4.0'
-    };
-    if (tok) headers['__RequestVerificationToken'] = tok.value;
+    if (tok && tok.value) return Promise.resolve(tok.value);
+    // После перезагрузки страницы форма исчезает — берём токен с /_layout/tokenhtml
+    return fetch('/_layout/tokenhtml')
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        var m = html.match(/value="([^"]+)"/);
+        return m ? m[1] : null;
+      });
+  }
 
+  function uploadFile(filename, buffer) {
     document.getElementById('h5p-upload-progress').style.display = '';
     document.getElementById('h5p-upload-result').innerHTML = '';
 
-    fetch('/_api/new_h5pcontents(' + recordId + ')/new_h5pfile', {
-      method: 'PATCH',
-      headers: headers,
-      body: buffer
+    getToken().then(function (token) {
+      var headers = {
+        'Content-Type': 'application/octet-stream',
+        'x-ms-file-name': encodeURIComponent(filename),
+        'OData-MaxVersion': '4.0',
+        'OData-Version': '4.0'
+      };
+      if (token) headers['__RequestVerificationToken'] = token;
+
+      return fetch('/_api/new_h5pcontents(' + recordId + ')/new_h5pfile', {
+        method: 'PATCH',
+        headers: headers,
+        body: buffer
+      });
     })
     .then(function (res) {
       document.getElementById('h5p-upload-progress').style.display = 'none';
