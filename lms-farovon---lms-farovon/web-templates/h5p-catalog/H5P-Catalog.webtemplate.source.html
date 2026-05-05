@@ -7,6 +7,7 @@
     <attribute name="new_librarytype" />
     <attribute name="new_durationseconds" />
     <attribute name="new_thumbnailurl" />
+    <attribute name="new_thumbnailfile" />
     <filter>
       <condition attribute="new_isactive" operator="eq" value="1" />
     </filter>
@@ -66,8 +67,15 @@
 
         <div class="card-thumb position-relative" style="height:160px;overflow:hidden;cursor:pointer"
              onclick="location.href='/h5p-lesson?id={{ cid }}'">
-          {% if item.new_thumbnailurl %}
-          <img src="{{ item.new_thumbnailurl }}"
+          {% assign thumb_src = '' %}
+          {% if item.new_thumbnailfile and item.new_thumbnailfile != '' %}
+            {% assign thumb_src = 'data:image/jpeg;base64,' | append: item.new_thumbnailfile %}
+          {% elsif item.new_thumbnailurl and item.new_thumbnailurl != '' %}
+            {% assign thumb_src = item.new_thumbnailurl %}
+          {% endif %}
+
+          {% if thumb_src != '' %}
+          <img src="{{ thumb_src }}"
                style="width:100%;height:160px;object-fit:cover;display:block"
                alt="{{ item.new_name }}"
                onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
@@ -331,8 +339,7 @@
           document.getElementById('thumb-upload-status').style.display = 'none';
           document.getElementById('thumb-save-btn').disabled = false;
           if (res.ok || res.status === 204) {
-            // Добавляем timestamp чтобы браузер не кешировал старое изображение
-            resolve('/_api/new_h5pcontents(' + id + ')/new_thumbnailfile/$value?t=' + Date.now());
+            resolve(null); // страница перезагрузится, Liquid покажет base64 из Image-колонки
           } else {
             res.text().then(function (t) { reject(new Error('HTTP ' + res.status + ': ' + t.slice(0, 200))); });
           }
@@ -379,9 +386,7 @@
     if (activeTab === 'file') {
       var file = document.getElementById('thumb-file-input').files && document.getElementById('thumb-file-input').files[0];
       if (!file) { saveBtn.disabled = false; return; }
-      promise = uploadThumbFile(currentId, file).then(function (fileUrl) {
-        return saveThumbUrl(currentId, fileUrl);
-      });
+      promise = uploadThumbFile(currentId, file);
     } else {
       var url = document.getElementById('thumb-url-input').value.trim();
       promise = saveThumbUrl(currentId, url);
