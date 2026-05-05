@@ -68,9 +68,10 @@
         <div class="card-thumb position-relative" style="height:160px;overflow:hidden;cursor:pointer"
              onclick="location.href='/h5p-lesson?id={{ cid }}'">
           {% assign thumb_src = '' %}
-          {% if item.new_thumbnailfile and item.new_thumbnailfile != '' %}
-            {% assign thumb_src = 'data:image/jpeg;base64,' | append: item.new_thumbnailfile %}
-          {% elsif item.new_thumbnailurl and item.new_thumbnailurl != '' %}
+          {% if item.new_thumbnailfile %}
+            {% assign thumb_src = item.new_thumbnailfile.url %}
+          {% endif %}
+          {% if thumb_src == '' or thumb_src == nil %}
             {% assign thumb_src = item.new_thumbnailurl %}
           {% endif %}
 
