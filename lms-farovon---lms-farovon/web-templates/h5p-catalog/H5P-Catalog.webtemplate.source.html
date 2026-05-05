@@ -6,6 +6,7 @@
     <attribute name="new_description" />
     <attribute name="new_librarytype" />
     <attribute name="new_durationseconds" />
+    <attribute name="new_thumbnailurl" />
     <filter>
       <condition attribute="new_isactive" operator="eq" value="1" />
     </filter>
@@ -14,10 +15,27 @@
 </fetch>
 {% endfetchxml %}
 
+{% fetchxml allprogress %}
+<fetch>
+  <entity name="new_h5pprogress">
+    <attribute name="new_h5pcontent" />
+    <attribute name="new_scorescaled" />
+    <filter>
+      <condition attribute="new_completion" operator="eq" value="1" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign is_admin = false %}
+{% if user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Administrators' %}
+  {% assign is_admin = true %}
+{% endif %}
+
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="mb-0">H5P Уроки</h2>
-    {% if user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Administrators' %}
+    {% if is_admin %}
     <a href="/h5p-upload" class="btn btn-primary btn-sm">+ Загрузить урок</a>
     {% endif %}
   </div>
@@ -28,47 +46,60 @@
   {% else %}
   <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
     {% for item in h5plist.results.entities %}
-    {% assign cid = item.new_h5pcontentid %}
-
-    {% comment %} Progress for current user {% endcomment %}
-    {% fetchxml myprogress %}
-    <fetch top="1">
-      <entity name="new_h5pprogress">
-        <attribute name="new_completion" />
-        <attribute name="new_scorescaled" />
-        <filter type="and">
-          <condition attribute="new_h5pcontentid" operator="eq" value="{{ cid }}" />
-          <condition attribute="new_userid" operator="eq" value="{{ user.contactid }}" />
-          <condition attribute="new_completion" operator="eq" value="1" />
-        </filter>
-        <order attribute="new_lastupdated" descending="true" />
-      </entity>
-    </fetch>
-    {% endfetchxml %}
+    {% assign cid = item.id %}
 
     {% assign completed = false %}
-    {% assign score = '' %}
-    {% if myprogress.results.entities.size > 0 %}
-      {% assign completed = true %}
-      {% assign prog = myprogress.results.entities[0] %}
-      {% if prog.new_scorescaled %}
-        {% assign score = prog.new_scorescaled | times: 100 | round %}
+    {% assign prog_score = '' %}
+    {% for prog in allprogress.results.entities %}
+      {% assign prog_cid = prog.new_h5pcontent.id %}
+      {% if prog_cid == cid %}
+        {% assign completed = true %}
+        {% if prog.new_scorescaled %}
+          {% assign prog_score = prog.new_scorescaled | times: 100 | round %}
+        {% endif %}
+        {% break %}
       {% endif %}
-    {% endif %}
+    {% endfor %}
 
     <div class="col">
       <div class="card h-100 shadow-sm {% if completed %}border-success{% endif %}">
+
+        {% if item.new_thumbnailurl %}
+        <img src="{{ item.new_thumbnailurl }}" class="card-img-top" style="height:160px;object-fit:cover" alt="{{ item.new_name }}">
+        {% else %}
+        <div class="card-img-top d-flex align-items-center justify-content-center"
+             style="height:160px;background:linear-gradient(135deg,#e8eaf6 0%,#c5cae9 100%)">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#7986cb" stroke-width="1.5">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+        </div>
+        {% endif %}
+
         <div class="card-body d-flex flex-column">
 
           <div class="d-flex justify-content-between align-items-start mb-2">
-            {% if item.new_librarytype %}
-            <span class="badge bg-secondary">{{ item.new_librarytype.label }}</span>
-            {% endif %}
-            {% if completed %}
-            <span class="badge bg-success ms-auto">
-              ✓ Пройдено{% if score != '' %} · {{ score }}%{% endif %}
-            </span>
-            {% endif %}
+            <div>
+              {% if item.new_librarytype %}
+              <span class="badge bg-secondary">{{ item.new_librarytype.label }}</span>
+              {% endif %}
+            </div>
+            <div class="d-flex align-items-center gap-1">
+              {% if completed %}
+              <span class="badge bg-success">
+                ✓ Пройдено{% if prog_score != '' %} · {{ prog_score }}%{% endif %}
+              </span>
+              {% endif %}
+              {% if is_admin %}
+              <button class="btn btn-outline-danger btn-sm py-0 px-1 delete-h5p"
+                      data-id="{{ cid }}" data-name="{{ item.new_name }}" type="button"
+                      title="Удалить урок" style="line-height:1.4">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                  <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                </svg>
+              </button>
+              {% endif %}
+            </div>
           </div>
 
           <h5 class="card-title">{{ item.new_name }}</h5>
@@ -97,3 +128,54 @@
   </div>
   {% endif %}
 </div>
+
+{% if is_admin %}
+<script>
+(function () {
+  function getToken() {
+    return fetch('/_layout/tokenhtml', { credentials: 'include' })
+      .then(function (r) { return r.ok ? r.text() : ''; })
+      .then(function (html) {
+        if (!html) return '';
+        var inp = html.match(/<input[^>]+__RequestVerificationToken[^>]*>/i);
+        if (inp) { var v = inp[0].match(/value="([^"]+)"/); if (v) return v[1]; }
+        var m = html.match(/value="([^"]{20,})"/);
+        return m ? m[1] : '';
+      })
+      .catch(function () { return ''; });
+  }
+
+  document.querySelectorAll('.delete-h5p').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var id   = this.dataset.id;
+      var name = this.dataset.name || 'урок';
+      if (!confirm('Удалить урок «' + name + '»?\nЭто действие нельзя отменить.')) return;
+      btn.disabled = true;
+      getToken().then(function (token) {
+        return fetch('/_api/new_h5pcontents(' + id + ')', {
+          method : 'DELETE',
+          headers: {
+            'OData-MaxVersion'           : '4.0',
+            'OData-Version'              : '4.0',
+            '__RequestVerificationToken' : token
+          },
+          credentials: 'include'
+        });
+      }).then(function (res) {
+        if (res.ok || res.status === 204) {
+          location.reload();
+        } else {
+          btn.disabled = false;
+          return res.text().then(function (t) {
+            alert('Ошибка удаления (HTTP ' + res.status + '):\n' + t.slice(0, 300));
+          });
+        }
+      }).catch(function (e) {
+        btn.disabled = false;
+        alert('Сетевая ошибка: ' + e.message);
+      });
+    });
+  });
+})();
+</script>
+{% endif %}
