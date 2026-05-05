@@ -450,7 +450,15 @@
     _csrfTokenPromise = _fetch('/_layout/tokenhtml', { credentials: 'include' })
       .then(function (r) { return r.ok ? r.text() : ''; })
       .then(function (html) {
-        var m = html && html.match(/name="__RequestVerificationToken"[^>]*value="([^"]+)"/);
+        if (!html) return '';
+        // Ищем <input> содержащий __RequestVerificationToken — порядок атрибутов не важен
+        var inputMatch = html.match(/<input[^>]+__RequestVerificationToken[^>]*>/i);
+        if (inputMatch) {
+          var valMatch = inputMatch[0].match(/value="([^"]+)"/);
+          if (valMatch) return valMatch[1];
+        }
+        // Запасной вариант: просто первое value на странице
+        var m = html.match(/value="([^"]{20,})"/);
         return m ? m[1] : '';
       })
       .catch(function () { return ''; });
@@ -459,7 +467,10 @@
 
   function sendXAPI(cid, uid, stmt) {
     if (!uid) return;
-    getCsrfToken().then(function (tok) { sendXAPIWithToken(cid, uid, stmt, tok); });
+    getCsrfToken().then(function (tok) {
+      console.log('[H5P] xAPI token length:', tok ? tok.length : 0);
+      sendXAPIWithToken(cid, uid, stmt, tok);
+    });
   }
   function sendXAPIWithToken(cid, uid, stmt, tok) {
     var hdrs = { 'Content-Type': 'application/json' };
@@ -483,7 +494,7 @@
       if (r.duration)  body.new_durationseconds = parseISO(r.duration);
     }
     _fetch('/_api/new_h5pprogresses', {
-      method: 'POST', headers: hdrs, body: JSON.stringify(body)
+      method: 'POST', headers: hdrs, body: JSON.stringify(body), credentials: 'include'
     }).then(function (res) {
       if (res.ok) return;
       res.text().then(function (txt) {
