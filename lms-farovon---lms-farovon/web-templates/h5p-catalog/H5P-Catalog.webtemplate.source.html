@@ -64,19 +64,39 @@
     <div class="col">
       <div class="card h-100 shadow-sm {% if completed %}border-success{% endif %}">
 
-        {% if item.new_thumbnailurl %}
-        <img src="{{ item.new_thumbnailurl }}" class="card-img-top" style="height:160px;object-fit:cover" alt="{{ item.new_name }}">
-        {% else %}
-        <div class="card-img-top d-flex align-items-center justify-content-center"
-             style="height:160px;background:linear-gradient(135deg,#e8eaf6 0%,#c5cae9 100%)">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#7986cb" stroke-width="1.5">
-            <polygon points="5 3 19 12 5 21 5 3"/>
-          </svg>
+        <div class="card-thumb position-relative" style="height:160px;overflow:hidden;cursor:pointer"
+             onclick="location.href='/h5p-lesson?id={{ cid }}'">
+          {% if item.new_thumbnailurl %}
+          <img src="{{ item.new_thumbnailurl }}"
+               style="width:100%;height:160px;object-fit:cover;display:block"
+               alt="{{ item.new_name }}"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="d-none align-items-center justify-content-center w-100 h-100"
+               style="background:linear-gradient(135deg,#e8eaf6 0%,#c5cae9 100%);position:absolute;top:0;left:0">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#7986cb" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+          {% else %}
+          <div class="d-flex align-items-center justify-content-center w-100 h-100"
+               style="background:linear-gradient(135deg,#e8eaf6 0%,#c5cae9 100%)">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#7986cb" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+          {% endif %}
+          {% if is_admin %}
+          <button class="btn btn-sm edit-thumb-btn position-absolute"
+                  style="bottom:6px;right:6px;background:rgba(0,0,0,.45);border:none;color:#fff;padding:3px 7px;border-radius:4px;z-index:2"
+                  data-id="{{ cid }}"
+                  data-thumb="{{ item.new_thumbnailurl }}"
+                  onclick="event.stopPropagation()"
+                  type="button" title="Изменить превью">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+            </svg>
+            Превью
+          </button>
+          {% endif %}
         </div>
-        {% endif %}
 
         <div class="card-body d-flex flex-column">
-
           <div class="d-flex justify-content-between align-items-start mb-2">
             <div>
               {% if item.new_librarytype %}
@@ -105,18 +125,14 @@
           <h5 class="card-title">{{ item.new_name }}</h5>
 
           {% if item.new_description %}
-          <p class="card-text text-muted small flex-grow-1">
-            {{ item.new_description | truncate: 120 }}
-          </p>
+          <p class="card-text text-muted small flex-grow-1">{{ item.new_description | truncate: 120 }}</p>
           {% endif %}
 
           {% if item.new_durationseconds %}
-          <p class="card-text small text-muted mb-2">
-            ⏱ {{ item.new_durationseconds | divided_by: 60 }} мин
-          </p>
+          <p class="card-text small text-muted mb-2">⏱ {{ item.new_durationseconds | divided_by: 60 }} мин</p>
           {% endif %}
-
         </div>
+
         <div class="card-footer bg-transparent border-top-0 pt-0">
           <a href="/h5p-lesson?id={{ cid }}" class="btn btn-outline-primary w-100">
             {% if completed %}Смотреть снова{% else %}Смотреть{% endif %}
@@ -130,10 +146,72 @@
 </div>
 
 {% if is_admin %}
+<!-- Модальное окно редактирования превью -->
+<div class="modal fade" id="thumbModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Превью урока</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Превью -->
+        <div id="thumb-preview-wrap" class="mb-3 rounded overflow-hidden"
+             style="height:180px;background:linear-gradient(135deg,#e8eaf6,#c5cae9);display:flex;align-items:center;justify-content:center">
+          <img id="thumb-preview-img" src="" alt="" style="width:100%;height:180px;object-fit:cover;display:none">
+          <svg id="thumb-preview-icon" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#7986cb" stroke-width="1.5">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+        </div>
+
+        <!-- Вкладки -->
+        <ul class="nav nav-tabs mb-3" id="thumbTabs">
+          <li class="nav-item">
+            <button class="nav-link active" data-tab="url" type="button">Ссылка на изображение</button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" data-tab="file" type="button">Загрузить файл</button>
+          </li>
+        </ul>
+
+        <!-- Таб: URL -->
+        <div id="tab-url">
+          <label class="form-label small text-muted">Вставьте URL изображения (JPEG, PNG, WebP)</label>
+          <input type="url" id="thumb-url-input" class="form-control" placeholder="https://...">
+        </div>
+
+        <!-- Таб: Файл -->
+        <div id="tab-file" style="display:none">
+          <label class="form-label small text-muted">Выберите файл (JPG, PNG, WebP — макс. 2 МБ)</label>
+          <input type="file" id="thumb-file-input" class="form-control" accept="image/jpeg,image/png,image/webp,image/gif">
+          <div id="thumb-upload-status" class="mt-2" style="display:none">
+            <div class="progress"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%"></div></div>
+            <small class="text-muted">Загрузка…</small>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+        <button type="button" class="btn btn-danger btn-sm me-auto" id="thumb-clear-btn">Удалить превью</button>
+        <button type="button" class="btn btn-primary" id="thumb-save-btn">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
+  var currentId   = null;
+  var activeTab   = 'url';
+  var uploadedUrl = null;
+
+  // ── CSRF token ────────────────────────────────────────────────────────────
+  var _tokenPromise = null;
   function getToken() {
-    return fetch('/_layout/tokenhtml', { credentials: 'include' })
+    if (_tokenPromise) return _tokenPromise;
+    _tokenPromise = fetch('/_layout/tokenhtml', { credentials: 'include' })
       .then(function (r) { return r.ok ? r.text() : ''; })
       .then(function (html) {
         if (!html) return '';
@@ -143,14 +221,202 @@
         return m ? m[1] : '';
       })
       .catch(function () { return ''; });
+    return _tokenPromise;
   }
 
+  function resetToken() { _tokenPromise = null; }
+
+  // ── Превью ────────────────────────────────────────────────────────────────
+  function setPreview(url) {
+    var img  = document.getElementById('thumb-preview-img');
+    var icon = document.getElementById('thumb-preview-icon');
+    if (url) {
+      img.src = url;
+      img.style.display = 'block';
+      icon.style.display = 'none';
+      img.onerror = function () {
+        img.style.display = 'none';
+        icon.style.display = 'block';
+      };
+    } else {
+      img.style.display = 'none';
+      img.src = '';
+      icon.style.display = 'block';
+    }
+  }
+
+  // ── Вкладки ───────────────────────────────────────────────────────────────
+  document.querySelectorAll('#thumbTabs [data-tab]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activeTab = this.dataset.tab;
+      document.querySelectorAll('#thumbTabs [data-tab]').forEach(function (b) {
+        b.classList.toggle('active', b.dataset.tab === activeTab);
+      });
+      document.getElementById('tab-url').style.display  = activeTab === 'url'  ? '' : 'none';
+      document.getElementById('tab-file').style.display = activeTab === 'file' ? '' : 'none';
+    });
+  });
+
+  // ── Живое превью при вводе URL ────────────────────────────────────────────
+  document.getElementById('thumb-url-input').addEventListener('input', function () {
+    setPreview(this.value.trim());
+  });
+
+  // ── Живое превью при выборе файла ────────────────────────────────────────
+  document.getElementById('thumb-file-input').addEventListener('change', function () {
+    uploadedUrl = null;
+    var file = this.files && this.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Файл слишком большой (макс. 2 МБ)');
+      this.value = '';
+      return;
+    }
+    setPreview(URL.createObjectURL(file));
+  });
+
+  // ── Открытие модального окна ──────────────────────────────────────────────
+  document.querySelectorAll('.edit-thumb-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      currentId   = this.dataset.id;
+      uploadedUrl = null;
+      var cur     = this.dataset.thumb || '';
+
+      document.getElementById('thumb-url-input').value = cur;
+      document.getElementById('thumb-file-input').value = '';
+      document.getElementById('thumb-upload-status').style.display = 'none';
+      setPreview(cur);
+
+      // Сбрасываем на вкладку URL
+      activeTab = 'url';
+      document.querySelectorAll('#thumbTabs [data-tab]').forEach(function (b) {
+        b.classList.toggle('active', b.dataset.tab === 'url');
+      });
+      document.getElementById('tab-url').style.display  = '';
+      document.getElementById('tab-file').style.display = 'none';
+
+      var modal = new bootstrap.Modal(document.getElementById('thumbModal'));
+      modal.show();
+    });
+  });
+
+  // ── Загрузка файла в Dataverse ───────────────────────────────────────────
+  function uploadThumbFile(id, file) {
+    document.getElementById('thumb-upload-status').style.display = '';
+    document.getElementById('thumb-save-btn').disabled = true;
+
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function (ev) {
+        resetToken();
+        getToken().then(function (token) {
+          return fetch('/_api/new_h5pcontents(' + id + ')/new_thumbnailfile', {
+            method : 'PATCH',
+            headers: {
+              'Content-Type'               : file.type || 'application/octet-stream',
+              'x-ms-file-name'             : encodeURIComponent(file.name),
+              'OData-MaxVersion'           : '4.0',
+              'OData-Version'              : '4.0',
+              '__RequestVerificationToken' : token
+            },
+            body       : ev.target.result,
+            credentials: 'include'
+          });
+        }).then(function (res) {
+          document.getElementById('thumb-upload-status').style.display = 'none';
+          document.getElementById('thumb-save-btn').disabled = false;
+          if (res.ok || res.status === 204) {
+            // Сохраняем URL файла в текстовое поле для отображения
+            var fileUrl = '/_api/new_h5pcontents(' + id + ')/new_thumbnailfile/$value';
+            resolve(fileUrl);
+          } else {
+            res.text().then(function (t) { reject(new Error('HTTP ' + res.status + ': ' + t.slice(0, 200))); });
+          }
+        }).catch(function (e) {
+          document.getElementById('thumb-upload-status').style.display = 'none';
+          document.getElementById('thumb-save-btn').disabled = false;
+          reject(e);
+        });
+      };
+      reader.onerror = function () { reject(new Error('Ошибка чтения файла')); };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // ── Сохранение URL в Dataverse ───────────────────────────────────────────
+  function saveThumbUrl(id, url) {
+    return resetToken() || getToken().then(function (token) {
+      return fetch('/_api/new_h5pcontents(' + id + ')', {
+        method : 'PATCH',
+        headers: {
+          'Content-Type'               : 'application/json',
+          'OData-MaxVersion'           : '4.0',
+          'OData-Version'              : '4.0',
+          '__RequestVerificationToken' : token,
+          'If-Match'                   : '*'
+        },
+        body       : JSON.stringify({ new_thumbnailurl: url }),
+        credentials: 'include'
+      });
+    }).then(function (res) {
+      if (!res.ok && res.status !== 204) {
+        return res.text().then(function (t) { throw new Error('HTTP ' + res.status + ': ' + t.slice(0, 200)); });
+      }
+    });
+  }
+
+  // ── Кнопка «Сохранить» ───────────────────────────────────────────────────
+  document.getElementById('thumb-save-btn').addEventListener('click', function () {
+    if (!currentId) return;
+    var saveBtn = this;
+    saveBtn.disabled = true;
+
+    var promise;
+    if (activeTab === 'file') {
+      var file = document.getElementById('thumb-file-input').files && document.getElementById('thumb-file-input').files[0];
+      if (!file) { saveBtn.disabled = false; return; }
+      promise = uploadThumbFile(currentId, file).then(function (fileUrl) {
+        return saveThumbUrl(currentId, fileUrl);
+      });
+    } else {
+      var url = document.getElementById('thumb-url-input').value.trim();
+      promise = saveThumbUrl(currentId, url);
+    }
+
+    promise.then(function () {
+      bootstrap.Modal.getInstance(document.getElementById('thumbModal')).hide();
+      location.reload();
+    }).catch(function (e) {
+      saveBtn.disabled = false;
+      alert('Ошибка сохранения: ' + e.message);
+    });
+  });
+
+  // ── Кнопка «Удалить превью» ──────────────────────────────────────────────
+  document.getElementById('thumb-clear-btn').addEventListener('click', function () {
+    if (!currentId) return;
+    if (!confirm('Удалить превью?')) return;
+    this.disabled = true;
+    var btn = this;
+    resetToken();
+    saveThumbUrl(currentId, '').then(function () {
+      bootstrap.Modal.getInstance(document.getElementById('thumbModal')).hide();
+      location.reload();
+    }).catch(function (e) {
+      btn.disabled = false;
+      alert('Ошибка: ' + e.message);
+    });
+  });
+
+  // ── Кнопка удаления урока ────────────────────────────────────────────────
   document.querySelectorAll('.delete-h5p').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var id   = this.dataset.id;
       var name = this.dataset.name || 'урок';
       if (!confirm('Удалить урок «' + name + '»?\nЭто действие нельзя отменить.')) return;
-      btn.disabled = true;
+      this.disabled = true;
+      var self = this;
+      resetToken();
       getToken().then(function (token) {
         return fetch('/_api/new_h5pcontents(' + id + ')', {
           method : 'DELETE',
@@ -165,13 +431,13 @@
         if (res.ok || res.status === 204) {
           location.reload();
         } else {
-          btn.disabled = false;
+          self.disabled = false;
           return res.text().then(function (t) {
             alert('Ошибка удаления (HTTP ' + res.status + '):\n' + t.slice(0, 300));
           });
         }
       }).catch(function (e) {
-        btn.disabled = false;
+        self.disabled = false;
         alert('Сетевая ошибка: ' + e.message);
       });
     });
