@@ -300,7 +300,7 @@
     });
   });
 
-  // ── Загрузка файла в Dataverse ───────────────────────────────────────────
+  // ── Загрузка файла в Dataverse (Image-колонка принимает base64 в JSON) ───
   function uploadThumbFile(id, file) {
     document.getElementById('thumb-upload-status').style.display = '';
     document.getElementById('thumb-save-btn').disabled = true;
@@ -308,27 +308,31 @@
     return new Promise(function (resolve, reject) {
       var reader = new FileReader();
       reader.onload = function (ev) {
+        // Конвертируем ArrayBuffer → base64
+        var bytes  = new Uint8Array(ev.target.result);
+        var binary = '';
+        for (var i = 0; i < bytes.byteLength; i++) { binary += String.fromCharCode(bytes[i]); }
+        var b64 = btoa(binary);
+
         resetToken();
         getToken().then(function (token) {
-          return fetch('/_api/new_h5pcontents(' + id + ')/new_thumbnailfile', {
+          return fetch('/_api/new_h5pcontents(' + id + ')', {
             method : 'PATCH',
             headers: {
-              'Content-Type'               : file.type || 'application/octet-stream',
-              'x-ms-file-name'             : encodeURIComponent(file.name),
+              'Content-Type'               : 'application/json',
               'OData-MaxVersion'           : '4.0',
               'OData-Version'              : '4.0',
               '__RequestVerificationToken' : token
             },
-            body       : ev.target.result,
+            body       : JSON.stringify({ new_thumbnailfile: b64 }),
             credentials: 'include'
           });
         }).then(function (res) {
           document.getElementById('thumb-upload-status').style.display = 'none';
           document.getElementById('thumb-save-btn').disabled = false;
           if (res.ok || res.status === 204) {
-            // Сохраняем URL файла в текстовое поле для отображения
-            var fileUrl = '/_api/new_h5pcontents(' + id + ')/new_thumbnailfile/$value';
-            resolve(fileUrl);
+            // Добавляем timestamp чтобы браузер не кешировал старое изображение
+            resolve('/_api/new_h5pcontents(' + id + ')/new_thumbnailfile/$value?t=' + Date.now());
           } else {
             res.text().then(function (t) { reject(new Error('HTTP ' + res.status + ': ' + t.slice(0, 200))); });
           }
@@ -345,17 +349,17 @@
 
   // ── Сохранение URL в Dataverse ───────────────────────────────────────────
   function saveThumbUrl(id, url) {
-    return resetToken() || getToken().then(function (token) {
+    resetToken();
+    return getToken().then(function (token) {
       return fetch('/_api/new_h5pcontents(' + id + ')', {
         method : 'PATCH',
         headers: {
           'Content-Type'               : 'application/json',
           'OData-MaxVersion'           : '4.0',
           'OData-Version'              : '4.0',
-          '__RequestVerificationToken' : token,
-          'If-Match'                   : '*'
+          '__RequestVerificationToken' : token
         },
-        body       : JSON.stringify({ new_thumbnailurl: url }),
+        body       : JSON.stringify({ new_thumbnailurl: url || null }),
         credentials: 'include'
       });
     }).then(function (res) {
