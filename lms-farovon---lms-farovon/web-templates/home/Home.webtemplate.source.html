@@ -1,4 +1,4 @@
-{% comment %}── Step 1: lessons only, no progress ──{% endcomment %}
+{% comment %}── Step 3: lessons + user progress ──{% endcomment %}
 {% fetchxml h5p_all %}
 <fetch>
   <entity name="new_h5pcontent">
@@ -16,6 +16,51 @@
 {% for item in h5p_all.results.entities %}
   {% assign total_available = total_available | plus: 1 %}
 {% endfor %}
+
+{% assign started_count = 0 %}
+{% assign completed_count = 0 %}
+{% assign in_progress_count = 0 %}
+{% assign last_in_progress_id = '' %}
+{% assign last_lesson = null %}
+
+{% if user %}
+  {% fetchxml user_progress %}
+  <fetch>
+    <entity name="new_h5pprogress">
+      <attribute name="new_h5pprogressid" />
+      <attribute name="new_h5pcontent" />
+      <attribute name="new_completion" />
+      <attribute name="new_scorescaled" />
+      <filter>
+        <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
+      </filter>
+      <order attribute="modifiedon" descending="true" />
+    </entity>
+  </fetch>
+  {% endfetchxml %}
+
+  {% assign found_last_inprogress = false %}
+  {% for p in user_progress.results.entities %}
+    {% assign started_count = started_count | plus: 1 %}
+    {% if p.new_completion %}
+      {% assign completed_count = completed_count | plus: 1 %}
+    {% else %}
+      {% unless found_last_inprogress %}
+        {% assign last_in_progress_id = p.new_h5pcontent.id %}
+        {% assign found_last_inprogress = true %}
+      {% endunless %}
+    {% endif %}
+  {% endfor %}
+  {% assign in_progress_count = started_count | minus: completed_count %}
+
+  {% if last_in_progress_id != '' %}
+    {% for item in h5p_all.results.entities %}
+      {% if item.id == last_in_progress_id %}
+        {% assign last_lesson = item %}
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+{% endif %}
 
 <style>
   .fv-dash { padding: 24px 0 48px; }
@@ -49,10 +94,16 @@
   .fv-action-btn:hover { background: #EEF2F9 !important; border-color: #1E3A8A !important; color: #1E3A8A !important; }
   .fv-action-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
 
+  .fv-continue-btn { display: flex; align-items: center; gap: 16px; padding: 16px; border-radius: 10px; border: 1px solid #E5E7EB; background: #fff; text-decoration: none !important; color: #0B1220 !important; transition: box-shadow 0.14s, border-color 0.14s; }
+  .fv-continue-btn:hover { box-shadow: 0 4px 12px rgba(30,58,138,0.10); border-color: #1E3A8A !important; text-decoration: none !important; }
+  .fv-continue-thumb { width: 88px; height: 60px; border-radius: 8px; overflow: hidden; flex-shrink: 0; background: linear-gradient(135deg,#EEF2F9,#D8DFEF); display: flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 22px; }
+  .fv-continue-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
   .fv-lesson-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(11,18,32,0.04); transition: box-shadow 0.18s, transform 0.18s; text-decoration: none !important; color: inherit !important; }
   .fv-lesson-card:hover { box-shadow: 0 4px 14px rgba(11,18,32,0.10); transform: translateY(-2px); }
   .fv-lesson-thumb { height: 110px; background: linear-gradient(135deg,#EEF2F9,#D8DFEF); display: flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 32px; position: relative; overflow: hidden; }
   .fv-lesson-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .fv-lesson-badge { position: absolute; top: 6px; right: 6px; border-radius: 20px; font-size: 10px; font-weight: 600; padding: 2px 7px; line-height: 1.6; }
   .fv-lesson-body { padding: 12px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
   .fv-lesson-type { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #94A3B8; }
   .fv-lesson-title { font-size: 13px; font-weight: 600; color: #0B1220; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -73,12 +124,12 @@
     <p>Ваш персональный центр обучения. Отслеживайте прогресс и открывайте новые знания.</p>
     <div class="fv-hero-stats">
       <div class="fv-hero-stat">
-        <span class="fv-big">—</span>
+        <span class="fv-big">{{ in_progress_count }}</span>
         <span class="fv-lbl">уроков в работе</span>
       </div>
       <div class="fv-hero-div"></div>
       <div class="fv-hero-stat">
-        <span class="fv-big">—</span>
+        <span class="fv-big">{{ completed_count }}</span>
         <span class="fv-lbl">завершено</span>
       </div>
       <div class="fv-hero-div"></div>
@@ -95,7 +146,7 @@
       <div class="fv-stat-tile">
         <div class="fv-stat-icon" style="background:#EEF2F9;color:#1E3A8A;"><i class="bi bi-book-half"></i></div>
         <div>
-          <div class="fv-stat-value">—</div>
+          <div class="fv-stat-value">{{ in_progress_count }}</div>
           <div class="fv-stat-label">В обучении</div>
           <div class="fv-stat-sub">активных уроков</div>
         </div>
@@ -105,7 +156,7 @@
       <div class="fv-stat-tile">
         <div class="fv-stat-icon" style="background:#ECF6EF;color:#15803D;"><i class="bi bi-check-circle"></i></div>
         <div>
-          <div class="fv-stat-value">—</div>
+          <div class="fv-stat-value">{{ completed_count }}</div>
           <div class="fv-stat-label">Завершено</div>
           <div class="fv-stat-sub">уроков пройдено</div>
         </div>
@@ -125,7 +176,7 @@
       <div class="fv-stat-tile">
         <div class="fv-stat-icon" style="background:#FBEAEA;color:#B91C1C;"><i class="bi bi-person-check"></i></div>
         <div>
-          <div class="fv-stat-value">—</div>
+          <div class="fv-stat-value">{{ started_count }}</div>
           <div class="fv-stat-label">Начато</div>
           <div class="fv-stat-sub">всего за всё время</div>
         </div>
@@ -137,14 +188,37 @@
   <div class="row g-4 mb-4">
     <div class="col-md-8">
       <div class="fv-card mb-4">
-        <div class="fv-card-body text-center py-4">
-          <i class="bi bi-mortarboard" style="font-size:48px;color:#94A3B8;"></i>
-          <h3 style="font-size:16px;font-weight:700;color:#0B1220;margin:12px 0 6px;">Начните обучение</h3>
-          <p style="font-size:13px;color:#94A3B8;margin-bottom:16px;">Откройте каталог и выберите первый урок!</p>
-          <a href="/h5p-catalog" class="btn btn-primary">
-            <i class="bi bi-collection-play"></i> Открыть каталог уроков
-          </a>
-        </div>
+        {% if last_lesson %}
+          <div class="fv-card-head" style="padding-bottom:14px;">
+            <h2 class="fv-card-title">Продолжить обучение</h2>
+            <a href="/h5p-catalog" class="fv-card-link">Все уроки →</a>
+          </div>
+          <div class="fv-card-body">
+            <a href="/h5p-player?id={{ last_lesson.new_h5pcontentid }}" class="fv-continue-btn">
+              <div class="fv-continue-thumb">
+                {% if last_lesson.new_thumbnailurl and last_lesson.new_thumbnailurl != '' %}
+                  <img src="{{ last_lesson.new_thumbnailurl }}" alt="{{ last_lesson.new_name | escape }}" onerror="this.style.display='none'" />
+                {% else %}
+                  <i class="bi bi-play-circle-fill"></i>
+                {% endif %}
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#94A3B8;margin-bottom:4px;">{{ last_lesson.new_librarytype | default: 'H5P' }}</div>
+                <div style="font-size:14px;font-weight:600;color:#0B1220;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ last_lesson.new_name }}</div>
+                <div style="font-size:12px;color:#1E3A8A;margin-top:6px;font-weight:500;"><i class="bi bi-play-circle"></i> Продолжить урок →</div>
+              </div>
+            </a>
+          </div>
+        {% else %}
+          <div class="fv-card-body text-center py-4">
+            <i class="bi bi-mortarboard" style="font-size:48px;color:#94A3B8;"></i>
+            <h3 style="font-size:16px;font-weight:700;color:#0B1220;margin:12px 0 6px;">Начните обучение</h3>
+            <p style="font-size:13px;color:#94A3B8;margin-bottom:16px;">Откройте каталог и выберите первый урок!</p>
+            <a href="/h5p-catalog" class="btn btn-primary">
+              <i class="bi bi-collection-play"></i> Открыть каталог уроков
+            </a>
+          </div>
+        {% endif %}
       </div>
     </div>
 
@@ -171,7 +245,7 @@
     </div>
   </div>
 
-  <!-- LESSON GRID — static placeholders -->
+  <!-- LESSON GRID -->
   <div class="fv-sec-hdr">
     <div>
       <span class="fv-eyebrow">Каталог</span>
@@ -183,13 +257,32 @@
     {% assign card_count = 0 %}
     {% for item in h5p_all.results.entities %}
       {% if card_count < 6 %}
+        {% assign lesson_status = 'not_started' %}
+        {% assign found_status = false %}
+        {% for p in user_progress.results.entities %}
+          {% unless found_status %}
+            {% if p.new_h5pcontent.id == item.id %}
+              {% assign found_status = true %}
+              {% if p.new_completion %}
+                {% assign lesson_status = 'completed' %}
+              {% else %}
+                {% assign lesson_status = 'in_progress' %}
+              {% endif %}
+            {% endif %}
+          {% endunless %}
+        {% endfor %}
         <div class="col-6 col-md-4 col-lg-2">
           <a href="/h5p-player?id={{ item.new_h5pcontentid }}" class="fv-lesson-card">
             <div class="fv-lesson-thumb">
               {% if item.new_thumbnailurl and item.new_thumbnailurl != '' %}
-                <img src="{{ item.new_thumbnailurl }}" alt="{{ item.new_name | escape }}" />
+                <img src="{{ item.new_thumbnailurl }}" alt="{{ item.new_name | escape }}" onerror="this.style.display='none'" />
               {% else %}
                 <i class="bi bi-play-circle-fill"></i>
+              {% endif %}
+              {% if lesson_status == 'completed' %}
+                <span class="fv-lesson-badge" style="background:#15803D;color:#fff;"><i class="bi bi-check2"></i></span>
+              {% elsif lesson_status == 'in_progress' %}
+                <span class="fv-lesson-badge" style="background:#1E3A8A;color:#fff;"><i class="bi bi-play-fill"></i></span>
               {% endif %}
             </div>
             <div class="fv-lesson-body">
@@ -197,7 +290,13 @@
               <span class="fv-lesson-title">{{ item.new_name }}</span>
             </div>
             <div class="fv-lesson-foot">
-              <i class="bi bi-circle" style="color:#94A3B8;"></i> Не начат
+              {% if lesson_status == 'completed' %}
+                <i class="bi bi-check-circle-fill" style="color:#15803D;"></i> Завершён
+              {% elsif lesson_status == 'in_progress' %}
+                <i class="bi bi-play-circle-fill" style="color:#1E3A8A;"></i> В процессе
+              {% else %}
+                <i class="bi bi-circle" style="color:#94A3B8;"></i> Не начат
+              {% endif %}
             </div>
           </a>
         </div>
