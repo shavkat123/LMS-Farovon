@@ -1,3 +1,81 @@
+<style>
+  /* Farovon v2 — navy top bar */
+  .fv-navbar {
+    background: #1E3A8A !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  }
+  .fv-navbar .navbar-brand,
+  .fv-navbar .navbar-brand a {
+    color: #fff !important;
+    text-decoration: none !important;
+  }
+  .fv-navbar .navbar-nav > li > a,
+  .fv-navbar .nav-link {
+    color: rgba(199,210,232,0.85) !important;
+    font-size: 13px;
+    font-weight: 500;
+    transition: color 0.14s, background 0.14s;
+  }
+  .fv-navbar .navbar-nav > li > a:hover,
+  .fv-navbar .nav-link:hover {
+    color: #fff !important;
+    background: rgba(255,255,255,0.07) !important;
+    border-radius: 6px;
+    text-decoration: none !important;
+  }
+  .fv-navbar .nav-item.active > a,
+  .fv-navbar .nav-link.active {
+    color: #fff !important;
+    background: rgba(255,255,255,0.12) !important;
+    border-radius: 6px;
+  }
+  .fv-navbar .navbar-toggler {
+    border-color: rgba(255,255,255,0.3);
+  }
+  .fv-navbar .navbar-toggler-icon {
+    filter: invert(1);
+  }
+  /* Dropdown menus — white on navy bar */
+  .fv-navbar .dropdown-menu {
+    background: #fff;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(11,18,32,0.12);
+  }
+  .fv-navbar .dropdown-menu .dropdown-item {
+    color: #0B1220;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .fv-navbar .dropdown-menu .dropdown-item:hover {
+    background: #EEF2F9;
+    color: #1E3A8A;
+  }
+  .fv-navbar .dropdown-divider {
+    border-color: #E5E7EB;
+  }
+  /* Username chip */
+  .fv-navbar .username {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px;
+    padding: 3px 12px 3px 10px;
+    font-size: 13px;
+    color: #fff !important;
+    font-weight: 500;
+  }
+  /* Dividers between nav items — subtle */
+  .fv-navbar .divider-vertical {
+    border-right: 1px solid rgba(255,255,255,0.15) !important;
+    height: 20px;
+    align-self: center;
+    margin: 0 4px;
+  }
+</style>
 <!-- Navigation based on web roles -->
 {% assign is_hr = false %}
 {% assign is_nastavnik = false %}
@@ -17,7 +95,7 @@
 
 {% assign defaultlang = settings['LanguageLocale/Code'] | default: 'en-us' %}
 {% assign homeurl = website.adx_partialurl %}
-<div class="navbar-expand-xl navbar navbar-dark static-top" style="flex-wrap:wrap;" role="banner">
+<div class="navbar-expand-xl navbar navbar-dark static-top fv-navbar" style="flex-wrap:wrap;" role="banner">
   <div class="skip-to-content"><a href="#mainContent">{{ resx.Skip_To_Content | default: "Skip to main content" }}</a></div><div class="container custom-container">
     <!--div class="visible-xs-block">
       {% editable snippets 'Mobile Header' type: 'html' %}
