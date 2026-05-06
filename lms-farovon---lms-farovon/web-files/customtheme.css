@@ -2792,3 +2792,113 @@ button#courseTypes.categorySelected {
   margin-bottom: 5px; /* align with filters */
 }
 /* Custom Theme styles ends */
+
+/* ═══════════════════════════════════════════════════════════════
+   Farovon v2 — global theme overrides
+   Navy #1E3A8A primary · Inter font · slate-gray workspace
+   ═══════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --fv-primary:       #1E3A8A;
+  --fv-primary-hover: #15306E;
+  --fv-primary-50:    #EEF2F9;
+  --fv-accent:        #B45309;
+  --fv-success:       #15803D;
+  --fv-danger:        #B91C1C;
+  --fv-bg-app:        #F6F7F9;
+  --fv-bg-surface:    #FFFFFF;
+  --fv-fg-1:          #0B1220;
+  --fv-fg-2:          #475569;
+  --fv-fg-3:          #94A3B8;
+  --fv-border:        #E5E7EB;
+  --fv-radius-md:     8px;
+  --fv-radius-lg:     12px;
+  --fv-shadow-card:   0 1px 3px rgba(11,18,32,0.06), 0 1px 2px rgba(11,18,32,0.04);
+}
+
+/* Inter font across the portal */
+body {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif !important;
+  background: var(--fv-bg-app) !important;
+  color: var(--fv-fg-1) !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Page background inside the main wrapper */
+.wrapper-body {
+  background: var(--fv-bg-app);
+}
+
+/* Primary colour — replace purple #302CE1 with navy */
+a {
+  color: var(--fv-primary) !important;
+}
+a:hover, a:focus {
+  color: var(--fv-primary-hover) !important;
+}
+/* Don't override nav links or buttons that handle their own colour */
+[role="navigation"] a,
+[role="contentinfo"] a,
+.btn a,
+a.btn,
+.fv-navbar a,
+.fv-rail a {
+  color: inherit !important;
+}
+
+.btn-primary {
+  background-color: var(--fv-primary) !important;
+  border-color: var(--fv-primary) !important;
+  color: #fff !important;
+}
+.btn-primary:hover,
+.btn-primary:active,
+.btn-primary:focus {
+  background-color: var(--fv-primary-hover) !important;
+  border-color: var(--fv-primary-hover) !important;
+  color: #fff !important;
+}
+
+/* Default button — remove the purple tint from theme.css */
+.btn-default {
+  color: var(--fv-fg-1) !important;
+  background-color: #fff !important;
+  border-color: var(--fv-border) !important;
+}
+.btn-default:hover,
+.btn-default:active,
+.btn-default:focus {
+  color: var(--fv-primary) !important;
+  background-color: var(--fv-primary-50) !important;
+  border-color: var(--fv-primary) !important;
+}
+
+/* Cards — subtle border + shadow replacing flat zero-shadow */
+.card {
+  border: 1px solid var(--fv-border) !important;
+  border-radius: var(--fv-radius-lg) !important;
+  box-shadow: var(--fv-shadow-card) !important;
+  background: var(--fv-bg-surface) !important;
+}
+
+/* Inputs */
+.form-control:focus {
+  border-color: var(--fv-primary) !important;
+  box-shadow: 0 0 0 3px rgba(30,58,138,0.12) !important;
+  outline: none !important;
+}
+
+/* Breadcrumb link */
+.breadcrumb > li a {
+  color: var(--fv-primary) !important;
+}
+
+/* Active nav pagination */
+.pagination > .active > a,
+.pagination > .active > span {
+  background-color: var(--fv-primary) !important;
+  border-color: var(--fv-primary) !important;
+  color: #fff !important;
+}
+/* ── end Farovon v2 overrides ── */
