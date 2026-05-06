@@ -1,3 +1,22 @@
+{% comment %}── Step 1: lessons only, no progress ──{% endcomment %}
+{% fetchxml h5p_all %}
+<fetch>
+  <entity name="new_h5pcontent">
+    <attribute name="new_h5pcontentid" />
+    <attribute name="new_name" />
+    <attribute name="new_librarytype" />
+    <attribute name="new_thumbnailurl" />
+    <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
+    <order attribute="new_name" descending="false" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign total_available = 0 %}
+{% for item in h5p_all.results.entities %}
+  {% assign total_available = total_available | plus: 1 %}
+{% endfor %}
+
 <style>
   .fv-dash { padding: 24px 0 48px; }
   .fv-hero {
@@ -64,7 +83,7 @@
       </div>
       <div class="fv-hero-div"></div>
       <div class="fv-hero-stat">
-        <span class="fv-big">—</span>
+        <span class="fv-big">{{ total_available }}</span>
         <span class="fv-lbl">доступно</span>
       </div>
     </div>
@@ -96,7 +115,7 @@
       <div class="fv-stat-tile">
         <div class="fv-stat-icon" style="background:#FAF3E8;color:#B45309;"><i class="bi bi-collection-play"></i></div>
         <div>
-          <div class="fv-stat-value">—</div>
+          <div class="fv-stat-value">{{ total_available }}</div>
           <div class="fv-stat-label">Доступно</div>
           <div class="fv-stat-sub">уроков в каталоге</div>
         </div>
@@ -161,16 +180,30 @@
     <a href="/h5p-catalog" class="fv-card-link">Открыть полный каталог →</a>
   </div>
   <div class="row g-3">
-    <div class="col-6 col-md-4 col-lg-2">
-      <a href="/h5p-catalog" class="fv-lesson-card">
-        <div class="fv-lesson-thumb"><i class="bi bi-play-circle-fill"></i></div>
-        <div class="fv-lesson-body">
-          <span class="fv-lesson-type">H5P</span>
-          <span class="fv-lesson-title">Перейдите в каталог</span>
+    {% assign card_count = 0 %}
+    {% for item in h5p_all.results.entities %}
+      {% if card_count < 6 %}
+        <div class="col-6 col-md-4 col-lg-2">
+          <a href="/h5p-player?id={{ item.new_h5pcontentid }}" class="fv-lesson-card">
+            <div class="fv-lesson-thumb">
+              {% if item.new_thumbnailurl and item.new_thumbnailurl != '' %}
+                <img src="{{ item.new_thumbnailurl }}" alt="{{ item.new_name | escape }}" />
+              {% else %}
+                <i class="bi bi-play-circle-fill"></i>
+              {% endif %}
+            </div>
+            <div class="fv-lesson-body">
+              <span class="fv-lesson-type">{{ item.new_librarytype | default: 'H5P' }}</span>
+              <span class="fv-lesson-title">{{ item.new_name }}</span>
+            </div>
+            <div class="fv-lesson-foot">
+              <i class="bi bi-circle" style="color:#94A3B8;"></i> Не начат
+            </div>
+          </a>
         </div>
-        <div class="fv-lesson-foot"><i class="bi bi-circle" style="color:#94A3B8;"></i> Открыть</div>
-      </a>
-    </div>
+        {% assign card_count = card_count | plus: 1 %}
+      {% endif %}
+    {% endfor %}
   </div>
 
   {% else %}
