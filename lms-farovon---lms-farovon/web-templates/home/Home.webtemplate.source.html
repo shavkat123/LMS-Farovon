@@ -6,7 +6,6 @@
     <attribute name="new_name" />
     <attribute name="new_description" />
     <attribute name="new_thumbnailurl" />
-    <attribute name="new_thumbnailfile" />
     <attribute name="new_librarytype" />
     <attribute name="new_durationseconds" />
     <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
@@ -352,13 +351,7 @@
           <div class="fv-card-body">
             <div class="fv-continue">
               <div class="fv-continue-thumb">
-                {% assign thumb_src = '' %}
-                {% if last_content.new_thumbnailfile %}
-                  {% assign thumb_src = last_content.new_thumbnailfile.url %}
-                {% endif %}
-                {% if thumb_src == '' or thumb_src == nil %}
-                  {% assign thumb_src = last_content.new_thumbnailurl %}
-                {% endif %}
+                {% assign thumb_src = last_content.new_thumbnailurl %}
                 {% if thumb_src and thumb_src != '' %}
                   <img src="{{ thumb_src }}" alt="{{ last_content.new_name | escape }}" />
                 {% else %}
@@ -517,9 +510,7 @@
             {% endfor %}
           {% endif %}
 
-          {% assign thumb_src = '' %}
-          {% if item.new_thumbnailfile %}{% assign thumb_src = item.new_thumbnailfile.url %}{% endif %}
-          {% if thumb_src == '' or thumb_src == nil %}{% assign thumb_src = item.new_thumbnailurl %}{% endif %}
+          {% assign thumb_src = item.new_thumbnailurl %}
 
           <div class="col-6 col-md-4 col-lg-2">
             <a href="/h5p-player?id={{ item.new_h5pcontentid }}" class="fv-lesson-card">

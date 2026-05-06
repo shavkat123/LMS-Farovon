@@ -1,76 +1,77 @@
 <style>
-  /* Farovon v2 — navy top bar */
+  /* Farovon v2 — white top bar */
   .fv-navbar {
-    background: #1E3A8A !important;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    background: #ffffff !important;
+    border-bottom: 1px solid #E9ECEF;
     font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
   }
   .fv-navbar .navbar-brand,
   .fv-navbar .navbar-brand a {
-    color: #fff !important;
+    color: #212529 !important;
     text-decoration: none !important;
   }
   .fv-navbar .navbar-nav > li > a,
   .fv-navbar .nav-link {
-    color: rgba(199,210,232,0.85) !important;
+    color: #495057 !important;
     font-size: 13px;
     font-weight: 500;
     transition: color 0.14s, background 0.14s;
   }
   .fv-navbar .navbar-nav > li > a:hover,
   .fv-navbar .nav-link:hover {
-    color: #fff !important;
-    background: rgba(255,255,255,0.07) !important;
+    color: #007BFF !important;
+    background: #EFF6FF !important;
     border-radius: 6px;
     text-decoration: none !important;
   }
   .fv-navbar .nav-item.active > a,
   .fv-navbar .nav-link.active {
-    color: #fff !important;
-    background: rgba(255,255,255,0.12) !important;
+    color: #007BFF !important;
+    background: #EFF6FF !important;
     border-radius: 6px;
   }
   .fv-navbar .navbar-toggler {
-    border-color: rgba(255,255,255,0.3);
+    border-color: #DEE2E6;
   }
   .fv-navbar .navbar-toggler-icon {
-    filter: invert(1);
+    filter: none;
   }
-  /* Dropdown menus — white on navy bar */
+  /* Dropdown menus */
   .fv-navbar .dropdown-menu {
     background: #fff;
-    border: 1px solid #E5E7EB;
+    border: 1px solid #E9ECEF;
     border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(11,18,32,0.12);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
   }
   .fv-navbar .dropdown-menu .dropdown-item {
-    color: #0B1220;
+    color: #212529;
     font-size: 13px;
     font-weight: 500;
   }
   .fv-navbar .dropdown-menu .dropdown-item:hover {
-    background: #EEF2F9;
-    color: #1E3A8A;
+    background: #EFF6FF;
+    color: #007BFF;
   }
   .fv-navbar .dropdown-divider {
-    border-color: #E5E7EB;
+    border-color: #E9ECEF;
   }
   /* Username chip */
   .fv-navbar .username {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
+    background: #EFF6FF;
+    border: 1px solid #DBEAFE;
     border-radius: 20px;
     padding: 3px 12px 3px 10px;
     font-size: 13px;
-    color: #fff !important;
-    font-weight: 500;
+    color: #1E40AF !important;
+    font-weight: 600;
   }
-  /* Dividers between nav items — subtle */
+  /* Dividers between nav items */
   .fv-navbar .divider-vertical {
-    border-right: 1px solid rgba(255,255,255,0.15) !important;
+    border-right: 1px solid #DEE2E6 !important;
     height: 20px;
     align-self: center;
     margin: 0 4px;
