@@ -46,7 +46,7 @@
 {% if user %}
   {% for p in user_progress.results.entities %}
     {% assign total_started = total_started | plus: 1 %}
-    {% if p.new_completion == true %}
+    {% if p.new_completion %}
       {% assign total_completed = total_completed | plus: 1 %}
     {% endif %}
   {% endfor %}
@@ -60,10 +60,10 @@
   {% assign found_last = false %}
   {% for p in user_progress.results.entities %}
     {% unless found_last %}
-      {% if p.new_completion != true %}
+      {% unless p.new_completion %}
         {% assign last_progress = p %}
         {% assign found_last = true %}
-      {% endif %}
+      {% endunless %}
     {% endunless %}
   {% endfor %}
 
@@ -71,7 +71,7 @@
     {% assign found_content = false %}
     {% for item in h5p_all.results.entities %}
       {% unless found_content %}
-        {% if item.new_h5pcontentid == last_progress.new_h5pcontent.id %}
+        {% if item.id == last_progress.new_h5pcontent.id %}
           {% assign last_content = item %}
           {% assign found_content = true %}
         {% endif %}
@@ -406,7 +406,7 @@
               {% assign found_hist = false %}
               {% for item in h5p_all.results.entities %}
                 {% unless found_hist %}
-                  {% if item.new_h5pcontentid == p.new_h5pcontent.id %}
+                  {% if item.id == p.new_h5pcontent.id %}
                     {% assign hist_item = item %}
                     {% assign found_hist = true %}
                   {% endif %}
@@ -499,10 +499,10 @@
             {% assign found_prog = false %}
             {% for p in user_progress.results.entities %}
               {% unless found_prog %}
-                {% if p.new_h5pcontent.id == item.new_h5pcontentid %}
+                {% if p.new_h5pcontent.id == item.id %}
                   {% assign item_started = true %}
                   {% assign found_prog = true %}
-                  {% if p.new_completion == true %}
+                  {% if p.new_completion %}
                     {% assign item_done = true %}
                   {% endif %}
                 {% endif %}
