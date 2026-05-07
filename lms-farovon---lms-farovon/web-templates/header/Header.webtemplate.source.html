@@ -1,236 +1,421 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 <style>
-  /* Farovon v2 — white top bar */
-  .fv-navbar {
-    background: #ffffff !important;
-    border-bottom: 1px solid #E9ECEF;
+  /* ── Farovon v2 header ───────────────────────────────────────────────── */
+  .fv-header-wrap {
+    position: sticky;
+    top: 0;
+    z-index: 1030;
     font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
   }
-  .fv-navbar .navbar-brand,
-  .fv-navbar .navbar-brand a {
-    color: #212529 !important;
-    text-decoration: none !important;
-  }
-  .fv-navbar .navbar-nav > li > a,
-  .fv-navbar .nav-link {
-    color: #495057 !important;
-    font-size: 13px;
-    font-weight: 500;
-    transition: color 0.14s, background 0.14s;
-  }
-  .fv-navbar .navbar-nav > li > a:hover,
-  .fv-navbar .nav-link:hover {
-    color: #007BFF !important;
-    background: #EFF6FF !important;
-    border-radius: 6px;
-    text-decoration: none !important;
-  }
-  .fv-navbar .nav-item.active > a,
-  .fv-navbar .nav-link.active {
-    color: #007BFF !important;
-    background: #EFF6FF !important;
-    border-radius: 6px;
-  }
-  .fv-navbar .navbar-toggler {
-    border-color: #DEE2E6;
-  }
-  .fv-navbar .navbar-toggler-icon {
-    filter: none;
-  }
-  /* Dropdown menus */
-  .fv-navbar .dropdown-menu {
+
+  /* ── Top bar ─────────────────────────────────────────────────────────── */
+  .fv-topbar {
     background: #fff;
-    border: 1px solid #E9ECEF;
-    border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
-  }
-  .fv-navbar .dropdown-menu .dropdown-item {
-    color: #212529;
-    font-size: 13px;
-    font-weight: 500;
-  }
-  .fv-navbar .dropdown-menu .dropdown-item:hover {
-    background: #EFF6FF;
-    color: #007BFF;
-  }
-  .fv-navbar .dropdown-divider {
-    border-color: #E9ECEF;
-  }
-  /* Username chip */
-  .fv-navbar .username {
-    display: inline-flex;
+    border-bottom: 1px solid #E9ECEF;
+    height: 64px;
+    display: flex;
     align-items: center;
-    gap: 6px;
-    background: #EFF6FF;
-    border: 1px solid #DBEAFE;
-    border-radius: 20px;
-    padding: 3px 12px 3px 10px;
+    padding: 0 24px;
+    gap: 12px;
+  }
+  .fv-topbar-inner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* Brand */
+  .fv-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none !important;
+    flex-shrink: 0;
+    margin-right: 8px;
+  }
+  .fv-brand-icon {
+    width: 34px;
+    height: 34px;
+    background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 800;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .fv-brand-text { font-size: 15px; font-weight: 800; color: #0B1220; letter-spacing: -0.01em; line-height: 1.1; }
+  .fv-brand-sub  { font-size: 9px;  font-weight: 700; letter-spacing: 0.12em; color: #94A3B8; text-transform: uppercase; }
+
+  /* Search */
+  .fv-topbar-search { position: relative; flex: 1; max-width: 360px; }
+  .fv-topbar-search .fv-si { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94A3B8; font-size: 13px; pointer-events: none; }
+  .fv-topbar-search input {
+    width: 100%;
+    padding: 9px 14px 9px 36px;
+    background: #F8FAFC;
+    border: 1px solid transparent;
+    border-radius: 10px;
     font-size: 13px;
-    color: #1E40AF !important;
-    font-weight: 600;
+    color: #0B1220;
+    outline: none;
+    transition: all 0.14s;
   }
-  /* Dividers between nav items */
-  .fv-navbar .divider-vertical {
-    border-right: 1px solid #DEE2E6 !important;
-    height: 20px;
-    align-self: center;
-    margin: 0 4px;
+  .fv-topbar-search input:focus { background: #fff; border-color: #1E3A8A; box-shadow: 0 0 0 3px rgba(30,58,138,0.08); }
+  .fv-topbar-search input::placeholder { color: #94A3B8; }
+
+  /* Spacer */
+  .fv-topbar-gap { flex: 1; }
+
+  /* Icon buttons */
+  .fv-icon-btn {
+    width: 38px; height: 38px;
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; color: #475569;
+    background: transparent; border: none; cursor: pointer;
+    transition: all 0.14s; position: relative; flex-shrink: 0;
   }
+  .fv-icon-btn:hover { background: #F1F5F9; color: #1E3A8A; }
+  .fv-icon-btn .fv-badge {
+    position: absolute; top: 8px; right: 8px;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #EF4444; border: 2px solid #fff;
+  }
+
+  /* Divider */
+  .fv-topbar-div { width: 1px; height: 28px; background: #E5E7EB; flex-shrink: 0; margin: 0 4px; }
+
+  /* Language */
+  .fv-lang-btn {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 12px; font-weight: 600; color: #475569;
+    background: transparent; border: none; cursor: pointer;
+    padding: 6px 8px; border-radius: 7px; flex-shrink: 0;
+    transition: all 0.14s;
+  }
+  .fv-lang-btn:hover { background: #F1F5F9; color: #1E3A8A; }
+
+  /* User button */
+  .fv-user-btn {
+    display: flex; align-items: center; gap: 9px;
+    padding: 5px 12px 5px 5px;
+    border-radius: 40px;
+    border: 1px solid #E5E7EB;
+    background: #fff; cursor: pointer;
+    transition: all 0.14s;
+    text-decoration: none !important;
+  }
+  .fv-user-btn:hover { background: #F8FAFC; border-color: #CBD5E1; }
+  .fv-user-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, #2D4FBF, #7B5BFF);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .fv-user-name { font-size: 13px; font-weight: 600; color: #0B1220; line-height: 1.2; }
+  .fv-user-role { font-size: 10px; color: #94A3B8; line-height: 1.2; }
+
+  /* User dropdown menu */
+  .fv-user-menu {
+    border: 1px solid #E5E7EB !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 24px rgba(11,18,32,0.12) !important;
+    padding: 6px !important;
+    min-width: 200px;
+  }
+  .fv-user-menu .dropdown-item {
+    border-radius: 7px;
+    font-size: 13px; font-weight: 500;
+    color: #0B1220;
+    padding: 8px 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .fv-user-menu .dropdown-item:hover { background: #EEF2F9; color: #1E3A8A; }
+  .fv-user-menu .dropdown-divider { border-color: #F1F5F9; margin: 4px 0; }
+  .fv-user-menu .fv-menu-header {
+    padding: 8px 12px 6px;
+    font-size: 12px; color: #64748B;
+  }
+  .fv-user-menu .fv-menu-header strong { display: block; font-size: 13px; font-weight: 600; color: #0B1220; }
+
+  /* Sign-in button */
+  .fv-signin-btn {
+    padding: 8px 18px; border-radius: 9px;
+    background: #1E3A8A; color: #fff !important;
+    font-size: 13px; font-weight: 600;
+    text-decoration: none !important;
+    transition: background 0.14s;
+    border: none;
+  }
+  .fv-signin-btn:hover { background: #152D6E !important; }
+
+  /* Mobile toggle */
+  .fv-toggler {
+    width: 36px; height: 36px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: #475569;
+    background: transparent; border: 1px solid #E5E7EB; cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  /* ── Nav row ─────────────────────────────────────────────────────────── */
+  .fv-navrow {
+    background: #fff;
+    border-bottom: 1px solid #E9ECEF;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .fv-navrow::-webkit-scrollbar { display: none; }
+  .fv-navrow-inner {
+    display: flex;
+    align-items: center;
+    padding: 6px 24px;
+    gap: 2px;
+    max-width: 1400px;
+    margin: 0 auto;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .fv-navrow .nav-link {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: #475569 !important;
+    padding: 6px 12px !important;
+    border-radius: 7px !important;
+    transition: all 0.14s !important;
+    text-decoration: none !important;
+    white-space: nowrap;
+  }
+  .fv-navrow .nav-link:hover { background: #EEF2F9 !important; color: #1E3A8A !important; }
+  .fv-navrow .nav-item.active > .nav-link,
+  .fv-navrow .nav-link.active { background: #EEF2F9 !important; color: #1E3A8A !important; font-weight: 600 !important; }
+  .fv-navrow .dropdown-menu {
+    border: 1px solid #E5E7EB; border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.10); padding: 4px;
+  }
+  .fv-navrow .dropdown-item { font-size: 13px; font-weight: 500; color: #0B1220; border-radius: 6px; padding: 7px 12px; }
+  .fv-navrow .dropdown-item:hover { background: #EEF2F9; color: #1E3A8A; }
+  .fv-navrow .dropdown-divider { border-color: #F1F5F9; }
+  .fv-navrow .nav-div { width: 1px; height: 18px; background: #E5E7EB; margin: 0 4px; flex-shrink: 0; }
+
+  /* Mobile: collapse navrow */
+  @media (max-width: 1199px) {
+    .fv-navrow-collapse { display: none; }
+    .fv-navrow-collapse.show { display: block; }
+    .fv-navrow-inner { flex-wrap: wrap; padding: 8px 16px; }
+  }
+
+  /* Skip link */
+  .fv-skip { position: absolute; left: -9999px; }
+  .fv-skip:focus { left: 8px; top: 8px; z-index: 9999; padding: 6px 12px; background: #1E3A8A; color: #fff; border-radius: 6px; text-decoration: none; }
 </style>
-<!-- Navigation based on web roles -->
+
 {% assign is_hr = false %}
 {% assign is_nastavnik = false %}
 {% assign is_rukovoditel = false %}
 {% assign is_new_employee = false %}
-
 {% if user %}
   {% if user.roles contains 'HR' %}{% assign is_hr = true %}{% endif %}
   {% if user.roles contains 'Наставник' %}{% assign is_nastavnik = true %}{% endif %}
   {% if user.roles contains 'Руководитель' %}{% assign is_rukovoditel = true %}{% endif %}
   {% if user.roles contains 'Новый сотрудник' %}{% assign is_new_employee = true %}{% endif %}
 {% endif %}
-
 {% assign is_admin_role = false %}
 {% if is_hr or is_nastavnik or is_rukovoditel %}{% assign is_admin_role = true %}{% endif %}
-<!-- END Navigation based on web roles -->
 
-{% assign defaultlang = settings['LanguageLocale/Code'] | default: 'en-us' %}
 {% assign homeurl = website.adx_partialurl %}
-<div class="navbar-expand-xl navbar navbar-dark static-top fv-navbar" style="flex-wrap:wrap;" role="banner">
-  <div class="skip-to-content"><a href="#mainContent">{{ resx.Skip_To_Content | default: "Skip to main content" }}</a></div><div class="container custom-container">
-    <!--div class="visible-xs-block">
-      {% editable snippets 'Mobile Header' type: 'html' %}
-    </div-->
-    <div class="d-xs-block d-sm-block d-md-block d-lg-block navbar-brand navbar-header">
-      {% editable snippets 'Mobile Header' type: 'html' %}
-    </div>
-    <button type="button" class="navbar-toggler collapsed custom-navbar-toggler" title="{{ snippets["Header/Toggle Navigation"] | default: resx['Toggle_Navigation'] | h }}" data-bs-toggle="collapse" data-bs-target="#navbar" aria-expanded="false" onclick="setHeight();">
-      <span class="visually-hidden">{{ snippets["Header/Toggle Navigation"] | default: resx['Toggle_Navigation'] | h }}</span>
-      <span class="navbar-toggler-icon"></span>
-    </button>
+{% assign search_enabled = settings['Search/Enabled'] | boolean | default:true %}
 
-    <div id="navbar" class="navbar-collapse collapse">
-      {% if is_admin_role or is_new_employee == false %}
-        {% assign primary_nav = weblinks["Primary Navigation"] %}
-      {% else %}
-        {% assign primary_nav = nil %}
+{% if user %}
+  {% assign name_parts = user.fullname | split: ' ' %}
+  {% assign init1 = name_parts[0] | slice: 0, 1 | upcase %}
+  {% assign init2 = name_parts[1] | slice: 0, 1 | upcase %}
+  {% assign initials = init1 | append: init2 %}
+{% endif %}
+
+{% if is_admin_role or is_new_employee == false %}
+  {% assign primary_nav = weblinks["Primary Navigation"] %}
+{% else %}
+  {% assign primary_nav = nil %}
+{% endif %}
+
+<div class="fv-header-wrap" role="banner">
+  <a href="#mainContent" class="fv-skip">{{ resx.Skip_To_Content | default: "Skip to main content" }}</a>
+
+  <!-- ── TOP BAR ───────────────────────────────────────────────────────── -->
+  <div class="fv-topbar">
+    <div class="fv-topbar-inner">
+
+      <!-- Brand -->
+      <a href="/" class="fv-brand">
+        <div class="fv-brand-icon">F</div>
+        <div class="d-none d-sm-block">
+          <div class="fv-brand-text">FAROVON</div>
+          <div class="fv-brand-sub">LEARNING HUB</div>
+        </div>
+      </a>
+
+      <!-- Search -->
+      {% if search_enabled %}
+      <div class="fv-topbar-search d-none d-md-block">
+        <i class="bi bi-search fv-si"></i>
+        <form action="{{ sitemarkers['Search'].url | default: '/search' }}" method="get">
+          <input type="text" name="q" placeholder="Найти урок или раздел…" autocomplete="off" />
+        </form>
+      </div>
       {% endif %}
-      {% if primary_nav %}
-      <nav aria-label="{{ resx.Main_Navigation | default: "Main Navigation" }}" class="ms-auto menu-bar {% if primary_nav.editable %}xrm-entity xrm-editable-adx_weblinkset{% endif %}" data-weblinks-maxdepth="2">
-        <ul class="nav navbar-nav weblinks">
-          {% for link in primary_nav.weblinks %}
-          {% unless forloop.first %}
-          <li class="nav-item divider-vertical" aria-hidden="true"></li>
-          {% endunless %}
-          {% if link.display_page_child_links %}
-          {% if link.url != null %}
-          {% assign sublinks = sitemap[link.url].children %}
-          {% endif %}
-          {% else %}
-          {% assign sublinks = link.weblinks %}
-          {% endif %}
-          <li class="nav-item weblink {% if sublinks.size > 0 %} dropdown{% endif %}">
-            <a aria-label="{{ link.name | escape }}" {% if sublinks.size > 0 -%} href="#" role="button" class="dropdown-toggle nav-link" data-bs-toggle="dropdown" {%- else -%} href="{{ link.url | escape }}" class="nav-link" aria-roledescription="link" {%- endif -%} {%- if link.Open_In_New_Window %} target="_blank" {% endif -%} {%- if link.nofollow %} rel="nofollow" {% endif -%} {%- if link.tooltip %} title="{{ link.tooltip | escape }}" {% endif %}>
-              {%- if link.image -%}
-              {%- if link.image.url  -%}
-              {%- if link.image.url.first == '.' -%}
-              <span class="{{ link.image.url | split:'.' | join }}" aria-hidden="true"></span>
-              {%- endif -%}
-              {%- else -%}
-              <img src="{{ link.image.url | escape }}" alt="{{ link.image.alternate_text | default:link.tooltip | escape }}" {% if link.image.width %}width="{{ link.image.width | escape }}" {% endif %} {% if link.image.height %}height="{{ link.image.height | escape }}" {% endif %} />
-              {%- endif -%}
-              {%- endif -%}
-              {%- unless link.display_image_only -%}
-              {{ link.name | escape }}
-              {%- endunless -%}
-              {%- if sublinks.size > 0 -%}
-              {%- endif -%}
-            </a>
-            {% if sublinks.size > 0 %}
-            <ul class="dropdown-menu dropdown-menu-end">
-              {% if link.name %}
-              <li>
-                <a class="dropdown-item" aria-label="{{ link.name | escape }}" href="{{ link.url }}" {% if link.Open_In_New_Window %} target="_blank" {% endif %} {% if link.nofollow %}rel="nofollow" {% endif %} {% if link.tooltip %}title="{{ link.tooltip | escape }}" {% endif %}>{{ link.name | escape }}</a>
-              </li>
-              <div class="dropdown-divider"></div>
-              {% endif %}
-              {% for sublink in sublinks %}
-              <li>
-                <a class="dropdown-item" aria-label="{{ sublink.name | default:sublink.title | escape }}" href="{{ sublink.url }}" {% if sublink.Open_In_New_Window %} target="_blank" {% endif %} {% if sublink.nofollow %}rel="nofollow" {% endif %} {% if sublink.tooltip %}title="{{ sublink.tooltip | escape }}" {% endif %}>
-                  {{ sublink.name | default:sublink.title | escape }}
-                </a>
-              </li>
-              {% endfor %}
-            </ul>
-            {% endif %}
-          </li>
-          {% endfor %}
-          {% assign search_enabled = settings['Search/Enabled'] | boolean | default:true %}
-          {% if search_enabled %}
-          <li class=" nav-item divider-vertical" aria-hidden="true"></li>
-          <li class=" nav-item dropdown">
-            <a id="search" class=" nav-link navbar-icon" href="#" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-label="{{ snippets["Header/Search/ToolTip"] | default:resx["Search_DefaultText"] | escape }}">
-              <span class="glyphicon fa-solid fa-magnifying-glass">
-            </a>
-            </a>
-            <div class="dropdown-menu dropdown-search dropdown-menu-end">
-              {% include 'Search', search_id:'q' %}
+
+      <div class="fv-topbar-gap"></div>
+
+      <!-- Language selector -->
+      {% if website.languages.size > 1 %}
+      <div class="dropdown d-none d-md-block">
+        <button class="fv-lang-btn dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+          <i class="bi bi-globe2"></i> {{ website.selected_language.name | escape }}
+        </button>
+        {% include 'Languages Dropdown' %}
+      </div>
+      {% endif %}
+
+      <!-- Notification bell -->
+      <button class="fv-icon-btn d-none d-md-flex" title="Уведомления" aria-label="Уведомления">
+        <i class="bi bi-bell"></i>
+      </button>
+
+      <div class="fv-topbar-div d-none d-md-block"></div>
+
+      <!-- User section -->
+      {% if user %}
+      <div class="dropdown">
+        <a href="#" class="fv-user-btn dropdown-toggle"
+           data-bs-toggle="dropdown" role="button" aria-expanded="false"
+           title="{{ user.fullname | escape }}">
+          <div class="fv-user-avatar">{{ initials }}</div>
+          <div class="d-none d-lg-block">
+            <div class="fv-user-name">{{ user.firstname | escape }}</div>
+          </div>
+          <i class="bi bi-chevron-down" style="font-size:10px;color:#94A3B8;"></i>
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end fv-user-menu">
+          <li>
+            <div class="fv-menu-header">
+              <strong>{{ user.fullname | escape }}</strong>
+              {{ user.emailaddress1 | escape }}
             </div>
           </li>
-          {% endif %}
-          <li class="nav-item divider-vertical" aria-hidden="true"></li>
-          {% if website.languages.size > 1 %}
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" aria-label="{{ website.selected_language.name | escape }}" aria-haspopup="true" aria-expanded="false" title="{{ website.selected_language.name | escape }}">
-              <span class="drop_language">{{ website.selected_language.name | escape }}</span>
-            </a>
-            {% include 'Languages Dropdown' %}
-          </li>
-          <li class="nav-item divider-vertical" aria-hidden="true"></li>
-          {% endif %}
-          {% if user %}
-          <li class="nav-item dropdown">
-            {% assign username=user.fullname | escape %}
-            <a href="#" class="nav-link dropdown-toggle" title="{{username | default: resx['Default_Profile_name'] }}" data-bs-toggle="dropdown" role="button" aria-expanded="false">
-              <span class="username">{{ username | default: resx['Default_Profile_name'] }}</span>
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end">
-              {% assign show_profile_nav = settings["Header/ShowAllProfileNavigationLinks"] | boolean | default:true %}
-              {% if show_profile_nav %}
-              {% assign profile_nav = weblinks["Profile Navigation"] %}
-              {% if profile_nav %}
+          <li><hr class="dropdown-divider"></li>
+          {% assign show_profile_nav = settings["Header/ShowAllProfileNavigationLinks"] | boolean | default:true %}
+          {% if show_profile_nav %}
+            {% assign profile_nav = weblinks["Profile Navigation"] %}
+            {% if profile_nav %}
               {% for link in profile_nav.weblinks %}
               <li>
-                <a class="dropdown-item" aria-label="{{ link.name | escape }}" href="{{ link.url | escape }}" title="{{ link.name | escape }}">{{ link.name | escape }}</a>
-              </li>
-              {% endfor %}
-              {% endif %}
-              {% else %}
-              <li><a class="dropdown-item" aria-label="{{ snippets["Profile Link Text"] | default:resx["Profile_Text"] | escape }}" href="{{ sitemarkers['Profile'].url | escape }}">{{ snippets["Profile Link Text"] | default:resx["Profile_Text"] | escape }}</a></li>
-              {% endif %}
-              <li class="dropdown-divider" role="separator" aria-hidden="true"></li>
-              <li>
-                <a class="dropdown-item" aria-label="{{ snippets["links/logout"] | default:resx["Sign_Out"] | escape }}" href="{% if homeurl%}/{{ homeurl }}{% endif %}{{ website.sign_out_url_substitution }}" title="{{ snippets["links/logout"] | default:resx["Sign_Out"] | escape }}">
-                  {{ snippets["links/logout"] | default:resx["Sign_Out"] | escape }}
+                <a class="dropdown-item" href="{{ link.url | escape }}" aria-label="{{ link.name | escape }}">
+                  <i class="bi bi-person"></i> {{ link.name | escape }}
                 </a>
               </li>
-            </ul>
-          </li>
+              {% endfor %}
+            {% endif %}
           {% else %}
-          <li class="nav-item">
-            <a class="nav-link" aria-label="{{ snippets["links/login"] | default:resx["Sign_In"] | escape }}" href="{% if homeurl%}/{{ homeurl }}{% endif %}{{ website.sign_in_url_substitution }}">
-              {{ snippets["links/login"] | default:resx["Sign_In"] | escape }}
+            <li>
+              <a class="dropdown-item" href="{{ sitemarkers['Profile'].url | escape }}">
+                <i class="bi bi-person"></i> {{ snippets["Profile Link Text"] | default:resx["Profile_Text"] | escape }}
+              </a>
+            </li>
+          {% endif %}
+          <li><hr class="dropdown-divider"></li>
+          <li>
+            <a class="dropdown-item" href="{% if homeurl %}/{{ homeurl }}{% endif %}{{ website.sign_out_url_substitution }}"
+               aria-label="{{ snippets['links/logout'] | default:resx['Sign_Out'] | escape }}">
+              <i class="bi bi-box-arrow-right"></i> {{ snippets["links/logout"] | default:resx["Sign_Out"] | escape }}
             </a>
           </li>
-          {% endif %}
         </ul>
-        {% editable primary_nav %}
-      </nav>
+      </div>
+
+      {% else %}
+      <a href="{% if homeurl %}/{{ homeurl }}{% endif %}{{ website.sign_in_url_substitution }}" class="fv-signin-btn">
+        {{ snippets["links/login"] | default:resx["Sign_In"] | escape }}
+      </a>
       {% endif %}
+
+      <!-- Mobile toggle -->
+      {% if primary_nav %}
+      <button class="fv-toggler d-xl-none" type="button"
+              data-bs-toggle="collapse" data-bs-target="#fv-navrow"
+              aria-expanded="false" aria-controls="fv-navrow"
+              title="{{ snippets['Header/Toggle Navigation'] | default: resx['Toggle_Navigation'] | h }}">
+        <i class="bi bi-list"></i>
+      </button>
+      {% endif %}
+
     </div>
+  </div><!-- /fv-topbar -->
+
+  <!-- ── NAV ROW ───────────────────────────────────────────────────────── -->
+  {% if primary_nav %}
+  <div class="fv-navrow fv-navrow-collapse collapse d-xl-block" id="fv-navrow">
+    <nav class="fv-navrow-inner {% if primary_nav.editable %}xrm-entity xrm-editable-adx_weblinkset{% endif %}"
+         aria-label="{{ resx.Main_Navigation | default: 'Main Navigation' }}"
+         data-weblinks-maxdepth="2">
+      {% for link in primary_nav.weblinks %}
+        {% unless forloop.first %}<div class="fv-nav-div" aria-hidden="true"></div>{% endunless %}
+        {% if link.display_page_child_links %}
+          {% if link.url != null %}{% assign sublinks = sitemap[link.url].children %}{% endif %}
+        {% else %}
+          {% assign sublinks = link.weblinks %}
+        {% endif %}
+        {% if sublinks.size > 0 %}
+        <div class="nav-item dropdown">
+          <a href="#" class="nav-link dropdown-toggle" role="button"
+             data-bs-toggle="dropdown" aria-expanded="false"
+             aria-label="{{ link.name | escape }}"
+             {% if link.tooltip %}title="{{ link.tooltip | escape }}"{% endif %}>
+            {{ link.name | escape }}
+          </a>
+          <ul class="dropdown-menu">
+            {% if link.url %}
+            <li><a class="dropdown-item" href="{{ link.url | escape }}">{{ link.name | escape }}</a></li>
+            <li><hr class="dropdown-divider"></li>
+            {% endif %}
+            {% for sublink in sublinks %}
+            <li>
+              <a class="dropdown-item"
+                 href="{{ sublink.url | escape }}"
+                 aria-label="{{ sublink.name | default:sublink.title | escape }}"
+                 {% if sublink.Open_In_New_Window %}target="_blank"{% endif %}
+                 {% if sublink.nofollow %}rel="nofollow"{% endif %}>
+                {{ sublink.name | default:sublink.title | escape }}
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% else %}
+        <a href="{{ link.url | escape }}"
+           class="nav-link"
+           aria-label="{{ link.name | escape }}"
+           aria-roledescription="link"
+           {% if link.Open_In_New_Window %}target="_blank"{% endif %}
+           {% if link.nofollow %}rel="nofollow"{% endif %}
+           {% if link.tooltip %}title="{{ link.tooltip | escape }}"{% endif %}>
+          {%- unless link.display_image_only -%}{{ link.name | escape }}{%- endunless -%}
+        </a>
+        {% endif %}
+      {% endfor %}
+      {% editable primary_nav %}
+    </nav>
   </div>
-</div>
+  {% endif %}
+
+</div><!-- /fv-header-wrap -->
+
 {% substitution %}
 {% assign current_page = page.id %}
 {% assign sr_page = sitemarkers["Search"].id %}
@@ -238,13 +423,11 @@
 {% if current_page %}
 {% if current_page == sr_page or current_page == forum_page %}
 {% assign section_class = "section-landing-search" %}
-{% if current_page == forum_page %}
-{% assign section_class = "section-landing-forums" %}
-{% endif %}
+{% if current_page == forum_page %}{% assign section_class = "section-landing-forums" %}{% endif %}
 <section class="page_section {{ section_class | h }} color-inverse">
-  <div class="row sectionBlockLayout sectionFixedStyle" style="display: flex; flex-wrap: wrap; text-align: center; min-height: 420px; background: url('/Homehero.png') center / cover no-repeat; padding: 8px; margin: 0px;">
-    <div class="container" style="display: flex; flex-wrap: wrap;">
-      <div class="col-lg-12 columnBlockLayout" style="display: flex; flex-direction: column; justify-content: center;">
+  <div class="row sectionBlockLayout sectionFixedStyle" style="display:flex;flex-wrap:wrap;text-align:center;min-height:420px;background:url('/Homehero.png') center/cover no-repeat;padding:8px;margin:0;">
+    <div class="container" style="display:flex;flex-wrap:wrap;">
+      <div class="col-lg-12 columnBlockLayout" style="display:flex;flex-direction:column;justify-content:center;">
         {% if current_page == sr_page %}
         <h1 id="mainContent">{% editable snippets 'Search/Title' default: resx["Discover_Contoso"] %}</h1>
         {% include 'Search' search_id:'search_control' %}
@@ -256,21 +439,11 @@
 {% endif %}
 {% endif %}
 {% endsubstitution %}
-<script type="text/javascript">
-  window.onload = function() {
-    if (window.navigator.appName == "Microsoft Internet Explorer" || window.navigator.userAgent.indexOf("Trident") > 0) {
-      var searchElement = document.getElementById("search");
-      if (searchElement != null) searchElement.setAttribute("href", "");
-    }
-  };
+
+<script>
   function setHeight() {
-    var windowHeight = window.innerHeight - 140;
-    var navbar = document.getElementById("navbar");
-    if (navbar) {
-      navbar.style.maxHeight = windowHeight + "px";
-    }
+    var nav = document.getElementById('fv-navrow');
+    if (nav) nav.style.maxHeight = (window.innerHeight - 140) + 'px';
   }
-  window.addEventListener('resize', function(event) {
-    setHeight();
-  });
+  window.addEventListener('resize', setHeight);
 </script>
