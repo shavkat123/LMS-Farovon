@@ -1,47 +1,40 @@
-<footer role="contentinfo" class="footer" style="padding-top: 0px;">
-  <div class="footer-bottom d-print-none">
-    <div class="container">
-      <div class="row">
-        <div class="col-lg-9 col-md-9 col-sm-9 text-start">
-          {% editable snippets 'Footer' type: 'html' %}
-        </div>
-        <div id="accessibilityLinkContainer" class="col-lg-3 col-md-3 col-sm-3 text-end">
-          
+<style>
+  .fv-footer {
+    background: #0E1A35;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding: 32px 0 20px;
+    margin-top: 40px;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  }
+  .fv-footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+  .fv-footer-brand { display: flex; align-items: center; gap: 10px; }
+  .fv-footer-logo { width: 28px; height: 28px; background: linear-gradient(135deg,#1E3A8A,#3B82F6); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #fff; }
+  .fv-footer-name { font-size: 14px; font-weight: 700; color: #fff; }
+  .fv-footer-tagline { font-size: 11px; color: rgba(138,153,189,0.7); margin-top: 1px; }
+  .fv-footer-links { display: flex; gap: 20px; flex-wrap: wrap; }
+  .fv-footer-links a { font-size: 12px; font-weight: 500; color: rgba(138,153,189,0.8); text-decoration: none !important; transition: color 0.14s; }
+  .fv-footer-links a:hover { color: #fff !important; }
+  .fv-footer-copy { font-size: 11px; color: rgba(138,153,189,0.45); padding-top: 20px; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.06); text-align: center; }
+</style>
+
+<footer role="contentinfo" class="fv-footer d-print-none">
+  <div class="container">
+    <div class="fv-footer-inner">
+      <div class="fv-footer-brand">
+        <div class="fv-footer-logo">F</div>
+        <div>
+          <div class="fv-footer-name">FAROVON LMS</div>
+          <div class="fv-footer-tagline">Система управления обучением</div>
         </div>
       </div>
+      <div class="fv-footer-links">
+        <a href="/h5p-catalog"><i class="bi bi-collection-play"></i> Каталог уроков</a>
+        <a href="/h5p-progress"><i class="bi bi-bar-chart-line"></i> Мой прогресс</a>
+        <a href="/профиль"><i class="bi bi-person-circle"></i> Профиль</a>
+      </div>
     </div>
+    <div class="fv-footer-copy">
+      © {{ 'now' | date: 'yyyy' }} FAROVON — Все права защищены
+    </div>
+  </div>
 </footer>
-
-<script type="text/javascript">
-  window.onload = function() {
-    const accessibilityLinkContainer = document.getElementById("accessibilityLinkContainer");
-    switch(window.navigator.language) {
-      case "fr":
-        if (accessibilityLinkContainer != null) {
-          const accessibilityText="Accessibilité : partiellement conforme";
-          const frenchAccessibilityAnchor = document.createElement("a");
-          frenchAccessibilityAnchor.id = "frenchAccesssibleLink";
-          frenchAccessibilityAnchor.target = "_blank";
-          frenchAccessibilityAnchor.href = "https://go.microsoft.com/fwlink/?linkid=2163806";
-          frenchAccessibilityAnchor.title = accessibilityText;
-          frenchAccessibilityAnchor.innerText = accessibilityText;
-          accessibilityLinkContainer.appendChild(frenchAccessibilityAnchor);
-        }
-        break;
-      case "it":
-        if (accessibilityLinkContainer != null) {
-          const accessibilityText="Accessibilità: parzialmente conforme";
-          const italianAccessibilityAnchor = document.createElement("a");
-          italianAccessibilityAnchor.id = "italianAccesssibleLink";
-          italianAccessibilityAnchor.target = "_blank";
-          italianAccessibilityAnchor.href = "https://go.microsoft.com/fwlink/?linkid=2208177";
-          italianAccessibilityAnchor.title = accessibilityText;
-          italianAccessibilityAnchor.innerText = accessibilityText;
-          accessibilityLinkContainer.appendChild(italianAccessibilityAnchor);
-        }
-        break;
-      default: 
-        accessibilityLinkContainer.remove();
-    }
-  };
- </script>

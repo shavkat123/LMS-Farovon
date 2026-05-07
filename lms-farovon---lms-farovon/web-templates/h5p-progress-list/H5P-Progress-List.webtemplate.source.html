@@ -1,11 +1,12 @@
-{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Administrators' %}
-<div class="alert alert-danger">Доступ запрещён</div>
-{% else %}
+{% assign is_admin = false %}
+{% if user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Administrators' %}
+  {% assign is_admin = true %}
+{% endif %}
 
-<h2>Прогресс по H5P урокам</h2>
-
+{% if is_admin %}
+{% comment %} ── ADMIN VIEW: all users' progress ──────────────────────────── {% endcomment %}
 {% fetchxml progress %}
-<fetch top="200">
+<fetch top="500">
   <entity name="new_h5pprogress">
     <attribute name="new_name" />
     <attribute name="new_user" />
@@ -19,33 +20,345 @@
 </fetch>
 {% endfetchxml %}
 
-{% if progress.results.entities.size > 0 %}
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th>Стажёр</th>
-      <th>Урок</th>
-      <th>Балл</th>
-      <th>Завершён</th>
-      <th>Успешно</th>
-      <th>Обновлено</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for p in progress.results.entities %}
-    <tr>
-      <td>{{ p.new_user.name }}</td>
-      <td>{{ p.new_h5pcontent.name }}</td>
-      <td>{% if p.new_scorescaled %}{{ p.new_scorescaled | times: 100 | round }}%{% else %}—{% endif %}</td>
-      <td>{% if p.new_completion %}<span class="badge bg-success">Да</span>{% else %}<span class="badge bg-secondary">Нет</span>{% endif %}</td>
-      <td>{% if p.new_success %}<span class="badge bg-success">Да</span>{% else %}<span class="badge bg-secondary">—</span>{% endif %}</td>
-      <td>{{ p.new_lastupdated | date: 'dd.MM.yyyy HH:mm' }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+{% assign total_records = 0 %}
+{% assign total_completed = 0 %}
+{% assign score_sum = 0 %}
+{% assign score_count = 0 %}
+{% for p in progress.results.entities %}
+  {% assign total_records = total_records | plus: 1 %}
+  {% if p.new_completion %}{% assign total_completed = total_completed | plus: 1 %}{% endif %}
+  {% if p.new_scorescaled %}
+    {% assign score_sum = score_sum | plus: p.new_scorescaled %}
+    {% assign score_count = score_count | plus: 1 %}
+  {% endif %}
+{% endfor %}
+{% assign avg_score = 0 %}
+{% if score_count > 0 %}{% assign avg_score = score_sum | divided_by: score_count | times: 100 | round %}{% endif %}
+
 {% else %}
-<div class="alert alert-info">Записей о прогрессе пока нет</div>
+{% comment %} ── USER VIEW: own progress ───────────────────────────────────── {% endcomment %}
+{% if user %}
+{% fetchxml h5p_all %}
+<fetch>
+  <entity name="new_h5pcontent">
+    <attribute name="new_h5pcontentid" />
+    <attribute name="new_name" />
+    <attribute name="new_librarytype" />
+    <attribute name="new_durationseconds" />
+    <attribute name="new_thumbnailurl" />
+    <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
+    <order attribute="new_name" descending="false" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml user_progress %}
+<fetch>
+  <entity name="new_h5pprogress">
+    <attribute name="new_h5pcontent" />
+    <attribute name="new_completion" />
+    <attribute name="new_scorescaled" />
+    <attribute name="new_success" />
+    <attribute name="new_lastupdated" />
+    <filter>
+      <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
+    </filter>
+    <order attribute="new_lastupdated" descending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign started_count = 0 %}
+{% assign completed_count = 0 %}
+{% assign score_sum = 0 %}
+{% assign score_count = 0 %}
+{% for p in user_progress.results.entities %}
+  {% assign started_count = started_count | plus: 1 %}
+  {% if p.new_completion %}{% assign completed_count = completed_count | plus: 1 %}{% endif %}
+  {% if p.new_scorescaled %}
+    {% assign score_sum = score_sum | plus: p.new_scorescaled %}
+    {% assign score_count = score_count | plus: 1 %}
+  {% endif %}
+{% endfor %}
+{% assign avg_score = 0 %}
+{% if score_count > 0 %}{% assign avg_score = score_sum | divided_by: score_count | times: 100 | round %}{% endif %}
+{% assign in_progress_count = started_count | minus: completed_count %}
+{% endif %}
 {% endif %}
 
-{% endunless %}
+<style>
+  .fv-prog { padding: 28px 0 48px; }
+  .fv-prog-header { margin-bottom: 24px; }
+  .fv-prog-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #94A3B8; display: block; margin-bottom: 4px; }
+  .fv-prog-title { font-size: 22px; font-weight: 700; color: #0B1220; margin: 0 0 4px; }
+  .fv-prog-sub { font-size: 13px; color: #64748B; margin: 0; }
+
+  .fv-kpi-row { display: flex; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+  .fv-kpi { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 18px 20px; display: flex; align-items: center; gap: 14px; flex: 1; min-width: 140px; box-shadow: 0 1px 3px rgba(11,18,32,0.04); }
+  .fv-kpi-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .fv-kpi-val { font-size: 26px; font-weight: 700; color: #0B1220; line-height: 1; }
+  .fv-kpi-lbl { font-size: 12px; font-weight: 500; color: #475569; margin-top: 2px; }
+
+  .fv-tbl-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(11,18,32,0.04); }
+  .fv-tbl-head { padding: 14px 20px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .fv-tbl-title { font-size: 15px; font-weight: 700; color: #0B1220; }
+  .fv-search-wrap { display: flex; align-items: center; gap: 7px; background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: 7px; padding: 7px 12px; }
+  .fv-search-wrap i { color: #94A3B8; font-size: 13px; }
+  .fv-search-input { border: none; background: transparent; outline: none; font-size: 13px; color: #0B1220; width: 180px; }
+  .fv-search-input::placeholder { color: #94A3B8; }
+
+  .fv-table { width: 100%; border-collapse: collapse; }
+  .fv-table th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #94A3B8; padding: 8px 20px; text-align: left; border-bottom: 1px solid #F1F5F9; background: #FAFBFC; }
+  .fv-table td { padding: 12px 20px; font-size: 13px; color: #0B1220; border-bottom: 1px solid #F1F5F9; vertical-align: middle; }
+  .fv-table tr:last-child td { border-bottom: none; }
+  .fv-table tr:hover td { background: #FAFBFC; }
+  .fv-table .fv-user-cell { display: flex; align-items: center; gap: 10px; }
+  .fv-avatar { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,#EEF2F9,#D8DFEF); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #1E3A8A; flex-shrink: 0; }
+  .fv-badge-yes { display: inline-flex; align-items: center; gap: 4px; background: #ECF6EF; color: #15803D; border-radius: 20px; font-size: 11px; font-weight: 600; padding: 3px 8px; }
+  .fv-badge-no  { display: inline-flex; align-items: center; gap: 4px; background: #F1F5F9; color: #94A3B8; border-radius: 20px; font-size: 11px; font-weight: 600; padding: 3px 8px; }
+  .fv-score-bar { display: flex; align-items: center; gap: 8px; }
+  .fv-score-track { flex: 1; height: 4px; background: #E5E7EB; border-radius: 2px; overflow: hidden; min-width: 60px; }
+  .fv-score-fill { height: 100%; border-radius: 2px; background: #1E3A8A; }
+
+  .fv-lesson-row { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; display: flex; align-items: center; gap: 14px; padding: 14px 16px; margin-bottom: 10px; transition: box-shadow 0.14s; text-decoration: none !important; color: inherit !important; }
+  .fv-lesson-row:hover { box-shadow: 0 4px 12px rgba(11,18,32,0.08); }
+  .fv-lesson-thumb-sm { width: 56px; height: 40px; border-radius: 6px; background: linear-gradient(135deg,#EEF2F9,#D8DFEF); flex-shrink: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 18px; }
+  .fv-lesson-thumb-sm img { width: 100%; height: 100%; object-fit: cover; }
+  .fv-prog-bar-wrap { flex: 1; min-width: 100px; }
+  .fv-prog-bar-track { height: 4px; background: #E5E7EB; border-radius: 2px; overflow: hidden; margin-top: 6px; }
+
+  .fv-empty { text-align: center; padding: 56px 20px; color: #94A3B8; }
+  .fv-empty i { font-size: 48px; display: block; margin-bottom: 12px; }
+  .fv-empty h3 { font-size: 16px; font-weight: 600; color: #475569; margin-bottom: 6px; }
+  .fv-empty p { font-size: 13px; }
+  .fv-empty a { color: #1E3A8A; font-weight: 600; }
+</style>
+
+<div class="container fv-prog">
+
+{% if is_admin %}
+  <!-- ─── ADMIN VIEW ──────────────────────────────────────────────────── -->
+  <div class="fv-prog-header">
+    <span class="fv-prog-eyebrow">Администрирование</span>
+    <h1 class="fv-prog-title">Прогресс обучающихся</h1>
+    <p class="fv-prog-sub">Активность всех пользователей по H5P урокам</p>
+  </div>
+
+  <div class="fv-kpi-row">
+    <div class="fv-kpi">
+      <div class="fv-kpi-icon" style="background:#EEF2F9;color:#1E3A8A;"><i class="bi bi-person-lines-fill"></i></div>
+      <div><div class="fv-kpi-val">{{ total_records }}</div><div class="fv-kpi-lbl">всего записей</div></div>
+    </div>
+    <div class="fv-kpi">
+      <div class="fv-kpi-icon" style="background:#ECF6EF;color:#15803D;"><i class="bi bi-check-circle-fill"></i></div>
+      <div><div class="fv-kpi-val">{{ total_completed }}</div><div class="fv-kpi-lbl">завершено</div></div>
+    </div>
+    <div class="fv-kpi">
+      <div class="fv-kpi-icon" style="background:#FAF3E8;color:#B45309;"><i class="bi bi-graph-up"></i></div>
+      <div><div class="fv-kpi-val">{{ avg_score }}%</div><div class="fv-kpi-lbl">средний балл</div></div>
+    </div>
+    <div class="fv-kpi">
+      <div class="fv-kpi-icon" style="background:#FBEAEA;color:#B91C1C;"><i class="bi bi-clock-history"></i></div>
+      <div><div class="fv-kpi-val">{{ total_records | minus: total_completed }}</div><div class="fv-kpi-lbl">в процессе</div></div>
+    </div>
+  </div>
+
+  {% if progress.results.entities.size > 0 %}
+  <div class="fv-tbl-card">
+    <div class="fv-tbl-head">
+      <span class="fv-tbl-title">Детальный журнал</span>
+      <div class="fv-search-wrap">
+        <i class="bi bi-search"></i>
+        <input type="text" id="fv-admin-search" class="fv-search-input" placeholder="Поиск по имени…" />
+      </div>
+    </div>
+    <table class="fv-table" id="fv-admin-table">
+      <thead>
+        <tr>
+          <th>Сотрудник</th>
+          <th>Урок</th>
+          <th>Балл</th>
+          <th>Завершён</th>
+          <th>Обновлено</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in progress.results.entities %}
+        {% assign score_pct = '' %}
+        {% if p.new_scorescaled %}{% assign score_pct = p.new_scorescaled | times: 100 | round %}{% endif %}
+        {% assign user_init = p.new_user.name | truncate: 1, '' %}
+        <tr class="fv-admin-row" data-search="{{ p.new_user.name | downcase }} {{ p.new_h5pcontent.name | downcase }}">
+          <td>
+            <div class="fv-user-cell">
+              <div class="fv-avatar">{{ user_init }}</div>
+              <span style="font-weight:500;">{{ p.new_user.name | default: '—' }}</span>
+            </div>
+          </td>
+          <td style="max-width:240px;">
+            <a href="/h5p-player?id={{ p.new_h5pcontent.id }}" style="color:#1E3A8A;font-weight:500;text-decoration:none;">
+              {{ p.new_h5pcontent.name | default: '—' }}
+            </a>
+          </td>
+          <td>
+            {% if score_pct != '' %}
+            <div class="fv-score-bar">
+              <span style="font-size:12px;font-weight:600;color:#0B1220;width:34px;">{{ score_pct }}%</span>
+              <div class="fv-score-track">
+                <div class="fv-score-fill" style="width:{{ score_pct }}%;"></div>
+              </div>
+            </div>
+            {% else %}
+            <span style="color:#94A3B8;font-size:12px;">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.new_completion %}
+              <span class="fv-badge-yes"><i class="bi bi-check2"></i> Да</span>
+            {% else %}
+              <span class="fv-badge-no"><i class="bi bi-hourglass-split"></i> Нет</span>
+            {% endif %}
+          </td>
+          <td style="color:#94A3B8;font-size:12px;">{{ p.new_lastupdated | date: 'dd.MM.yyyy HH:mm' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div id="fv-admin-no-results" style="display:none;" class="fv-empty">
+      <i class="bi bi-search"></i>
+      <h3>Ничего не найдено</h3>
+      <p>Попробуйте изменить поисковый запрос.</p>
+    </div>
+  </div>
+  {% else %}
+  <div class="fv-empty">
+    <i class="bi bi-bar-chart-line"></i>
+    <h3>Записей о прогрессе пока нет</h3>
+    <p>Данные появятся после того как сотрудники начнут проходить уроки.</p>
+  </div>
+  {% endif %}
+
+{% elsif user %}
+  <!-- ─── USER VIEW ───────────────────────────────────────────────────── -->
+  <div class="fv-prog-header">
+    <span class="fv-prog-eyebrow">Обучение</span>
+    <h1 class="fv-prog-title">Мой прогресс</h1>
+    <p class="fv-prog-sub">Отслеживайте прохождение уроков и свои результаты</p>
+  </div>
+
+  <div class="fv-kpi-row">
+    <div class="fv-kpi">
+      <div class="fv-kpi-icon" style="background:#EEF2F9;color:#1E3A8A;"><i class="bi bi-book-half"></i></div>
+      <div><div class="fv-kpi-val">{{ in_progress_count }}</div><div class="fv-kpi-lbl">в процессе</div></div>
+    </div>
+    <div class="fv-kpi">
+      <div class="fv-kpi-icon" style="background:#ECF6EF;color:#15803D;"><i class="bi bi-check-circle"></i></div>
+      <div><div class="fv-kpi-val">{{ completed_count }}</div><div class="fv-kpi-lbl">завершено</div></div>
+    </div>
+    <div class="fv-kpi">
+      <div class="fv-kpi-icon" style="background:#FAF3E8;color:#B45309;"><i class="bi bi-graph-up"></i></div>
+      <div><div class="fv-kpi-val">{{ avg_score }}%</div><div class="fv-kpi-lbl">средний балл</div></div>
+    </div>
+    <div class="fv-kpi">
+      <div class="fv-kpi-icon" style="background:#F5F3FF;color:#7C3AED;"><i class="bi bi-collection-play"></i></div>
+      <div><div class="fv-kpi-val">{{ h5p_all.results.entities.size }}</div><div class="fv-kpi-lbl">доступно</div></div>
+    </div>
+  </div>
+
+  {% if user_progress.results.entities.size > 0 %}
+  <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
+    <span style="font-size:15px;font-weight:700;color:#0B1220;">Ваши уроки</span>
+    <a href="/h5p-catalog" style="font-size:12px;font-weight:600;color:#1E3A8A;text-decoration:none;">Весь каталог →</a>
+  </div>
+
+  {% for item in h5p_all.results.entities %}
+    {% assign lesson_status = '' %}
+    {% assign prog_score = '' %}
+    {% assign prog_updated = '' %}
+    {% assign found = false %}
+    {% for p in user_progress.results.entities %}
+      {% unless found %}
+        {% if p.new_h5pcontent.id == item.id %}
+          {% assign found = true %}
+          {% if p.new_completion %}
+            {% assign lesson_status = 'completed' %}
+          {% else %}
+            {% assign lesson_status = 'in_progress' %}
+          {% endif %}
+          {% if p.new_scorescaled %}{% assign prog_score = p.new_scorescaled | times: 100 | round %}{% endif %}
+          {% assign prog_updated = p.new_lastupdated %}
+        {% endif %}
+      {% endunless %}
+    {% endfor %}
+    {% if found %}
+    <a href="/h5p-player?id={{ item.new_h5pcontentid }}" class="fv-lesson-row">
+      <div class="fv-lesson-thumb-sm">
+        {% if item.new_thumbnailurl and item.new_thumbnailurl != '' %}
+          <img src="{{ item.new_thumbnailurl }}" alt="" onerror="this.style.display='none'" />
+        {% else %}
+          <i class="bi bi-play-circle-fill"></i>
+        {% endif %}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#94A3B8;">{{ item.new_librarytype | default: 'H5P' }}</div>
+        <div style="font-size:14px;font-weight:600;color:#0B1220;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ item.new_name }}</div>
+        {% if prog_score != '' %}
+          <div class="fv-prog-bar-wrap">
+            <span style="font-size:11px;color:#64748B;">Балл: <strong>{{ prog_score }}%</strong></span>
+            <div class="fv-prog-bar-track">
+              <div class="fv-score-fill" style="width:{{ prog_score }}%;"></div>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        {% if lesson_status == 'completed' %}
+          <span class="fv-badge-yes"><i class="bi bi-check2"></i> Завершён</span>
+        {% else %}
+          <span class="fv-badge-no"><i class="bi bi-play-fill"></i> В процессе</span>
+        {% endif %}
+        {% if prog_updated %}
+        <div style="font-size:11px;color:#94A3B8;margin-top:4px;">{{ prog_updated | date: 'dd.MM.yyyy' }}</div>
+        {% endif %}
+      </div>
+    </a>
+    {% endif %}
+  {% endfor %}
+
+  {% else %}
+  <div class="fv-empty">
+    <i class="bi bi-mortarboard"></i>
+    <h3>Вы ещё не начали ни одного урока</h3>
+    <p>Откройте каталог и выберите первый урок для начала обучения.</p>
+    <a href="/h5p-catalog" class="btn btn-primary mt-3"><i class="bi bi-collection-play"></i> Открыть каталог</a>
+  </div>
+  {% endif %}
+
+{% else %}
+  <div class="fv-empty">
+    <i class="bi bi-lock"></i>
+    <h3>Требуется авторизация</h3>
+    <p>Войдите в систему для просмотра своего прогресса.</p>
+    <a href="{{ website.sign_in_url_substitution }}" class="btn btn-primary mt-3">Войти в систему</a>
+  </div>
+{% endif %}
+
+</div>
+
+<script>
+(function () {
+  var searchInput = document.getElementById('fv-admin-search');
+  if (!searchInput) return;
+  var rows = document.querySelectorAll('.fv-admin-row');
+  var noRes = document.getElementById('fv-admin-no-results');
+  searchInput.addEventListener('input', function () {
+    var q = this.value.trim().toLowerCase();
+    var visible = 0;
+    rows.forEach(function (r) {
+      var match = !q || (r.dataset.search || '').indexOf(q) !== -1;
+      r.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    if (noRes) noRes.style.display = visible === 0 ? '' : 'none';
+  });
+})();
+</script>

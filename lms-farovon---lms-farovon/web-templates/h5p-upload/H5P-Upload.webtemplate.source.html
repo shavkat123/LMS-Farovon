@@ -1,33 +1,67 @@
 {% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Administrators' %}
-<div class="alert alert-danger">Доступ запрещён</div>
+<div class="container py-5 text-center">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#94A3B8;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Эта страница доступна только администраторам.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
 {% else %}
 
-<h2>Загрузка H5P контента</h2>
+<style>
+  .fv-upload-page { padding: 28px 0 48px; }
+  .fv-upload-header { margin-bottom: 24px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .fv-upload-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #94A3B8; display: block; margin-bottom: 4px; }
+  .fv-upload-title { font-size: 22px; font-weight: 700; color: #0B1220; margin: 0 0 4px; }
+  .fv-upload-sub { font-size: 13px; color: #64748B; margin: 0; }
+  .fv-upload-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(11,18,32,0.04); margin-bottom: 16px; }
+  .fv-upload-hint { background: #EEF2F9; border: 1px solid #DBEAFE; border-radius: 10px; padding: 14px 18px; font-size: 13px; color: #1E40AF; display: flex; gap: 12px; align-items: flex-start; }
+  .fv-upload-hint i { flex-shrink: 0; font-size: 16px; margin-top: 1px; }
+</style>
+
+<div class="container fv-upload-page">
+  <div class="fv-upload-header">
+    <div>
+      <span class="fv-upload-eyebrow">Администрирование</span>
+      <h1 class="fv-upload-title">Загрузка H5P урока</h1>
+      <p class="fv-upload-sub">Создайте запись урока и загрузите .h5p файл</p>
+    </div>
+    <a href="/h5p-catalog" class="btn btn-outline-secondary btn-sm" style="border-radius:8px;font-size:13px;">
+      <i class="bi bi-arrow-left"></i> Назад к каталогу
+    </a>
+  </div>
+
+  <div class="fv-upload-hint mb-4">
+    <i class="bi bi-info-circle-fill"></i>
+    <div>
+      <strong>Как создать .h5p файл:</strong> скачайте
+      <a href="https://lumi.education" target="_blank" rel="noopener" style="color:#1E3A8A;font-weight:600;">Lumi Desktop</a>,
+      создайте Interactive Video и экспортируйте как <code>.h5p</code>.
+    </div>
+  </div>
+
+  <div class="fv-upload-card">
+    <div style="font-size:13px;font-weight:600;color:#0B1220;margin-bottom:4px;">Шаг 1 — Заполните данные урока</div>
+    <p style="font-size:12px;color:#64748B;margin-bottom:16px;">Введите название, описание и другие параметры. После сохранения откроется шаг 2 с загрузкой файла.</p>
 
 {% entityform name:'H5P Upload Form' %}
 
-<div id="h5p-file-upload-section" style="display:none" class="card mt-3">
-  <div class="card-body">
-    <h5 class="card-title">Шаг 2: Загрузите .h5p файл</h5>
-    <p class="text-muted">Запись создана. Теперь выберите <code>.h5p</code> файл для загрузки.</p>
+  </div><!-- /fv-upload-card step 1 -->
+
+  <div id="h5p-file-upload-section" style="display:none" class="fv-upload-card mt-2">
+    <div style="font-size:13px;font-weight:600;color:#0B1220;margin-bottom:4px;"><i class="bi bi-file-earmark-zip" style="color:#1E3A8A;"></i> Шаг 2 — Загрузите .h5p файл</div>
+    <p style="font-size:12px;color:#64748B;margin-bottom:14px;">Запись создана. Выберите <code>.h5p</code> файл для загрузки.</p>
     <div class="input-group">
       <input type="file" id="h5p-file-input" class="form-control" accept=".h5p">
       <button id="h5p-upload-btn" class="btn btn-primary" type="button">Загрузить файл</button>
     </div>
-    <div id="h5p-upload-progress" class="mt-2" style="display:none">
-      <div class="progress">
-        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width:100%"></div>
-      </div>
+    <div id="h5p-upload-progress" class="mt-3" style="display:none">
+      <div class="progress"><div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width:100%"></div></div>
       <small class="text-muted">Загрузка файла…</small>
     </div>
     <div id="h5p-upload-result" class="mt-2"></div>
   </div>
-</div>
 
-<div class="alert alert-secondary mt-2">
-  <strong>Как создать .h5p файл:</strong>
-  скачайте <a href="https://lumi.education" target="_blank" rel="noopener">Lumi Desktop</a>, создайте Interactive Video и экспортируйте как <code>.h5p</code>.
-</div>
+</div><!-- /fv-upload-page -->
 
 <script>
 (function () {
