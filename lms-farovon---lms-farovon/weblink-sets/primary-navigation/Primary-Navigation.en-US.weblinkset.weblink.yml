@@ -101,6 +101,17 @@
   adx_displayimageonly: false
   adx_displayorder: 10
   adx_displaypagechildlinks: false
+  adx_name: Лидерборд
+  adx_openinnewwindow: false
+  adx_pageid: e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b
+  adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_robotsfollowlink: true
+  adx_weblinkid: aa09e5ed-a538-f111-88b5-7ced8d76b3cc
+  adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_disablepagevalidation: false
+  adx_displayimageonly: false
+  adx_displayorder: 11
+  adx_displaypagechildlinks: false
   adx_name: Магазин наград
   adx_openinnewwindow: false
   adx_pageid: b5c4d3e2-f1a0-4b9c-8d7e-6f5a4b3c2d1e

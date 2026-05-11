@@ -1,0 +1,351 @@
+{% comment %}
+  Leaderboard — Рейтинг
+  Данные: new_h5pprogress (монеты = 100 + round(new_scorescaled*50) за каждый completed урок)
+  Группировка по new_user → суммируем монеты на стороне Liquid
+{% endcomment %}
+
+{% unless user %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-trophy" style="font-size:52px;color:#94A3B8;display:block;margin-bottom:16px;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin-bottom:6px;">Войдите в систему</h2>
+  <p style="font-size:13px;color:#64748B;margin-bottom:20px;">Для просмотра рейтинга необходимо авторизоваться.</p>
+  <a href="/SignIn" class="btn btn-primary" style="border-radius:8px;">Войти</a>
+</div>
+{% else %}
+
+{% comment %}── Все завершённые уроки всех пользователей ──{% endcomment %}
+{% fetchxml all_progress %}
+<fetch>
+  <entity name="new_h5pprogress">
+    <attribute name="new_h5pprogressid" />
+    <attribute name="new_user" />
+    <attribute name="new_scorescaled" />
+    <attribute name="new_completion" />
+    <link-entity name="contact" from="contactid" to="new_user" alias="c">
+      <attribute name="fullname" />
+      <attribute name="jobtitle" />
+    </link-entity>
+    <filter>
+      <condition attribute="new_completion" operator="eq" value="1" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Считаем монеты по каждому пользователю ──{% endcomment %}
+{% assign user_ids   = '' %}
+{% assign user_names = '' %}
+{% assign user_jobs  = '' %}
+{% assign user_coins = '' %}
+
+{% for p in all_progress.results.entities %}
+  {% assign uid = p.new_user.id %}
+  {% assign score_pts = 0 %}
+  {% if p.new_scorescaled %}
+    {% assign score_pts = p.new_scorescaled | times: 50 | round %}
+  {% endif %}
+  {% assign lesson_pts = 100 | plus: score_pts %}
+
+  {% comment %} найти индекс пользователя в массиве {% endcomment %}
+  {% assign found_idx = -1 %}
+  {% assign ids_arr   = user_ids   | split: '|' %}
+  {% assign coins_arr = user_coins | split: '|' %}
+  {% assign names_arr = user_names | split: '|' %}
+  {% assign jobs_arr  = user_jobs  | split: '|' %}
+
+  {% for existing_id in ids_arr %}
+    {% if existing_id == uid %}
+      {% assign found_idx = forloop.index0 %}
+    {% endif %}
+  {% endfor %}
+
+  {% if found_idx == -1 %}
+    {% comment %} новый пользователь {% endcomment %}
+    {% assign user_ids   = user_ids   | append: uid                       | append: '|' %}
+    {% assign user_names = user_names | append: p['c.fullname']           | append: '|' %}
+    {% assign user_jobs  = user_jobs  | append: p['c.jobtitle']           | append: '|' %}
+    {% assign user_coins = user_coins | append: lesson_pts                | append: '|' %}
+  {% else %}
+    {% comment %} добавляем монеты существующему пользователю {% endcomment %}
+    {% assign old_coins = coins_arr[found_idx] | plus: 0 %}
+    {% assign new_coins = old_coins | plus: lesson_pts %}
+    {% assign new_coins_arr = '' %}
+    {% for c in coins_arr %}
+      {% if forloop.index0 == found_idx %}
+        {% assign new_coins_arr = new_coins_arr | append: new_coins | append: '|' %}
+      {% else %}
+        {% assign new_coins_arr = new_coins_arr | append: c | append: '|' %}
+      {% endif %}
+    {% endfor %}
+    {% assign user_coins = new_coins_arr %}
+  {% endif %}
+{% endfor %}
+
+{% comment %}── Собираем итоговый список и сортируем (пузырёк по убыванию) ──{% endcomment %}
+{% assign ids_arr   = user_ids   | split: '|' %}
+{% assign names_arr = user_names | split: '|' %}
+{% assign jobs_arr  = user_jobs  | split: '|' %}
+{% assign coins_arr = user_coins | split: '|' %}
+{% assign total_participants = ids_arr | size %}
+
+{% comment %}── Пузырьковая сортировка по монетам (убывание) ──{% endcomment %}
+{% assign sorted = false %}
+{% assign pass = 0 %}
+{% for _outer in (1..20) %}
+  {% unless sorted %}
+    {% assign sorted = true %}
+    {% assign last_i = total_participants | minus: 2 %}
+    {% for i in (0..last_i) %}
+      {% assign j = i | plus: 1 %}
+      {% assign ci = coins_arr[i] | plus: 0 %}
+      {% assign cj = coins_arr[j] | plus: 0 %}
+      {% if ci < cj %}
+        {% assign sorted = false %}
+        {% comment %} swap {% endcomment %}
+        {% assign tmp_id   = ids_arr[i]   %}{% assign tmp_nm = names_arr[i] %}
+        {% assign tmp_job  = jobs_arr[i]  %}{% assign tmp_c  = coins_arr[i] %}
+        {% assign new_ids   = '' %}{% assign new_names = '' %}
+        {% assign new_jobs  = '' %}{% assign new_coins2 = '' %}
+        {% for k in (0..last_i) %}
+          {% assign kk = k | plus: 0 %}
+          {% if kk == i %}
+            {% assign new_ids   = new_ids   | append: ids_arr[j]   | append: '|' %}
+            {% assign new_names = new_names | append: names_arr[j] | append: '|' %}
+            {% assign new_jobs  = new_jobs  | append: jobs_arr[j]  | append: '|' %}
+            {% assign new_coins2 = new_coins2 | append: coins_arr[j] | append: '|' %}
+          {% elsif kk == j %}
+            {% assign new_ids   = new_ids   | append: tmp_id  | append: '|' %}
+            {% assign new_names = new_names | append: tmp_nm  | append: '|' %}
+            {% assign new_jobs  = new_jobs  | append: tmp_job | append: '|' %}
+            {% assign new_coins2 = new_coins2 | append: tmp_c | append: '|' %}
+          {% else %}
+            {% assign new_ids   = new_ids   | append: ids_arr[k]   | append: '|' %}
+            {% assign new_names = new_names | append: names_arr[k] | append: '|' %}
+            {% assign new_jobs  = new_jobs  | append: jobs_arr[k]  | append: '|' %}
+            {% assign new_coins2 = new_coins2 | append: coins_arr[k] | append: '|' %}
+          {% endif %}
+        {% endfor %}
+        {% assign last_k = total_participants | minus: 1 %}
+        {% assign new_ids   = new_ids   | append: ids_arr[last_k]   | append: '|' %}
+        {% assign new_names = new_names | append: names_arr[last_k] | append: '|' %}
+        {% assign new_jobs  = new_jobs  | append: jobs_arr[last_k]  | append: '|' %}
+        {% assign new_coins2 = new_coins2 | append: coins_arr[last_k] | append: '|' %}
+        {% assign ids_arr   = new_ids   | split: '|' %}
+        {% assign names_arr = new_names | split: '|' %}
+        {% assign jobs_arr  = new_jobs  | split: '|' %}
+        {% assign coins_arr = new_coins2 | split: '|' %}
+      {% endif %}
+    {% endfor %}
+  {% endunless %}
+{% endfor %}
+
+{% comment %}── Найти позицию текущего пользователя ──{% endcomment %}
+{% assign my_rank  = 0 %}
+{% assign my_coins = 0 %}
+{% for uid in ids_arr %}
+  {% if uid == user.id %}
+    {% assign my_rank  = forloop.index %}
+    {% assign my_coins = coins_arr[forloop.index0] | plus: 0 %}
+  {% endif %}
+{% endfor %}
+
+{% assign coin_url = 'https://raw.githubusercontent.com/shavkat123/farovon-lms-system/main/frontend/src/assets/coin.png' %}
+
+<style>
+  .fv-lb { padding: 28px 0 56px; font-family: 'Inter', ui-sans-serif, sans-serif; }
+
+  /* ── Header ── */
+  .fv-lb-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 28px; flex-wrap: wrap; }
+  .fv-lb-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #D97706; display: block; margin-bottom: 4px; }
+  .fv-lb-title { font-size: 22px; font-weight: 800; color: #0B1220; margin: 0 0 3px; }
+  .fv-lb-sub { font-size: 13px; color: #64748B; margin: 0; }
+
+  /* ── My rank pill ── */
+  .fv-my-rank-pill { background: linear-gradient(135deg,#1E3A8A,#3B82F6); border-radius: 12px; padding: 14px 20px; color: #fff; display: flex; align-items: center; gap: 14px; flex-shrink: 0; min-width: 220px; }
+  .fv-my-rank-num { font-size: 28px; font-weight: 900; line-height: 1; }
+  .fv-my-rank-lbl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; opacity: .75; }
+  .fv-my-rank-coins { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+
+  /* ── Podium (top-3) ── */
+  .fv-podium { display: flex; align-items: flex-end; justify-content: center; gap: 12px; margin-bottom: 32px; }
+  .fv-podium-item { display: flex; flex-direction: column; align-items: center; flex: 1; max-width: 200px; }
+  .fv-podium-avatar { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; font-size: 18px; margin-bottom: 10px; position: relative; flex-shrink: 0; }
+  .fv-podium-medal { position: absolute; bottom: -6px; right: -6px; font-size: 20px; line-height: 1; }
+  .fv-podium-name { font-size: 13px; font-weight: 700; color: #0B1220; text-align: center; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+  .fv-podium-dept { font-size: 11px; color: #94A3B8; text-align: center; margin-bottom: 8px; }
+  .fv-podium-coins { display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 800; color: #D97706; }
+  .fv-podium-block { width: 100%; border-radius: 12px 12px 0 0; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900; color: rgba(255,255,255,.5); }
+
+  /* podium heights */
+  .fv-podium-item.rank-1 .fv-podium-block { height: 88px; background: linear-gradient(180deg,#F59E0B,#D97706); }
+  .fv-podium-item.rank-2 .fv-podium-block { height: 64px; background: linear-gradient(180deg,#94A3B8,#64748B); }
+  .fv-podium-item.rank-3 .fv-podium-block { height: 48px; background: linear-gradient(180deg,#D97706,#B45309); }
+  .fv-podium-item.rank-1 .fv-podium-avatar { width: 64px; height: 64px; font-size: 22px; background: linear-gradient(135deg,#F59E0B,#D97706); box-shadow: 0 4px 16px rgba(245,158,11,.4); }
+  .fv-podium-item.rank-2 .fv-podium-avatar { width: 52px; height: 52px; background: linear-gradient(135deg,#94A3B8,#64748B); }
+  .fv-podium-item.rank-3 .fv-podium-avatar { width: 48px; height: 48px; font-size: 16px; background: linear-gradient(135deg,#D97706,#B45309); }
+
+  /* ── Table ── */
+  .fv-lb-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(11,18,32,.04); }
+  .fv-lb-table { width: 100%; border-collapse: collapse; }
+  .fv-lb-table thead tr { background: #F8FAFC; border-bottom: 1px solid #E5E7EB; }
+  .fv-lb-table thead th { font-size: 11px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: .07em; padding: 10px 16px; text-align: left; }
+  .fv-lb-table thead th:last-child { text-align: right; }
+  .fv-lb-table tbody tr { border-bottom: 1px solid #F1F5F9; transition: background .12s; }
+  .fv-lb-table tbody tr:last-child { border-bottom: none; }
+  .fv-lb-table tbody tr:hover { background: #F8FAFC; }
+  .fv-lb-table tbody tr.fv-me { background: #EFF6FF !important; }
+  .fv-lb-table td { padding: 12px 16px; font-size: 13px; color: #0B1220; }
+  .fv-lb-table td:last-child { text-align: right; }
+
+  .fv-rank-num { font-size: 13px; font-weight: 700; color: #64748B; width: 32px; text-align: center; }
+  .fv-rank-num.top3 { font-size: 18px; }
+  .fv-avatar-sm { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .fv-lb-fullname { font-size: 13px; font-weight: 600; color: #0B1220; }
+  .fv-lb-job { font-size: 11px; color: #94A3B8; margin-top: 1px; }
+  .fv-coin-row { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 800; color: #D97706; justify-content: flex-end; }
+  .fv-coin-row img { width: 20px; height: 20px; }
+  .fv-me-badge { background: #DBEAFE; color: #1E40AF; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 20px; margin-left: 6px; letter-spacing: .04em; }
+
+  /* ── Empty ── */
+  .fv-lb-empty { text-align: center; padding: 56px 24px; }
+  .fv-lb-empty i { font-size: 48px; color: #CBD5E1; display: block; margin-bottom: 14px; }
+  .fv-lb-empty h3 { font-size: 15px; font-weight: 700; color: #64748B; margin: 0 0 6px; }
+  .fv-lb-empty p { font-size: 13px; color: #94A3B8; margin: 0; }
+
+  @media (max-width: 576px) {
+    .fv-lb-header { flex-direction: column; }
+    .fv-my-rank-pill { width: 100%; }
+    .fv-podium { gap: 6px; }
+    .fv-podium-name { font-size: 11px; max-width: 90px; }
+  }
+</style>
+
+<div class="container fv-lb">
+
+  <!-- Header -->
+  <div class="fv-lb-header">
+    <div>
+      <span class="fv-lb-eyebrow"><i class="bi bi-trophy-fill"></i> Рейтинг</span>
+      <h1 class="fv-lb-title">Лидеры обучения</h1>
+      <p class="fv-lb-sub">Рейтинг по монетам, заработанным за прохождение уроков</p>
+    </div>
+    {% if my_rank > 0 %}
+    <div class="fv-my-rank-pill">
+      <div>
+        <div class="fv-my-rank-lbl">Ваша позиция</div>
+        <div class="fv-my-rank-num">#{{ my_rank }}</div>
+      </div>
+      <div style="width:1px;height:36px;background:rgba(255,255,255,.2);"></div>
+      <div>
+        <div class="fv-my-rank-lbl">Монеты</div>
+        <div class="fv-my-rank-coins">
+          <img src="{{ coin_url }}" style="width:18px;height:18px;"> {{ my_coins }}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if total_participants == 0 %}
+  <div class="fv-lb-empty">
+    <i class="bi bi-trophy"></i>
+    <h3>Рейтинг пока пуст</h3>
+    <p>Проходите уроки чтобы попасть в таблицу лидеров</p>
+  </div>
+  {% else %}
+
+  <!-- Podium top-3 -->
+  {% if total_participants >= 3 %}
+  <div class="fv-podium">
+    {% comment %} Порядок подиума: 2-й, 1-й, 3-й {% endcomment %}
+    {% assign podium_order = '1,0,2' | split: ',' %}
+    {% assign podium_ranks = '2,1,3' | split: ',' %}
+    {% for pi in podium_order %}
+      {% assign idx = pi | plus: 0 %}
+      {% assign pr  = podium_ranks[forloop.index0] | plus: 0 %}
+      {% assign pname  = names_arr[idx] | default: 'Участник' %}
+      {% assign pjob   = jobs_arr[idx]  | default: '' %}
+      {% assign pcoins = coins_arr[idx] | plus: 0 %}
+      {% assign puid   = ids_arr[idx] %}
+      {% assign initials = pname | split: ' ' %}
+      {% assign ini1 = initials[0] | slice: 0, 1 | upcase %}
+      {% assign ini2 = initials[1] | slice: 0, 1 | upcase %}
+      {% assign medal_emoji = '🥇' %}
+      {% if pr == 2 %}{% assign medal_emoji = '🥈' %}{% endif %}
+      {% if pr == 3 %}{% assign medal_emoji = '🥉' %}{% endif %}
+      <div class="fv-podium-item rank-{{ pr }}">
+        <div class="fv-podium-avatar">
+          {{ ini1 }}{{ ini2 }}
+          <span class="fv-podium-medal">{{ medal_emoji }}</span>
+        </div>
+        <div class="fv-podium-name">{{ pname }}</div>
+        {% if pjob and pjob != '' %}<div class="fv-podium-dept">{{ pjob }}</div>{% endif %}
+        <div class="fv-podium-coins"><img src="{{ coin_url }}" style="width:16px;height:16px;"> {{ pcoins }}</div>
+        <div class="fv-podium-block">#{{ pr }}</div>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Table -->
+  <div class="fv-lb-card">
+    <table class="fv-lb-table">
+      <thead>
+        <tr>
+          <th style="width:48px;">#</th>
+          <th>Участник</th>
+          <th style="width:140px;text-align:right;">Монеты</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for uid in ids_arr %}
+          {% if uid == '' %}{% continue %}{% endif %}
+          {% assign ri    = forloop.index %}
+          {% assign idx   = forloop.index0 %}
+          {% assign pname  = names_arr[idx] | default: 'Участник' %}
+          {% assign pjob   = jobs_arr[idx]  | default: '' %}
+          {% assign pcoins = coins_arr[idx] | plus: 0 %}
+          {% assign is_me  = false %}
+          {% if uid == user.id %}{% assign is_me = true %}{% endif %}
+          {% assign initials = pname | split: ' ' %}
+          {% assign ini1 = initials[0] | slice: 0, 1 | upcase %}
+          {% assign ini2 = initials[1] | slice: 0, 1 | upcase %}
+          {% assign avatar_colors = '#1E3A8A,#7C3AED,#047857,#B45309,#BE185D,#0369A1' | split: ',' %}
+          {% assign color_idx = idx | modulo: 6 %}
+          {% assign avatar_color = avatar_colors[color_idx] %}
+        <tr{% if is_me %} class="fv-me"{% endif %}>
+          <td>
+            {% if ri <= 3 %}
+              {% if ri == 1 %}🥇{% elsif ri == 2 %}🥈{% else %}🥉{% endif %}
+            {% else %}
+              <span class="fv-rank-num">{{ ri }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="fv-avatar-sm" style="background:{{ avatar_color }};">{{ ini1 }}{{ ini2 }}</div>
+              <div>
+                <div class="fv-lb-fullname">
+                  {{ pname }}
+                  {% if is_me %}<span class="fv-me-badge">Вы</span>{% endif %}
+                </div>
+                {% if pjob and pjob != '' %}<div class="fv-lb-job">{{ pjob }}</div>{% endif %}
+              </div>
+            </div>
+          </td>
+          <td>
+            <div class="fv-coin-row">
+              <img src="{{ coin_url }}" alt="coin"> {{ pcoins }}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% endif %}
+
+</div>
+
+{% endunless %}
