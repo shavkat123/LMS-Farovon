@@ -1,0 +1,366 @@
+{% comment %}
+  Admin Users — Управление пользователями
+  FetchXML: contact (active, top 500) + new_h5pprogress (completed lessons)
+  Aggregates per-user: completion count, avg score
+{% endcomment %}
+
+{% if user %}
+
+{% fetchxml ct_data %}
+<fetch top="500">
+  <entity name="contact">
+    <attribute name="contactid" />
+    <attribute name="fullname" />
+    <attribute name="emailaddress1" />
+    <attribute name="jobtitle" />
+    <attribute name="createdon" />
+    <filter>
+      <condition attribute="statecode" operator="eq" value="0" />
+    </filter>
+    <order attribute="createdon" descending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml prog_data %}
+<fetch>
+  <entity name="new_h5pprogress">
+    <attribute name="new_user" />
+    <attribute name="new_scorescaled" />
+    <filter>
+      <condition attribute="new_completion" operator="eq" value="1" />
+      <condition attribute="statecode" operator="eq" value="0" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Build pipe-separated arrays for per-contact stats ──{% endcomment %}
+{% assign ct_ids   = '' %}
+{% assign ct_names = '' %}
+{% assign ct_mails = '' %}
+{% assign ct_jobs  = '' %}
+{% assign ct_dates = '' %}
+{% assign ct_comp  = '' %}
+{% assign ct_sum   = '' %}
+
+{% for c in ct_data.results.entities %}
+  {% assign ct_ids   = ct_ids   | append: c.contactid     | append: '|' %}
+  {% assign ct_names = ct_names | append: c.fullname      | append: '|' %}
+  {% assign ct_mails = ct_mails | append: c.emailaddress1 | append: '|' %}
+  {% assign ct_jobs  = ct_jobs  | append: c.jobtitle      | append: '|' %}
+  {% assign ct_dates = ct_dates | append: c.createdon     | append: '|' %}
+  {% assign ct_comp  = ct_comp  | append: '0'             | append: '|' %}
+  {% assign ct_sum   = ct_sum   | append: '0'             | append: '|' %}
+{% endfor %}
+
+{% assign ids_arr  = ct_ids  | split: '|' %}
+{% assign comp_arr = ct_comp | split: '|' %}
+{% assign sum_arr  = ct_sum  | split: '|' %}
+{% assign n_real   = ids_arr | size | minus: 1 %}
+{% assign last_rt  = n_real  | minus: 1 %}
+
+{% comment %}── Aggregate progress per contact ──{% endcomment %}
+{% for p in prog_data.results.entities %}
+  {% assign uid   = p.new_user.id %}
+  {% assign found = -1 %}
+  {% for i in (0..last_rt) %}
+    {% if ids_arr[i] == uid %}{% assign found = i %}{% endif %}
+  {% endfor %}
+  {% if found >= 0 %}
+    {% assign new_c = '' %}
+    {% assign new_s = '' %}
+    {% for i in (0..last_rt) %}
+      {% if i == found %}
+        {% assign nv_c = comp_arr[i] | plus: 1 %}
+        {% assign sv   = p.new_scorescaled | default: 0 %}
+        {% assign nv_s = sum_arr[i]  | plus: sv %}
+        {% assign new_c = new_c | append: nv_c | append: '|' %}
+        {% assign new_s = new_s | append: nv_s | append: '|' %}
+      {% else %}
+        {% assign new_c = new_c | append: comp_arr[i] | append: '|' %}
+        {% assign new_s = new_s | append: sum_arr[i]  | append: '|' %}
+      {% endif %}
+    {% endfor %}
+    {% assign comp_arr = new_c | split: '|' %}
+    {% assign sum_arr  = new_s | split: '|' %}
+  {% endif %}
+{% endfor %}
+
+{% comment %}── Global stats ──{% endcomment %}
+{% assign names_arr = ct_names | split: '|' %}
+{% assign mails_arr = ct_mails | split: '|' %}
+{% assign jobs_arr  = ct_jobs  | split: '|' %}
+{% assign dates_arr = ct_dates | split: '|' %}
+
+{% assign g_total  = 0 %}
+{% assign g_active = 0 %}
+{% assign g_comps  = 0 %}
+{% assign g_score  = 0 %}
+{% assign g_scored = 0 %}
+
+{% for i in (0..last_rt) %}
+  {% assign g_total = g_total | plus: 1 %}
+  {% assign cc = comp_arr[i] | plus: 0 %}
+  {% assign ss = sum_arr[i]  | plus: 0 %}
+  {% assign g_comps = g_comps | plus: cc %}
+  {% if cc > 0 %}
+    {% assign g_active = g_active | plus: 1 %}
+    {% assign g_score  = g_score  | plus: ss %}
+    {% assign g_scored = g_scored | plus: cc %}
+  {% endif %}
+{% endfor %}
+
+{% assign g_avg = 0 %}
+{% if g_scored > 0 %}
+  {% assign g_avg = g_score | times: 100.0 | divided_by: g_scored | round %}
+{% endif %}
+
+{% assign av_palette = '#EC4899,#8B5CF6,#3B82F6,#22C55E,#F59E0B,#14B8A6,#6366F1,#EF4444' | split: ',' %}
+
+<style>
+  .fv-admin { padding: 28px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
+
+  .fv-breadcrumb { margin-bottom: 20px; }
+  .fv-breadcrumb ol { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .fv-breadcrumb li { font-size: 12px; color: #94A3B8; display: flex; align-items: center; gap: 6px; }
+  .fv-breadcrumb li::after { content: '/'; color: #CBD5E1; }
+  .fv-breadcrumb li:last-child::after { display: none; }
+  .fv-breadcrumb a { color: #64748B; text-decoration: none; }
+  .fv-breadcrumb a:hover { color: #EC4899; }
+  .fv-breadcrumb li:last-child { color: #0B1220; font-weight: 600; }
+
+  .fv-admin-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
+  .fv-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #EC4899; display: block; margin-bottom: 5px; }
+  .fv-page-title { font-size: 28px; font-weight: 800; color: #0B1220; margin: 0 0 4px; }
+  .fv-page-sub { font-size: 13px; color: #64748B; margin: 0; }
+
+  .fv-stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  @media (max-width: 768px) { .fv-stats-row { grid-template-columns: repeat(2, 1fr); } }
+  .fv-stat-card { background: #fff; border-radius: 14px; padding: 20px 22px; border: 1.5px solid #F1F5F9; display: flex; align-items: center; gap: 14px; }
+  .fv-stat-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .fv-stat-val { font-size: 26px; font-weight: 800; color: #0B1220; line-height: 1; }
+  .fv-stat-lbl { font-size: 12px; color: #64748B; margin-top: 3px; }
+
+  .fv-table-card { background: #fff; border-radius: 16px; border: 1.5px solid #F1F5F9; overflow: hidden; }
+  .fv-table-toolbar { padding: 16px 20px; border-bottom: 1px solid #F1F5F9; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .fv-search-wrap { flex: 1; min-width: 200px; position: relative; }
+  .fv-search-wrap i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94A3B8; font-size: 14px; pointer-events: none; }
+  .fv-search-input { width: 100%; padding: 9px 14px 9px 36px; border: 1.5px solid #E2E8F0; border-radius: 10px; font-size: 13px; outline: none; transition: border-color .15s; background: #F8FAFC; }
+  .fv-search-input:focus { border-color: #EC4899; background: #fff; }
+  .fv-tbl-count { font-size: 12px; color: #94A3B8; white-space: nowrap; }
+
+  .fv-tbl { width: 100%; border-collapse: collapse; }
+  .fv-tbl thead th { padding: 11px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94A3B8; background: #F8FAFC; border-bottom: 1px solid #F1F5F9; text-align: left; white-space: nowrap; }
+  .fv-tbl tbody tr { border-bottom: 1px solid #F8FAFC; transition: background .1s; }
+  .fv-tbl tbody tr:hover { background: #FFF5FB; }
+  .fv-tbl tbody tr:last-child { border-bottom: none; }
+  .fv-tbl tbody td { padding: 12px 16px; font-size: 13px; color: #334155; vertical-align: middle; }
+
+  .fv-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .fv-user-cell { display: flex; align-items: center; gap: 10px; }
+  .fv-user-name { font-weight: 600; color: #0B1220; font-size: 13px; line-height: 1.3; }
+  .fv-user-email { font-size: 11px; color: #94A3B8; }
+
+  .fv-badge-active { display: inline-block; padding: 3px 10px; background: #DCFCE7; color: #15803D; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .fv-badge-new    { display: inline-block; padding: 3px 10px; background: #F1F5F9; color: #94A3B8; border-radius: 20px; font-size: 11px; font-weight: 600; }
+
+  .fv-score-bar { display: flex; align-items: center; gap: 8px; }
+  .fv-score-track { width: 60px; height: 5px; background: #F1F5F9; border-radius: 9px; overflow: hidden; }
+  .fv-score-fill  { height: 100%; background: linear-gradient(90deg, #EC4899, #8B5CF6); border-radius: 9px; }
+
+  .fv-btn-prog { padding: 5px 12px; font-size: 12px; font-weight: 600; border: 1.5px solid #EC4899; color: #EC4899; background: transparent; border-radius: 7px; text-decoration: none; transition: all .15s; white-space: nowrap; display: inline-block; }
+  .fv-btn-prog:hover { background: #EC4899; color: #fff; text-decoration: none; }
+
+  .fv-empty-row td { padding: 48px 24px; text-align: center; }
+  .fv-empty-row i { font-size: 40px; display: block; margin-bottom: 12px; color: #CBD5E1; }
+  .fv-empty-row p { margin: 0; font-size: 14px; font-weight: 600; color: #94A3B8; }
+</style>
+
+<div class="fv-admin">
+<div class="container">
+
+  <nav class="fv-breadcrumb" aria-label="Навигация">
+    <ol>
+      <li><a href="/">Главная</a></li>
+      <li>Администрирование</li>
+      <li>Пользователи</li>
+    </ol>
+  </nav>
+
+  <div class="fv-admin-header">
+    <div>
+      <span class="fv-eyebrow"><i class="bi bi-shield-lock-fill"></i> Администрирование</span>
+      <h1 class="fv-page-title">Пользователи</h1>
+      <p class="fv-page-sub">Всего зарегистрировано: {{ g_total }} пользователей</p>
+    </div>
+  </div>
+
+  <div class="fv-stats-row">
+    <div class="fv-stat-card">
+      <div class="fv-stat-icon" style="background:#EFF6FF;">
+        <i class="bi bi-people-fill" style="color:#3B82F6;"></i>
+      </div>
+      <div>
+        <div class="fv-stat-val">{{ g_total }}</div>
+        <div class="fv-stat-lbl">Всего пользователей</div>
+      </div>
+    </div>
+    <div class="fv-stat-card">
+      <div class="fv-stat-icon" style="background:#F0FDF4;">
+        <i class="bi bi-person-check-fill" style="color:#22C55E;"></i>
+      </div>
+      <div>
+        <div class="fv-stat-val">{{ g_active }}</div>
+        <div class="fv-stat-lbl">Активных (≥1 урок)</div>
+      </div>
+    </div>
+    <div class="fv-stat-card">
+      <div class="fv-stat-icon" style="background:#FDF4FF;">
+        <i class="bi bi-check-circle-fill" style="color:#A855F7;"></i>
+      </div>
+      <div>
+        <div class="fv-stat-val">{{ g_comps }}</div>
+        <div class="fv-stat-lbl">Уроков завершено</div>
+      </div>
+    </div>
+    <div class="fv-stat-card">
+      <div class="fv-stat-icon" style="background:#FFF1F5;">
+        <i class="bi bi-star-fill" style="color:#EC4899;"></i>
+      </div>
+      <div>
+        <div class="fv-stat-val">{{ g_avg }}%</div>
+        <div class="fv-stat-lbl">Средний балл</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fv-table-card">
+    <div class="fv-table-toolbar">
+      <div class="fv-search-wrap">
+        <i class="bi bi-search"></i>
+        <input type="text" class="fv-search-input" id="adminUserSearch"
+               placeholder="Поиск по имени, email или должности..."
+               oninput="fvAdminFilter()" autocomplete="off">
+      </div>
+      <span class="fv-tbl-count" id="adminUserCount">{{ g_total }} пользователей</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="fv-tbl" id="adminUsersTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Пользователь</th>
+            <th>Должность</th>
+            <th>Завершений</th>
+            <th>Ср. балл</th>
+            <th>Регистрация</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="adminUsersBody">
+
+          {% assign row_n = 0 %}
+          {% for i in (0..last_rt) %}
+            {% assign cid = ids_arr[i] %}
+            {% unless cid == '' %}
+              {% assign row_n = row_n | plus: 1 %}
+              {% assign nm  = names_arr[i] | default: '—' %}
+              {% assign em  = mails_arr[i] | default: '' %}
+              {% assign jb  = jobs_arr[i]  | default: '—' %}
+              {% assign dt  = dates_arr[i] %}
+              {% assign cc  = comp_arr[i]  | plus: 0 %}
+              {% assign ss  = sum_arr[i]   | plus: 0 %}
+              {% assign ap  = 0 %}
+              {% if cc > 0 %}
+                {% assign ap = ss | times: 100.0 | divided_by: cc | round %}
+              {% endif %}
+              {% assign av_color = av_palette[i | modulo: 8] %}
+              {% assign init = nm | slice: 0 | upcase %}
+
+              <tr data-search="{{ nm | downcase }} {{ em | downcase }} {{ jb | downcase }}">
+                <td style="color:#94A3B8;font-weight:600;font-size:12px;">{{ row_n }}</td>
+                <td>
+                  <div class="fv-user-cell">
+                    <div class="fv-avatar" style="background:{{ av_color }};">{{ init }}</div>
+                    <div>
+                      <div class="fv-user-name">{{ nm }}</div>
+                      <div class="fv-user-email">{{ em }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td style="color:#64748B;">{{ jb }}</td>
+                <td>
+                  {% if cc == 1 %}
+                    <span class="fv-badge-active">1 урок</span>
+                  {% elsif cc >= 2 and cc <= 4 %}
+                    <span class="fv-badge-active">{{ cc }} урока</span>
+                  {% elsif cc > 0 %}
+                    <span class="fv-badge-active">{{ cc }} уроков</span>
+                  {% else %}
+                    <span class="fv-badge-new">Нет</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if cc > 0 %}
+                    <div class="fv-score-bar">
+                      <div class="fv-score-track">
+                        <div class="fv-score-fill" style="width:{{ ap }}%;"></div>
+                      </div>
+                      <span style="font-size:12px;font-weight:700;color:#0B1220;min-width:32px;">{{ ap }}%</span>
+                    </div>
+                  {% else %}
+                    <span style="color:#CBD5E1;">—</span>
+                  {% endif %}
+                </td>
+                <td style="color:#94A3B8;font-size:12px;">
+                  {{ dt | date: "%d.%m.%Y" | default: '—' }}
+                </td>
+                <td>
+                  <a href="/h5p-progress" class="fv-btn-prog" title="Просмотреть прогресс">
+                    <i class="bi bi-bar-chart-fill" style="margin-right:4px;font-size:11px;"></i>Прогресс
+                  </a>
+                </td>
+              </tr>
+            {% endunless %}
+          {% endfor %}
+
+          {% if g_total == 0 %}
+          <tr class="fv-empty-row">
+            <td colspan="7">
+              <i class="bi bi-people"></i>
+              <p>Пользователей не найдено</p>
+            </td>
+          </tr>
+          {% endif %}
+
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+function fvAdminFilter() {
+  var q = (document.getElementById('adminUserSearch').value || '').toLowerCase();
+  var rows = document.querySelectorAll('#adminUsersBody tr[data-search]');
+  var vis = 0;
+  rows.forEach(function(r) {
+    var match = !q || (r.getAttribute('data-search') || '').includes(q);
+    r.style.display = match ? '' : 'none';
+    if (match) vis++;
+  });
+  document.getElementById('adminUserCount').textContent = vis + ' пользователей';
+}
+</script>
+
+{% else %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#94A3B8;display:block;margin-bottom:16px;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin-bottom:6px;">Войдите в систему</h2>
+  <p style="font-size:13px;color:#64748B;margin-bottom:20px;">Для доступа к административной панели необходимо авторизоваться.</p>
+  <a href="/SignIn" class="btn btn-primary" style="border-radius:8px;">Войти</a>
+</div>
+{% endif %}

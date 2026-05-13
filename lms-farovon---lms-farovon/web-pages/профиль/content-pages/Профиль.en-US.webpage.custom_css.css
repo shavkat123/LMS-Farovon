@@ -127,3 +127,20 @@ body[data-sitemap-state="/profile/:/"] legend
   padding-left: 0.2em;
 }
 /* END PROFILE*/
+
+/* ── Hide built-in sidebar and "Your Information" form ── */
+
+/* Hide the sidebar column (Security/Manage External Authentication panel) */
+.col-md-4 { display: none !important; }
+
+/* Make page copy column take full width */
+.col-md-8 {
+  flex: 0 0 100% !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+/* Hide "Your Information" entity form — targets ASPX-generated control IDs only */
+[id^="ContentContainer"] { display: none !important; }
