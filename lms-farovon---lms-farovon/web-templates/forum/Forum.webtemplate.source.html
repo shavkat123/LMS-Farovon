@@ -1,0 +1,461 @@
+{% comment %}
+  Forum — Обсуждения и Q&A
+  Table: new_forumthread
+  Columns: new_Name, new_body, new_tag, new_votes, new_replycount, new_ispinned, new_author (Lookup→Contact)
+  Author name via link-entity alias "auth" → thread['auth.fullname']
+  Demo mode activates when 0 threads found (no Table Permissions yet or empty table).
+{% endcomment %}
+
+{% fetchxml forum_threads %}
+<fetch>
+  <entity name="new_forumthread">
+    <attribute name="new_forumthreadid" />
+    <attribute name="new_name" />
+    <attribute name="new_body" />
+    <attribute name="new_tag" />
+    <attribute name="new_votes" />
+    <attribute name="new_replycount" />
+    <attribute name="new_ispinned" />
+    <attribute name="createdon" />
+    <link-entity name="contact" from="contactid" to="new_author" alias="auth" link-type="outer">
+      <attribute name="fullname" />
+    </link-entity>
+    <filter>
+      <condition attribute="statecode" operator="eq" value="0" />
+    </filter>
+    <order attribute="new_ispinned" descending="true" />
+    <order attribute="createdon" descending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign total_threads = 0 %}
+{% assign total_replies = 0 %}
+{% for t in forum_threads.results.entities %}
+  {% assign total_threads = total_threads | plus: 1 %}
+  {% assign t_r = t.new_replycount | default: 0 %}
+  {% assign total_replies = total_replies | plus: t_r %}
+{% endfor %}
+
+{% assign demo_mode = false %}
+{% if total_threads == 0 %}{% assign demo_mode = true %}{% endif %}
+
+{% assign forum_user = user %}
+
+<style>
+  .fv-forum { padding: 28px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
+
+  .fv-breadcrumb { margin-bottom: 18px; }
+  .fv-breadcrumb ol { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; }
+  .fv-breadcrumb li { font-size: 12px; color: #94A3B8; display: flex; align-items: center; gap: 6px; }
+  .fv-breadcrumb li::after { content: '/'; color: #CBD5E1; }
+  .fv-breadcrumb li:last-child::after { display: none; }
+  .fv-breadcrumb a { color: #64748B; text-decoration: none; }
+  .fv-breadcrumb a:hover { color: #EC4899; }
+  .fv-breadcrumb li:last-child { color: #0B1220; font-weight: 600; }
+
+  .fv-forum-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .fv-eyebrow-pink { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #EC4899; display: block; margin-bottom: 5px; }
+  .fv-forum-title { font-size: 26px; font-weight: 800; color: #0B1220; margin: 0 0 4px; }
+  .fv-forum-sub { font-size: 13px; color: #64748B; margin: 0; }
+  .fv-new-btn { display: inline-flex; align-items: center; gap: 6px; background: #EC4899; color: #fff; border: none; border-radius: 12px; padding: 10px 18px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s; white-space: nowrap; text-decoration: none; }
+  .fv-new-btn:hover { opacity: .88; color: #fff; }
+
+  .fv-forum-stats { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+  .fv-fstat { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 12px 18px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+  .fv-fstat-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .fv-fstat-val { font-size: 18px; font-weight: 800; color: #0B1220; line-height: 1; }
+  .fv-fstat-lbl { font-size: 11px; color: #94A3B8; margin-top: 1px; }
+
+  .fv-demo-banner { display: flex; align-items: center; gap: 10px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px; padding: 10px 16px; margin-bottom: 18px; font-size: 12px; color: #92400E; }
+  .fv-demo-banner i { color: #F59E0B; flex-shrink: 0; }
+
+  .fv-forum-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .fv-filter-tabs { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
+  .fv-ftab { padding: 6px 14px; border-radius: 9px; font-size: 12px; font-weight: 600; border: 1px solid #E5E7EB; background: #fff; color: #64748B; cursor: pointer; transition: all .15s; }
+  .fv-ftab.active, .fv-ftab:hover { background: #FDF2F8; border-color: #EC4899; color: #EC4899; }
+  .fv-search-wrap { position: relative; }
+  .fv-search-input { padding: 7px 12px 7px 34px; border: 1px solid #E5E7EB; border-radius: 10px; font-size: 13px; color: #0B1220; outline: none; width: 200px; transition: border-color .15s; }
+  .fv-search-input:focus { border-color: #EC4899; }
+  .fv-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #94A3B8; font-size: 14px; pointer-events: none; }
+
+  .fv-thread-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 14px; padding: 16px 18px; display: flex; align-items: center; gap: 14px; margin-bottom: 8px; cursor: pointer; transition: box-shadow .18s, border-color .18s; }
+  .fv-thread-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.07); border-color: #d0d7e3; }
+
+  .fv-vote { display: flex; flex-direction: column; align-items: center; gap: 2px; background: #F8FAFC; border-radius: 10px; padding: 8px 10px; min-width: 42px; flex-shrink: 0; }
+  .fv-vote-btn { background: none; border: none; cursor: pointer; color: #94A3B8; padding: 1px; line-height: 1; font-size: 14px; transition: color .12s; }
+  .fv-vote-btn:hover { color: #EC4899; }
+  .fv-vote-num { font-size: 14px; font-weight: 800; color: #0B1220; line-height: 1.2; }
+
+  .fv-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; background: linear-gradient(135deg, #DCE4FF, #EFEAFF); color: #2563EB; }
+
+  .fv-thread-body { flex: 1; min-width: 0; }
+  .fv-thread-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+  .fv-tag { display: inline-block; padding: 2px 8px; border-radius: 5px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+  .fv-tag-pinned { background: #FEF3C7; color: #D97706; }
+  .fv-tag-help    { background: #DBEAFE; color: #1D4ED8; }
+  .fv-tag-disc    { background: #EDE9FE; color: #6D28D9; }
+  .fv-tag-bug     { background: #FEE2E2; color: #DC2626; }
+  .fv-tag-idea    { background: #D1FAE5; color: #059669; }
+  .fv-tag-news    { background: #CCFBF1; color: #0F766E; }
+  .fv-tag-general { background: #F1F5F9; color: #64748B; }
+  .fv-thread-when { font-size: 11px; color: #94A3B8; }
+  .fv-thread-title { font-size: 15px; font-weight: 700; color: #0B1220; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
+
+  .fv-replies { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: #64748B; flex-shrink: 0; white-space: nowrap; }
+
+  .fv-pagination { display: none; align-items: center; justify-content: center; gap: 10px; margin-top: 20px; }
+  .fv-page-btn { background: #fff; border: 1px solid #E5E7EB; border-radius: 9px; padding: 7px 16px; font-size: 13px; font-weight: 600; color: #374151; cursor: pointer; transition: all .15s; }
+  .fv-page-btn:hover:not(:disabled) { background: #FDF2F8; border-color: #EC4899; color: #EC4899; }
+  .fv-page-btn:disabled { opacity: .4; cursor: default; }
+  .fv-page-info { font-size: 13px; color: #64748B; min-width: 100px; text-align: center; }
+
+  .fv-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 9999; align-items: center; justify-content: center; padding: 20px; }
+  .fv-modal-overlay.open { display: flex; }
+  .fv-modal { background: #fff; border-radius: 20px; padding: 28px; width: 100%; max-width: 540px; box-shadow: 0 20px 60px rgba(0,0,0,.18); position: relative; }
+  .fv-modal-title { font-size: 18px; font-weight: 800; color: #0B1220; margin: 0 0 20px; }
+  .fv-modal-close { position: absolute; top: 20px; right: 20px; background: #F1F5F9; border: none; border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; color: #64748B; }
+  .fv-modal-close:hover { background: #E2E8F0; }
+  .fv-field { margin-bottom: 16px; }
+  .fv-label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 5px; }
+  .fv-input, .fv-textarea, .fv-select { width: 100%; padding: 9px 12px; border: 1px solid #E5E7EB; border-radius: 10px; font-size: 13px; color: #0B1220; outline: none; font-family: inherit; transition: border-color .15s; box-sizing: border-box; }
+  .fv-input:focus, .fv-textarea:focus, .fv-select:focus { border-color: #EC4899; }
+  .fv-textarea { resize: vertical; min-height: 100px; }
+  .fv-submit-btn { width: 100%; padding: 11px; background: #EC4899; color: #fff; border: none; border-radius: 11px; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity .15s; }
+  .fv-submit-btn:hover { opacity: .88; }
+
+  .fv-empty { text-align: center; padding: 50px 20px; color: #94A3B8; }
+  .fv-empty i { font-size: 40px; display: block; margin-bottom: 10px; }
+</style>
+
+<div class="fv-forum container-fluid px-3 px-md-4">
+
+  <nav class="fv-breadcrumb" aria-label="breadcrumb">
+    <ol>
+      <li><a href="/">Главная</a></li>
+      <li aria-current="page">Форум</li>
+    </ol>
+  </nav>
+
+  <div class="fv-forum-header">
+    <div>
+      <span class="fv-eyebrow-pink">Сообщество</span>
+      <h1 class="fv-forum-title">Обсуждения и Q&A</h1>
+      <p class="fv-forum-sub">Спрашивайте, отвечайте — за полезные ответы начисляются баллы.</p>
+    </div>
+    {% if forum_user %}
+    <button type="button" class="fv-new-btn" onclick="fvOpenModal()">
+      <i class="bi bi-plus-lg"></i> Новая тема
+    </button>
+    {% endif %}
+  </div>
+
+  {% assign stat_threads = total_threads %}
+  {% assign stat_replies = total_replies %}
+  {% if demo_mode %}{% assign stat_threads = 8 %}{% assign stat_replies = 90 %}{% endif %}
+
+  <div class="fv-forum-stats">
+    <div class="fv-fstat">
+      <div class="fv-fstat-icon" style="background:#FDF2F8;color:#EC4899;"><i class="bi bi-chat-square-text"></i></div>
+      <div><div class="fv-fstat-val" id="fvStatThreads">{{ stat_threads }}</div><div class="fv-fstat-lbl">Тем</div></div>
+    </div>
+    <div class="fv-fstat">
+      <div class="fv-fstat-icon" style="background:#EFF6FF;color:#2563EB;"><i class="bi bi-reply-all"></i></div>
+      <div><div class="fv-fstat-val">{{ stat_replies }}</div><div class="fv-fstat-lbl">Ответов</div></div>
+    </div>
+    <div class="fv-fstat">
+      <div class="fv-fstat-icon" style="background:#F0FDF4;color:#22C55E;"><i class="bi bi-people"></i></div>
+      <div><div class="fv-fstat-val">24</div><div class="fv-fstat-lbl">Участников</div></div>
+    </div>
+  </div>
+
+  {% if demo_mode %}
+  <div class="fv-demo-banner">
+    <i class="bi bi-info-circle-fill"></i>
+    <span>Демо-режим — добавьте записи в таблицу <strong>new_forumthread</strong> в Dataverse, и они появятся здесь автоматически.</span>
+  </div>
+  {% endif %}
+
+  <div class="fv-forum-toolbar">
+    <div class="fv-filter-tabs">
+      <button type="button" class="fv-ftab active" onclick="fvFilter('all',this)">Все</button>
+      <button type="button" class="fv-ftab" onclick="fvFilter('Закреплено',this)">📌 Закреплено</button>
+      <button type="button" class="fv-ftab" onclick="fvFilter('Помощь',this)">🙋 Помощь</button>
+      <button type="button" class="fv-ftab" onclick="fvFilter('Дискуссия',this)">💬 Дискуссия</button>
+      <button type="button" class="fv-ftab" onclick="fvFilter('Баг',this)">🐛 Баг</button>
+      <button type="button" class="fv-ftab" onclick="fvFilter('Идея',this)">💡 Идея</button>
+      <button type="button" class="fv-ftab" onclick="fvFilter('Новости',this)">📢 Новости</button>
+    </div>
+    <div class="fv-search-wrap">
+      <i class="bi bi-search fv-search-icon"></i>
+      <input type="text" class="fv-search-input" id="fvSearch" placeholder="Поиск по темам…" oninput="fvSearch()" />
+    </div>
+  </div>
+
+  <div id="fvThreadList">
+
+    {% if demo_mode %}
+
+    {% comment %}── Demo threads ──{% endcomment %}
+    <div class="fv-thread-card" data-tag="Закреплено" data-id="d1">
+      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('d1',1,event)"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d1">64</span><button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('d1',-1,event)"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="fv-avatar">👤</div>
+      <div class="fv-thread-body">
+        <div class="fv-thread-meta"><span class="fv-tag fv-tag-pinned">Закреплено</span><span class="fv-thread-when">2 нед. назад · автор CEO</span></div>
+        <h3 class="fv-thread-title">Добро пожаловать в сообщество Farovon!</h3>
+      </div>
+      <div class="fv-replies"><i class="bi bi-chat"></i> 28</div>
+    </div>
+
+    <div class="fv-thread-card" data-tag="Новости" data-id="d2">
+      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('d2',1,event)"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d2">31</span><button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('d2',-1,event)"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="fv-avatar">HR</div>
+      <div class="fv-thread-body">
+        <div class="fv-thread-meta"><span class="fv-tag fv-tag-news">Новости</span><span class="fv-thread-when">1 нед. назад · автор HR Team</span></div>
+        <h3 class="fv-thread-title">Обновление платформы — новые функции</h3>
+      </div>
+      <div class="fv-replies"><i class="bi bi-chat"></i> 11</div>
+    </div>
+
+    <div class="fv-thread-card" data-tag="Дискуссия" data-id="d3">
+      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('d3',1,event)"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d3">22</span><button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('d3',-1,event)"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="fv-avatar">К</div>
+      <div class="fv-thread-body">
+        <div class="fv-thread-meta"><span class="fv-tag fv-tag-disc">Дискуссия</span><span class="fv-thread-when">5 д. назад · автор Kamol D.</span></div>
+        <h3 class="fv-thread-title">Баллы и магазин — как лучше тратить монеты?</h3>
+      </div>
+      <div class="fv-replies"><i class="bi bi-chat"></i> 15</div>
+    </div>
+
+    <div class="fv-thread-card" data-tag="Идея" data-id="d4">
+      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('d4',1,event)"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d4">19</span><button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('d4',-1,event)"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="fv-avatar">А</div>
+      <div class="fv-thread-body">
+        <div class="fv-thread-meta"><span class="fv-tag fv-tag-idea">Идея</span><span class="fv-thread-when">3 д. назад · автор Aziz T.</span></div>
+        <h3 class="fv-thread-title">Добавить тёмную тему в интерфейс</h3>
+      </div>
+      <div class="fv-replies"><i class="bi bi-chat"></i> 5</div>
+    </div>
+
+    <div class="fv-thread-card" data-tag="Дискуссия" data-id="d5">
+      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('d5',1,event)"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d5">14</span><button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('d5',-1,event)"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="fv-avatar">Б</div>
+      <div class="fv-thread-body">
+        <div class="fv-thread-meta"><span class="fv-tag fv-tag-disc">Дискуссия</span><span class="fv-thread-when">5 ч. назад · автор Bekhzod K.</span></div>
+        <h3 class="fv-thread-title">Как удерживать мотивацию в длинных модулях?</h3>
+      </div>
+      <div class="fv-replies"><i class="bi bi-chat"></i> 7</div>
+    </div>
+
+    <div class="fv-thread-card" data-tag="Помощь" data-id="d6">
+      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('d6',1,event)"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d6">8</span><button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('d6',-1,event)"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="fv-avatar">М</div>
+      <div class="fv-thread-body">
+        <div class="fv-thread-meta"><span class="fv-tag fv-tag-help">Помощь</span><span class="fv-thread-when">2 ч. назад · автор Madina S.</span></div>
+        <h3 class="fv-thread-title">Советы по прохождению курсов на мобильном?</h3>
+      </div>
+      <div class="fv-replies"><i class="bi bi-chat"></i> 12</div>
+    </div>
+
+    <div class="fv-thread-card" data-tag="Помощь" data-id="d7">
+      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('d7',1,event)"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d7">6</span><button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('d7',-1,event)"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="fv-avatar">З</div>
+      <div class="fv-thread-body">
+        <div class="fv-thread-meta"><span class="fv-tag fv-tag-help">Помощь</span><span class="fv-thread-when">4 д. назад · автор Zulfiya O.</span></div>
+        <h3 class="fv-thread-title">Не могу найти тест по модулю 3 — куда нажать?</h3>
+      </div>
+      <div class="fv-replies"><i class="bi bi-chat"></i> 9</div>
+    </div>
+
+    <div class="fv-thread-card" data-tag="Баг" data-id="d8">
+      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('d8',1,event)"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d8">2</span><button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('d8',-1,event)"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="fv-avatar">Н</div>
+      <div class="fv-thread-body">
+        <div class="fv-thread-meta"><span class="fv-tag fv-tag-bug">Баг</span><span class="fv-thread-when">1 д. назад · автор Nigora R.</span></div>
+        <h3 class="fv-thread-title">Прогресс не сохраняется на iOS Safari</h3>
+      </div>
+      <div class="fv-replies"><i class="bi bi-chat"></i> 3</div>
+    </div>
+
+    {% else %}
+
+    {% comment %}── Real data from new_forumthread ──{% endcomment %}
+    {% for thread in forum_threads.results.entities %}
+      {% assign t_id     = thread.new_forumthreadid %}
+      {% assign t_title  = thread.new_name %}
+      {% assign t_votes  = thread.new_votes  | default: 0 %}
+      {% assign t_replies = thread.new_replycount | default: 0 %}
+      {% assign t_date   = thread.createdon | date: "%d.%m.%Y" %}
+      {% assign t_author = thread['auth.fullname'] | default: 'Аноним' %}
+      {% assign t_avatar = t_author | slice: 0, 1 | upcase %}
+      {% assign t_pinned = thread.new_ispinned %}
+      {% assign t_tag    = thread.new_tag | default: 'Общее' %}
+
+      {% comment %}── Tag display & CSS class ──{% endcomment %}
+      {% assign t_tag_display = t_tag %}
+      {% assign t_class = 'fv-tag-general' %}
+      {% assign t_filter = t_tag %}
+      {% if t_pinned %}
+        {% assign t_tag_display = 'Закреплено' %}
+        {% assign t_class = 'fv-tag-pinned' %}
+        {% assign t_filter = 'Закреплено' %}
+      {% else %}
+        {% if t_tag == 'Помощь' %}{% assign t_class = 'fv-tag-help' %}{% endif %}
+        {% if t_tag == 'Дискуссия' %}{% assign t_class = 'fv-tag-disc' %}{% endif %}
+        {% if t_tag == 'Баг' %}{% assign t_class = 'fv-tag-bug' %}{% endif %}
+        {% if t_tag == 'Идея' %}{% assign t_class = 'fv-tag-idea' %}{% endif %}
+        {% if t_tag == 'Новости' %}{% assign t_class = 'fv-tag-news' %}{% endif %}
+        {% if t_tag == 'Закреплено' %}{% assign t_class = 'fv-tag-pinned' %}{% assign t_filter = 'Закреплено' %}{% endif %}
+      {% endif %}
+
+      <div class="fv-thread-card" data-tag="{{ t_filter }}" data-id="{{ t_id }}">
+        <div class="fv-vote">
+          <button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('{{ t_id }}',1,event)"><i class="bi bi-chevron-up"></i></button>
+          <span class="fv-vote-num" id="fv-v-{{ t_id }}">{{ t_votes }}</span>
+          <button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('{{ t_id }}',-1,event)"><i class="bi bi-chevron-down"></i></button>
+        </div>
+        <div class="fv-avatar">{{ t_avatar }}</div>
+        <div class="fv-thread-body">
+          <div class="fv-thread-meta">
+            <span class="fv-tag {{ t_class }}">{{ t_tag_display }}</span>
+            <span class="fv-thread-when">{{ t_date }} · автор {{ t_author }}</span>
+          </div>
+          <h3 class="fv-thread-title">{{ t_title }}</h3>
+        </div>
+        <div class="fv-replies"><i class="bi bi-chat"></i> {{ t_replies }}</div>
+      </div>
+    {% endfor %}
+
+    {% endif %}
+
+    <div class="fv-empty" id="fvEmpty" style="display:none;">
+      <i class="bi bi-search"></i>
+      <p style="font-size:13px;margin:0;">Ничего не найдено. Попробуйте другой запрос или фильтр.</p>
+    </div>
+
+  </div>
+
+  <div class="fv-pagination" id="fvPagination">
+    <button type="button" class="fv-page-btn" id="fvPrevBtn" onclick="fvPageChange(-1)">&#8249; Назад</button>
+    <span class="fv-page-info" id="fvPageInfo"></span>
+    <button type="button" class="fv-page-btn" id="fvNextBtn" onclick="fvPageChange(1)">Вперёд &#8250;</button>
+  </div>
+
+</div>
+
+<div class="fv-modal-overlay" id="fvModal" onclick="fvCloseModalOutside(event)">
+  <div class="fv-modal">
+    <h2 class="fv-modal-title">Новая тема</h2>
+    <button type="button" class="fv-modal-close" onclick="fvCloseModal()"><i class="bi bi-x"></i></button>
+    <div class="fv-field">
+      <label class="fv-label" for="fvNewTitle">Заголовок темы</label>
+      <input type="text" id="fvNewTitle" class="fv-input" placeholder="Кратко опишите вопрос или тему…" />
+    </div>
+    <div class="fv-field">
+      <label class="fv-label" for="fvNewTag">Категория</label>
+      <select id="fvNewTag" class="fv-select">
+        <option value="">Выберите категорию</option>
+        <option value="Помощь">🙋 Помощь</option>
+        <option value="Дискуссия">💬 Дискуссия</option>
+        <option value="Идея">💡 Идея</option>
+        <option value="Баг">🐛 Баг</option>
+      </select>
+    </div>
+    <div class="fv-field">
+      <label class="fv-label" for="fvNewBody">Описание</label>
+      <textarea id="fvNewBody" class="fv-textarea" placeholder="Подробно опишите вопрос или предложение…"></textarea>
+    </div>
+    <button type="button" class="fv-submit-btn" onclick="fvSubmitThread()">Опубликовать тему</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var PER_PAGE = 10;
+  var curPage  = 1;
+  var curFilter = 'all';
+  var curSearch = '';
+
+  function allCards() {
+    return Array.from(document.querySelectorAll('#fvThreadList .fv-thread-card'));
+  }
+
+  function visibleCards() {
+    return allCards().filter(function (c) {
+      var tag   = c.getAttribute('data-tag') || '';
+      var title = c.querySelector('.fv-thread-title').textContent.toLowerCase();
+      return (curFilter === 'all' || tag === curFilter) &&
+             (curSearch === '' || title.indexOf(curSearch) !== -1);
+    });
+  }
+
+  function render() {
+    var vis   = visibleCards();
+    var total = vis.length;
+    var pages = Math.max(1, Math.ceil(total / PER_PAGE));
+    if (curPage > pages) curPage = pages;
+
+    allCards().forEach(function (c) { c.style.display = 'none'; });
+    var start = (curPage - 1) * PER_PAGE;
+    vis.slice(start, start + PER_PAGE).forEach(function (c) { c.style.display = 'flex'; });
+
+    document.getElementById('fvEmpty').style.display = total === 0 ? 'block' : 'none';
+
+    var pag  = document.getElementById('fvPagination');
+    var info = document.getElementById('fvPageInfo');
+    var prev = document.getElementById('fvPrevBtn');
+    var next = document.getElementById('fvNextBtn');
+    if (pages > 1) {
+      pag.style.display = 'flex';
+      info.textContent  = 'Страница ' + curPage + ' из ' + pages;
+      prev.disabled     = curPage === 1;
+      next.disabled     = curPage === pages;
+    } else {
+      pag.style.display = 'none';
+    }
+
+    var stat = document.getElementById('fvStatThreads');
+    if (stat) stat.textContent = total;
+  }
+
+  window.fvFilter = function (tag, el) {
+    curFilter = tag; curPage = 1;
+    document.querySelectorAll('.fv-ftab').forEach(function (b) { b.classList.remove('active'); });
+    el.classList.add('active');
+    render();
+  };
+
+  window.fvSearch = function () {
+    curSearch = document.getElementById('fvSearch').value.trim().toLowerCase();
+    curPage = 1;
+    render();
+  };
+
+  window.fvPageChange = function (dir) {
+    curPage = Math.max(1, curPage + dir);
+    render();
+  };
+
+  window.fvVote = function (id, dir, e) {
+    e.stopPropagation();
+    var el = document.getElementById('fv-v-' + id);
+    if (el) el.textContent = Math.max(0, parseInt(el.textContent) + dir);
+  };
+
+  window.fvOpenModal  = function () { document.getElementById('fvModal').classList.add('open'); };
+  window.fvCloseModal = function () { document.getElementById('fvModal').classList.remove('open'); };
+  window.fvCloseModalOutside = function (e) {
+    if (e.target === document.getElementById('fvModal')) fvCloseModal();
+  };
+
+  window.fvSubmitThread = function () {
+    var title = document.getElementById('fvNewTitle').value.trim();
+    var tag   = document.getElementById('fvNewTag').value;
+    if (!title || !tag) { alert('Заполните заголовок и категорию.'); return; }
+    alert('Тема «' + title + '» будет сохранена в Dataverse после настройки Web API.');
+    fvCloseModal();
+  };
+
+  render();
+})();
+</script>

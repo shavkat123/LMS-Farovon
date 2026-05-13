@@ -525,18 +525,25 @@
       'new_lastupdated'   : new Date().toISOString()
     };
     var r = stmt.result;
+    var decParts = [];
     if (r) {
       if (r.score) {
-        body.new_scoreraw    = r.score.raw;
-        body.new_scoremax    = r.score.max;
-        body.new_scorescaled = r.score.scaled;
+        if (r.score.raw    != null) decParts.push('"new_scoreraw":'    + parseFloat((+r.score.raw).toFixed(4)));
+        if (r.score.max    != null) decParts.push('"new_scoremax":'    + parseFloat((+r.score.max).toFixed(4)));
+        if (r.score.scaled != null) decParts.push('"new_scorescaled":' + (+r.score.scaled).toFixed(4));
       }
       if (r.completion !== undefined) body.new_completion = !!r.completion;
       if (r.success    !== undefined) body.new_success    = !!r.success;
-      if (r.duration)  body.new_durationseconds = parseISO(r.duration);
+      if (r.duration) {
+        var durSec = parseISO(r.duration);
+        if (durSec != null) decParts.push('"new_lastposition":' + durSec.toFixed(4));
+      }
     }
+    var bodyJson = JSON.stringify(body);
+    if (decParts.length) bodyJson = bodyJson.slice(0, -1) + ',' + decParts.join(',') + '}';
+    console.log('[H5P] xAPI body:', bodyJson);
     _fetch('/_api/new_h5pprogresses', {
-      method: 'POST', headers: hdrs, body: JSON.stringify(body), credentials: 'include'
+      method: 'POST', headers: hdrs, body: bodyJson, credentials: 'include'
     }).then(function (res) {
       if (res.ok) return;
       res.text().then(function (txt) {
