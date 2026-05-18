@@ -476,16 +476,31 @@
     })
     .then(function (data) {
       var raw = data.new_xapistatements;
-      if (!raw) { renderNoQuestions(body); return; }
-      var stmts = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      if (!Array.isArray(stmts)) { renderNoQuestions(body); return; }
+      console.log('[Detail] raw new_xapistatements:', raw ? raw.slice(0, 300) : null);
 
-      /* Фильтруем только "answered" стейтменты */
+      if (!raw) { renderNoQuestions(body, 'Поле new_xapistatements пусто'); return; }
+      var stmts;
+      try { stmts = typeof raw === 'string' ? JSON.parse(raw) : raw; }
+      catch (e) { renderNoQuestions(body, 'Ошибка парсинга JSON: ' + e.message); return; }
+      if (!Array.isArray(stmts)) { renderNoQuestions(body, 'Ожидался массив, получено: ' + typeof stmts); return; }
+
+      /* Лог всех вербов для отладки */
+      var verbLog = stmts.map(function(s){ return s && s.verb && s.verb.id ? s.verb.id.split('/').pop() : '?'; });
+      console.log('[Detail] verbs в массиве (' + stmts.length + '):', verbLog.join(', '));
+
+      /* Фильтруем "answered" и "interacted" (оба используются в H5P для вопросов) */
       var answered = stmts.filter(function (s) {
-        return s && s.verb && s.verb.id && s.verb.id.indexOf('answered') !== -1;
+        if (!s || !s.verb || !s.verb.id) return false;
+        var v = s.verb.id;
+        return v.indexOf('answered') !== -1 || v.indexOf('interacted') !== -1;
+      });
+      /* Только те, где есть success или score — это реальные вопросы */
+      answered = answered.filter(function(s) {
+        return s.result && (s.result.success !== undefined || s.result.score);
       });
 
-      if (answered.length === 0) { renderNoQuestions(body); return; }
+      console.log('[Detail] вопросов для отображения:', answered.length);
+      if (answered.length === 0) { renderNoQuestions(body, 'Нет answered/interacted стейтментов с результатом. Вербы: ' + verbLog.join(', ')); return; }
       renderQuestions(body, answered);
     })
     .catch(function (err) {

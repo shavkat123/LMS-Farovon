@@ -462,13 +462,18 @@
     container.innerHTML = '';
 
     // ── xAPI state ───────────────────────────────────────────────────────────
-    // allStatements: накапливаем ВСЕ xAPI-стейтменты сессии (answered, completed и т.д.)
-    // progressId: GUID записи new_h5pprogress (null = ещё не создана → POST; иначе → PATCH)
-    // lastSaved / saveInFlight: троттлинг для промежуточных сохранений
     var allStatements = [];
-    var progressId    = null;
+    var progressId    = null;  // генерируем до первого POST, используем для PATCH
     var lastSaved     = 0;
     var saveInFlight  = false;
+
+    // Генерируем UUID на клиенте — не зависим от заголовков ответа сервера
+    function genUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+      });
+    }
 
     new H5PS.H5P(container, {
       h5pJsonPath : h5pJsonPath,
@@ -482,6 +487,9 @@
         window.H5P.externalDispatcher.on('xAPI', function (event) {
           var stmt   = event.data.statement;
           var verbId = (stmt.verb && stmt.verb.id) || '';
+          var verbShort = verbId.split('/').pop() || verbId;
+          console.log('[H5P xAPI] verb:', verbShort, '| success:', stmt.result && stmt.result.success, '| score:', stmt.result && stmt.result.score);
+
           // Всегда добавляем в массив — не теряем ни одного стейтмента
           allStatements.push(stmt);
 
@@ -536,17 +544,20 @@
     var hdrs = { 'Content-Type': 'application/json' };
     if (tok) hdrs['__RequestVerificationToken'] = tok;
 
-    var isPatch = !!progressId;
+    var isFirstSave = !progressId;
 
-    // Базовые поля — для POST включаем lookups и name, для PATCH — нет
+    // Генерируем UUID ДО запроса — не зависим от заголовков ответа
+    if (isFirstSave) progressId = genUUID();
+
     var body = {
       'new_xapistatements': JSON.stringify(allStatements),
       'new_lastupdated'   : new Date().toISOString()
     };
-    if (!isPatch) {
-      body['new_user@odata.bind']       = '/contacts(' + userId + ')';
-      body['new_h5pcontent@odata.bind'] = '/new_h5pcontents(' + contentId + ')';
-      body['new_name']                  = 'xAPI ' + new Date().toISOString();
+    if (isFirstSave) {
+      body['new_h5pprogressid']           = progressId;
+      body['new_user@odata.bind']         = '/contacts(' + userId + ')';
+      body['new_h5pcontent@odata.bind']   = '/new_h5pcontents(' + contentId + ')';
+      body['new_name']                    = 'xAPI ' + new Date().toISOString();
     }
 
     // Scalar-поля из текущего стейтмента (score, completion, success, duration)
@@ -569,30 +580,22 @@
     var bodyJson = JSON.stringify(body);
     if (decParts.length) bodyJson = bodyJson.slice(0, -1) + ',' + decParts.join(',') + '}';
 
-    var method = isPatch ? 'PATCH' : 'POST';
-    var url    = isPatch
-      ? '/_api/new_h5pprogresses(' + progressId + ')'
-      : '/_api/new_h5pprogresses';
+    var method = isFirstSave ? 'POST' : 'PATCH';
+    var url    = isFirstSave
+      ? '/_api/new_h5pprogresses'
+      : '/_api/new_h5pprogresses(' + progressId + ')';
 
-    console.log('[H5P] xAPI save (' + method + '):', bodyJson);
+    console.log('[H5P] xAPI save (' + method + ') id:', progressId, '| stmts:', allStatements.length);
 
     _fetch(url, {
       method: method, headers: hdrs, body: bodyJson, credentials: 'include'
     }).then(function (res) {
       saveInFlight = false;
       if (res.ok) {
-        if (!isPatch) {
-          // Запоминаем GUID созданной записи для последующих PATCH
-          var loc = res.headers.get('OData-EntityId') || res.headers.get('Location') || '';
-          var m = loc.match(/\(([^)]+)\)/);
-          if (m) {
-            progressId = m[1];
-            console.log('[H5P] progress record created:', progressId);
-          }
-        }
+        console.log('[H5P] xAPI save OK — progressId:', progressId);
       } else {
         res.text().then(function (txt) {
-          console.warn('[H5P] xAPI save failed:', res.status, res.statusText, '—', txt.slice(0, 500));
+          console.warn('[H5P] xAPI save failed:', res.status, res.statusText, '—', txt.slice(0, 600));
         });
       }
     }).catch(function (e) {
