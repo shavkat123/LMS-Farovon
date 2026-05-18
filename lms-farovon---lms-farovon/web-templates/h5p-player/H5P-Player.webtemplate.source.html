@@ -460,7 +460,16 @@
     // Clear loading-spinner placeholder — h5p-standalone appends to container
     // without clearing, so spinner would otherwise stay visible above the player.
     container.innerHTML = '';
-    var lastSent = 0;
+
+    // ── xAPI state ───────────────────────────────────────────────────────────
+    // allStatements: накапливаем ВСЕ xAPI-стейтменты сессии (answered, completed и т.д.)
+    // progressId: GUID записи new_h5pprogress (null = ещё не создана → POST; иначе → PATCH)
+    // lastSaved / saveInFlight: троттлинг для промежуточных сохранений
+    var allStatements = [];
+    var progressId    = null;
+    var lastSaved     = 0;
+    var saveInFlight  = false;
+
     new H5PS.H5P(container, {
       h5pJsonPath : h5pJsonPath,
       embedType   : 'div',
@@ -471,10 +480,19 @@
       console.log('[H5P] H5PStandalone initialized successfully');
       if (window.H5P && window.H5P.externalDispatcher) {
         window.H5P.externalDispatcher.on('xAPI', function (event) {
+          var stmt   = event.data.statement;
+          var verbId = (stmt.verb && stmt.verb.id) || '';
+          // Всегда добавляем в массив — не теряем ни одного стейтмента
+          allStatements.push(stmt);
+
+          var isCompleted = verbId.indexOf('completed') !== -1;
           var now = Date.now();
-          if (now - lastSent < 5000) return;
-          lastSent = now;
-          sendXAPI(contentId, userId, event.data.statement);
+
+          // "completed" сохраняем немедленно; остальные — не чаще раз в 8 сек
+          if (isCompleted || now - lastSaved >= 8000) {
+            lastSaved = now;
+            saveXAPIProgress(stmt, isCompleted);
+          }
         });
       }
     })
@@ -493,13 +511,11 @@
       .then(function (r) { return r.ok ? r.text() : ''; })
       .then(function (html) {
         if (!html) return '';
-        // Ищем <input> содержащий __RequestVerificationToken — порядок атрибутов не важен
         var inputMatch = html.match(/<input[^>]+__RequestVerificationToken[^>]*>/i);
         if (inputMatch) {
           var valMatch = inputMatch[0].match(/value="([^"]+)"/);
           if (valMatch) return valMatch[1];
         }
-        // Запасной вариант: просто первое value на странице
         var m = html.match(/value="([^"]{20,})"/);
         return m ? m[1] : '';
       })
@@ -507,23 +523,33 @@
     return _csrfTokenPromise;
   }
 
-  function sendXAPI(cid, uid, stmt) {
-    if (!uid) return;
+  function saveXAPIProgress(triggerStmt, isCompleted) {
+    // Не блокируем "completed" — он должен сохраниться в любом случае
+    if (saveInFlight && !isCompleted) return;
+    saveInFlight = true;
     getCsrfToken().then(function (tok) {
-      console.log('[H5P] xAPI token length:', tok ? tok.length : 0);
-      sendXAPIWithToken(cid, uid, stmt, tok);
+      saveXAPIWithToken(triggerStmt, tok);
     });
   }
-  function sendXAPIWithToken(cid, uid, stmt, tok) {
+
+  function saveXAPIWithToken(stmt, tok) {
     var hdrs = { 'Content-Type': 'application/json' };
     if (tok) hdrs['__RequestVerificationToken'] = tok;
+
+    var isPatch = !!progressId;
+
+    // Базовые поля — для POST включаем lookups и name, для PATCH — нет
     var body = {
-      'new_user@odata.bind'      : '/contacts(' + uid + ')',
-      'new_h5pcontent@odata.bind': '/new_h5pcontents(' + cid + ')',
-      'new_name'          : 'xAPI ' + new Date().toISOString(),
-      'new_xapistatements': JSON.stringify(stmt),
+      'new_xapistatements': JSON.stringify(allStatements),
       'new_lastupdated'   : new Date().toISOString()
     };
+    if (!isPatch) {
+      body['new_user@odata.bind']       = '/contacts(' + userId + ')';
+      body['new_h5pcontent@odata.bind'] = '/new_h5pcontents(' + contentId + ')';
+      body['new_name']                  = 'xAPI ' + new Date().toISOString();
+    }
+
+    // Scalar-поля из текущего стейтмента (score, completion, success, duration)
     var r = stmt.result;
     var decParts = [];
     if (r) {
@@ -539,17 +565,40 @@
         if (durSec != null) decParts.push('"new_lastposition":' + durSec.toFixed(4));
       }
     }
+
     var bodyJson = JSON.stringify(body);
     if (decParts.length) bodyJson = bodyJson.slice(0, -1) + ',' + decParts.join(',') + '}';
-    console.log('[H5P] xAPI body:', bodyJson);
-    _fetch('/_api/new_h5pprogresses', {
-      method: 'POST', headers: hdrs, body: bodyJson, credentials: 'include'
+
+    var method = isPatch ? 'PATCH' : 'POST';
+    var url    = isPatch
+      ? '/_api/new_h5pprogresses(' + progressId + ')'
+      : '/_api/new_h5pprogresses';
+
+    console.log('[H5P] xAPI save (' + method + '):', bodyJson);
+
+    _fetch(url, {
+      method: method, headers: hdrs, body: bodyJson, credentials: 'include'
     }).then(function (res) {
-      if (res.ok) return;
-      res.text().then(function (txt) {
-        console.warn('[H5P] xAPI save failed:', res.status, res.statusText, '— body:', txt.slice(0, 500));
-      });
-    }).catch(function (e) { console.error('[H5P] xAPI save error:', e); });
+      saveInFlight = false;
+      if (res.ok) {
+        if (!isPatch) {
+          // Запоминаем GUID созданной записи для последующих PATCH
+          var loc = res.headers.get('OData-EntityId') || res.headers.get('Location') || '';
+          var m = loc.match(/\(([^)]+)\)/);
+          if (m) {
+            progressId = m[1];
+            console.log('[H5P] progress record created:', progressId);
+          }
+        }
+      } else {
+        res.text().then(function (txt) {
+          console.warn('[H5P] xAPI save failed:', res.status, res.statusText, '—', txt.slice(0, 500));
+        });
+      }
+    }).catch(function (e) {
+      saveInFlight = false;
+      console.error('[H5P] xAPI save error:', e);
+    });
   }
 
   function parseISO(iso) {
