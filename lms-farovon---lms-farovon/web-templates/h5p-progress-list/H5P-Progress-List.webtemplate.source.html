@@ -8,6 +8,7 @@
 {% fetchxml progress %}
 <fetch top="500">
   <entity name="new_h5pprogress">
+    <attribute name="new_h5pprogressid" />
     <attribute name="new_name" />
     <attribute name="new_user" />
     <attribute name="new_h5pcontent" />
@@ -55,6 +56,7 @@
 {% fetchxml user_progress %}
 <fetch>
   <entity name="new_h5pprogress">
+    <attribute name="new_h5pprogressid" />
     <attribute name="new_h5pcontent" />
     <attribute name="new_completion" />
     <attribute name="new_scorescaled" />
@@ -120,7 +122,8 @@
   .fv-score-track { flex: 1; height: 4px; background: #E5E7EB; border-radius: 2px; overflow: hidden; min-width: 60px; }
   .fv-score-fill { height: 100%; border-radius: 2px; background: #1E3A8A; }
 
-  .fv-lesson-row { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; display: flex; align-items: center; gap: 14px; padding: 14px 16px; margin-bottom: 10px; transition: box-shadow 0.14s; text-decoration: none !important; color: inherit !important; }
+  .fv-lesson-outer { display: flex; align-items: stretch; gap: 8px; margin-bottom: 10px; }
+  .fv-lesson-row { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; display: flex; align-items: center; gap: 14px; padding: 14px 16px; flex: 1; transition: box-shadow 0.14s; text-decoration: none !important; color: inherit !important; }
   .fv-lesson-row:hover { box-shadow: 0 4px 12px rgba(11,18,32,0.08); }
   .fv-lesson-thumb-sm { width: 56px; height: 40px; border-radius: 6px; background: linear-gradient(135deg,#EEF2F9,#D8DFEF); flex-shrink: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 18px; }
   .fv-lesson-thumb-sm img { width: 100%; height: 100%; object-fit: cover; }
@@ -132,6 +135,46 @@
   .fv-empty h3 { font-size: 16px; font-weight: 600; color: #475569; margin-bottom: 6px; }
   .fv-empty p { font-size: 13px; }
   .fv-empty a { color: #1E3A8A; font-weight: 600; }
+
+  /* ── Кнопка «Детали» ── */
+  .fv-btn-detail { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; font-size: 12px; font-weight: 600; color: #EC4899; background: #FFF1F5; border: 1.5px solid #FBCFE8; border-radius: 8px; cursor: pointer; transition: all .14s; white-space: nowrap; flex-shrink: 0; }
+  .fv-btn-detail:hover { background: #EC4899; color: #fff; border-color: #EC4899; }
+  .fv-btn-detail i { font-size: 13px; }
+  .fv-btn-detail-sm { align-self: center; }
+
+  /* ── Модальное окно деталей ── */
+  .fv-detail-backdrop { display: none; position: fixed; inset: 0; background: rgba(11,18,32,0.45); z-index: 1050; align-items: center; justify-content: center; padding: 20px; }
+  .fv-detail-backdrop.open { display: flex; }
+  .fv-detail-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 700px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(11,18,32,0.18); animation: fvModalIn .18s ease; }
+  @keyframes fvModalIn { from { opacity:0; transform:translateY(12px) scale(.97); } to { opacity:1; transform:none; } }
+  .fv-detail-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px 14px; border-bottom: 1px solid #F1F5F9; flex-shrink: 0; }
+  .fv-detail-title { font-size: 15px; font-weight: 700; color: #0B1220; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 540px; }
+  .fv-detail-close { width: 30px; height: 30px; border-radius: 8px; background: #F1F5F9; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; color: #64748B; flex-shrink: 0; transition: background .12s; }
+  .fv-detail-close:hover { background: #E2E8F0; color: #0B1220; }
+  .fv-detail-body { overflow-y: auto; padding: 18px 22px; flex: 1; }
+
+  /* ── Таблица вопросов ── */
+  .fv-q-summary { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .fv-q-chip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .fv-q-chip-ok  { background: #DCFCE7; color: #15803D; }
+  .fv-q-chip-err { background: #FEE2E2; color: #B91C1C; }
+  .fv-q-chip-skip { background: #F1F5F9; color: #64748B; }
+
+  .fv-q-table { width: 100%; border-collapse: collapse; }
+  .fv-q-table th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94A3B8; background: #F8FAFC; padding: 8px 14px; text-align: left; border-bottom: 1px solid #F1F5F9; }
+  .fv-q-table td { padding: 11px 14px; font-size: 13px; color: #334155; border-bottom: 1px solid #F8FAFC; vertical-align: top; }
+  .fv-q-table tr:last-child td { border-bottom: none; }
+  .fv-q-result-ok   { display: inline-flex; align-items: center; gap: 4px; background: #DCFCE7; color: #15803D; border-radius: 20px; font-size: 11px; font-weight: 600; padding: 3px 9px; white-space: nowrap; }
+  .fv-q-result-err  { display: inline-flex; align-items: center; gap: 4px; background: #FEE2E2; color: #B91C1C; border-radius: 20px; font-size: 11px; font-weight: 600; padding: 3px 9px; white-space: nowrap; }
+  .fv-q-result-skip { display: inline-flex; align-items: center; gap: 4px; background: #F1F5F9; color: #94A3B8; border-radius: 20px; font-size: 11px; font-weight: 600; padding: 3px 9px; white-space: nowrap; }
+
+  .fv-detail-spinner { text-align: center; padding: 40px 20px; color: #94A3B8; }
+  .fv-detail-spinner i { font-size: 28px; display: block; margin-bottom: 10px; animation: fvSpin 1s linear infinite; }
+  @keyframes fvSpin { to { transform: rotate(360deg); } }
+  .fv-detail-error { text-align: center; padding: 32px 20px; color: #B91C1C; }
+  .fv-detail-error i { font-size: 28px; display: block; margin-bottom: 8px; }
+  .fv-detail-noq { text-align: center; padding: 32px 20px; color: #94A3B8; }
+  .fv-detail-noq i { font-size: 28px; display: block; margin-bottom: 8px; }
 </style>
 
 <div class="container fv-prog">
@@ -180,6 +223,7 @@
           <th>Балл</th>
           <th>Завершён</th>
           <th>Обновлено</th>
+          <th><span class="visually-hidden">Действия</span></th>
         </tr>
       </thead>
       <tbody>
@@ -187,6 +231,7 @@
         {% assign score_pct = '' %}
         {% if p.new_scorescaled %}{% assign score_pct = p.new_scorescaled | times: 100 | round %}{% endif %}
         {% assign user_init = p.new_user.name | truncate: 1, '' %}
+        {% assign safe_lesson = p.new_h5pcontent.name | replace: "'", " " %}
         <tr class="fv-admin-row" data-search="{{ p.new_user.name | downcase }} {{ p.new_h5pcontent.name | downcase }}">
           <td>
             <div class="fv-user-cell">
@@ -194,7 +239,7 @@
               <span style="font-weight:500;">{{ p.new_user.name | default: '—' }}</span>
             </div>
           </td>
-          <td style="max-width:240px;">
+          <td style="max-width:220px;">
             <a href="/h5p-player?id={{ p.new_h5pcontent.id }}" style="color:#1E3A8A;font-weight:500;text-decoration:none;">
               {{ p.new_h5pcontent.name | default: '—' }}
             </a>
@@ -219,6 +264,13 @@
             {% endif %}
           </td>
           <td style="color:#94A3B8;font-size:12px;">{{ p.new_lastupdated | date: 'dd.MM.yyyy HH:mm' }}</td>
+          <td>
+            <button type="button" class="fv-btn-detail"
+                    onclick="fvOpenDetail('{{ p.new_h5pprogressid }}', '{{ safe_lesson }}')"
+                    title="Статистика по вопросам">
+              <i class="bi bi-list-check"></i> Детали
+            </button>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -274,11 +326,13 @@
     {% assign lesson_status = '' %}
     {% assign prog_score = '' %}
     {% assign prog_updated = '' %}
+    {% assign prog_id = '' %}
     {% assign found = false %}
     {% for p in user_progress.results.entities %}
       {% unless found %}
         {% if p.new_h5pcontent.id == item.id %}
           {% assign found = true %}
+          {% assign prog_id = p.new_h5pprogressid %}
           {% if p.new_completion %}
             {% assign lesson_status = 'completed' %}
           {% else %}
@@ -290,37 +344,47 @@
       {% endunless %}
     {% endfor %}
     {% if found %}
-    <a href="/h5p-player?id={{ item.new_h5pcontentid }}" class="fv-lesson-row">
-      <div class="fv-lesson-thumb-sm">
-        {% if item.new_thumbnailurl and item.new_thumbnailurl != '' %}
-          <img src="{{ item.new_thumbnailurl }}" alt="" onerror="this.style.display='none'" />
-        {% else %}
-          <i class="bi bi-play-circle-fill"></i>
-        {% endif %}
-      </div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#94A3B8;">{{ item.new_librarytype | default: 'H5P' }}</div>
-        <div style="font-size:14px;font-weight:600;color:#0B1220;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ item.new_name }}</div>
-        {% if prog_score != '' %}
-          <div class="fv-prog-bar-wrap">
-            <span style="font-size:11px;color:#64748B;">Балл: <strong>{{ prog_score }}%</strong></span>
-            <div class="fv-prog-bar-track">
-              <div class="fv-score-fill" style="width:{{ prog_score }}%;"></div>
+    {% assign safe_item_name = item.new_name | replace: "'", " " %}
+    <div class="fv-lesson-outer">
+      <a href="/h5p-player?id={{ item.new_h5pcontentid }}" class="fv-lesson-row">
+        <div class="fv-lesson-thumb-sm">
+          {% if item.new_thumbnailurl and item.new_thumbnailurl != '' %}
+            <img src="{{ item.new_thumbnailurl }}" alt="" onerror="this.style.display='none'" />
+          {% else %}
+            <i class="bi bi-play-circle-fill"></i>
+          {% endif %}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#94A3B8;">{{ item.new_librarytype | default: 'H5P' }}</div>
+          <div style="font-size:14px;font-weight:600;color:#0B1220;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ item.new_name }}</div>
+          {% if prog_score != '' %}
+            <div class="fv-prog-bar-wrap">
+              <span style="font-size:11px;color:#64748B;">Балл: <strong>{{ prog_score }}%</strong></span>
+              <div class="fv-prog-bar-track">
+                <div class="fv-score-fill" style="width:{{ prog_score }}%;"></div>
+              </div>
             </div>
-          </div>
-        {% endif %}
-      </div>
-      <div style="text-align:right;flex-shrink:0;">
-        {% if lesson_status == 'completed' %}
-          <span class="fv-badge-yes"><i class="bi bi-check2"></i> Завершён</span>
-        {% else %}
-          <span class="fv-badge-no"><i class="bi bi-play-fill"></i> В процессе</span>
-        {% endif %}
-        {% if prog_updated %}
-        <div style="font-size:11px;color:#94A3B8;margin-top:4px;">{{ prog_updated | date: 'dd.MM.yyyy' }}</div>
-        {% endif %}
-      </div>
-    </a>
+          {% endif %}
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          {% if lesson_status == 'completed' %}
+            <span class="fv-badge-yes"><i class="bi bi-check2"></i> Завершён</span>
+          {% else %}
+            <span class="fv-badge-no"><i class="bi bi-play-fill"></i> В процессе</span>
+          {% endif %}
+          {% if prog_updated %}
+          <div style="font-size:11px;color:#94A3B8;margin-top:4px;">{{ prog_updated | date: 'dd.MM.yyyy' }}</div>
+          {% endif %}
+        </div>
+      </a>
+      {% if prog_id != '' %}
+      <button type="button" class="fv-btn-detail fv-btn-detail-sm"
+              onclick="fvOpenDetail('{{ prog_id }}', '{{ safe_item_name }}')"
+              title="Статистика по вопросам">
+        <i class="bi bi-list-check"></i> Детали
+      </button>
+      {% endif %}
+    </div>
     {% endif %}
   {% endfor %}
 
@@ -344,21 +408,186 @@
 
 </div>
 
+<!-- ─── Модальное окно: Статистика по вопросам ──────────────────────── -->
+<div class="fv-detail-backdrop" id="fvDetailBackdrop" onclick="fvCloseDetail(event)">
+  <div class="fv-detail-modal" role="dialog" aria-modal="true" aria-labelledby="fvDetailTitle">
+    <div class="fv-detail-header">
+      <span class="fv-detail-title" id="fvDetailTitle">Статистика по вопросам</span>
+      <button type="button" class="fv-detail-close" onclick="fvCloseDetail()" aria-label="Закрыть">×</button>
+    </div>
+    <div class="fv-detail-body" id="fvDetailBody">
+      <div class="fv-detail-spinner">
+        <i class="bi bi-arrow-repeat"></i>
+        <span>Загрузка...</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
+  /* ── Поиск в таблице администратора ── */
   var searchInput = document.getElementById('fv-admin-search');
-  if (!searchInput) return;
-  var rows = document.querySelectorAll('.fv-admin-row');
-  var noRes = document.getElementById('fv-admin-no-results');
-  searchInput.addEventListener('input', function () {
-    var q = this.value.trim().toLowerCase();
-    var visible = 0;
-    rows.forEach(function (r) {
-      var match = !q || (r.dataset.search || '').indexOf(q) !== -1;
-      r.style.display = match ? '' : 'none';
-      if (match) visible++;
+  if (searchInput) {
+    var rows = document.querySelectorAll('.fv-admin-row');
+    var noRes = document.getElementById('fv-admin-no-results');
+    searchInput.addEventListener('input', function () {
+      var q = this.value.trim().toLowerCase();
+      var visible = 0;
+      rows.forEach(function (r) {
+        var match = !q || (r.dataset.search || '').indexOf(q) !== -1;
+        r.style.display = match ? '' : 'none';
+        if (match) visible++;
+      });
+      if (noRes) noRes.style.display = visible === 0 ? '' : 'none';
     });
-    if (noRes) noRes.style.display = visible === 0 ? '' : 'none';
+  }
+
+  /* ── Получение CSRF-токена ── */
+  function getCsrfToken() {
+    var m = document.querySelector('meta[name="__RequestVerificationToken"]');
+    if (m) return m.getAttribute('content') || m.getAttribute('value') || '';
+    var i = document.querySelector('input[name="__RequestVerificationToken"]');
+    return i ? i.value : '';
+  }
+
+  /* ── Открыть модалку и загрузить данные ── */
+  window.fvOpenDetail = function (progressId, lessonName) {
+    var backdrop = document.getElementById('fvDetailBackdrop');
+    var body     = document.getElementById('fvDetailBody');
+    var title    = document.getElementById('fvDetailTitle');
+
+    title.textContent = lessonName || 'Статистика по вопросам';
+    body.innerHTML = '<div class="fv-detail-spinner"><i class="bi bi-arrow-repeat"></i><span>Загрузка...</span></div>';
+    backdrop.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    fetch('/_api/new_h5pprogresses(' + progressId + ')?$select=new_xapistatements', {
+      headers: {
+        '__RequestVerificationToken': getCsrfToken(),
+        'Accept': 'application/json',
+        'OData-MaxVersion': '4.0',
+        'OData-Version': '4.0'
+      }
+    })
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      var raw = data.new_xapistatements;
+      if (!raw) { renderNoQuestions(body); return; }
+      var stmts = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (!Array.isArray(stmts)) { renderNoQuestions(body); return; }
+
+      /* Фильтруем только "answered" стейтменты */
+      var answered = stmts.filter(function (s) {
+        return s && s.verb && s.verb.id && s.verb.id.indexOf('answered') !== -1;
+      });
+
+      if (answered.length === 0) { renderNoQuestions(body); return; }
+      renderQuestions(body, answered);
+    })
+    .catch(function (err) {
+      body.innerHTML =
+        '<div class="fv-detail-error">' +
+        '<i class="bi bi-exclamation-circle"></i>' +
+        '<p style="font-weight:600;margin:0;">Не удалось загрузить данные</p>' +
+        '<p style="font-size:12px;margin:4px 0 0;color:#94A3B8;">' + err.message + '</p>' +
+        '</div>';
+    });
+  };
+
+  /* ── Рендер таблицы вопросов ── */
+  function renderQuestions(body, answered) {
+    var correct = 0, wrong = 0, skipped = 0;
+    answered.forEach(function (s) {
+      var res = s.result;
+      if (!res || (!res.response && res.success === undefined)) { skipped++; }
+      else if (res.success === true) { correct++; }
+      else { wrong++; }
+    });
+
+    var html = '<div class="fv-q-summary">';
+    html += '<span class="fv-q-chip fv-q-chip-ok"><i class="bi bi-check-circle-fill"></i> Верно: ' + correct + '</span>';
+    html += '<span class="fv-q-chip fv-q-chip-err"><i class="bi bi-x-circle-fill"></i> Неверно: ' + wrong + '</span>';
+    if (skipped > 0) {
+      html += '<span class="fv-q-chip fv-q-chip-skip"><i class="bi bi-dash-circle"></i> Без ответа: ' + skipped + '</span>';
+    }
+    html += '</div>';
+
+    html += '<div style="overflow-x:auto;"><table class="fv-q-table">';
+    html += '<thead><tr><th style="width:36px;">#</th><th>Вопрос</th><th>Ответ</th><th style="width:110px;">Результат</th></tr></thead><tbody>';
+
+    answered.forEach(function (s, idx) {
+      var def  = s.object && s.object.definition;
+      var desc = def && def.description;
+      var qText = '—';
+      if (desc) {
+        qText = desc['en-US'] || desc['ru-RU'] || desc['ru'] ||
+                desc[Object.keys(desc)[0]] || '—';
+        /* Убираем HTML-теги если есть */
+        qText = qText.replace(/<[^>]+>/g, '').trim() || '—';
+      }
+
+      var res      = s.result || {};
+      var response = (res.response !== undefined && res.response !== null)
+                     ? String(res.response).replace(/<[^>]+>/g, '').trim()
+                     : '—';
+      /* Заменяем служебный разделитель H5P */
+      response = response.replace(/\[,\]/g, ', ');
+      if (!response) response = '—';
+
+      var resultHtml;
+      if (!res.response && res.success === undefined) {
+        resultHtml = '<span class="fv-q-result-skip"><i class="bi bi-dash"></i> Пропущен</span>';
+      } else if (res.success === true) {
+        resultHtml = '<span class="fv-q-result-ok"><i class="bi bi-check2"></i> Верно</span>';
+      } else {
+        resultHtml = '<span class="fv-q-result-err"><i class="bi bi-x"></i> Неверно</span>';
+      }
+
+      html += '<tr>';
+      html += '<td style="color:#94A3B8;font-size:12px;font-weight:700;">' + (idx + 1) + '</td>';
+      html += '<td style="max-width:260px;">' + fvEsc(qText) + '</td>';
+      html += '<td style="max-width:160px;color:#64748B;">' + fvEsc(response) + '</td>';
+      html += '<td>' + resultHtml + '</td>';
+      html += '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+    body.innerHTML = html;
+  }
+
+  /* ── Нет вопросов ── */
+  function renderNoQuestions(body) {
+    body.innerHTML =
+      '<div class="fv-detail-noq">' +
+      '<i class="bi bi-chat-square-text"></i>' +
+      '<p style="font-weight:600;color:#475569;margin:0;">Данных по вопросам нет</p>' +
+      '<p style="font-size:12px;margin:4px 0 0;">Этот урок не содержит интерактивных вопросов или они не были записаны.</p>' +
+      '</div>';
+  }
+
+  /* ── Безопасное экранирование для HTML ── */
+  function fvEsc(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /* ── Закрыть модалку ── */
+  window.fvCloseDetail = function (e) {
+    if (e && e.target !== document.getElementById('fvDetailBackdrop')) return;
+    document.getElementById('fvDetailBackdrop').classList.remove('open');
+    document.body.style.overflow = '';
+  };
+
+  /* Закрытие по Escape */
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') window.fvCloseDetail();
   });
 })();
 </script>
