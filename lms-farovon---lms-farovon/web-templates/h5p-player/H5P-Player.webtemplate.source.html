@@ -134,6 +134,19 @@
   // and clobbers window.H5PStandalone.
   var H5PS = window.H5PStandalone;
 
+  // ── xAPI state (IIFE-scope so saveXAPIProgress/saveXAPIWithToken can access) ─
+  var allStatements = [];
+  var progressId    = null;
+  var lastSaved     = 0;
+  var saveInFlight  = false;
+
+  function genUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
   container.innerHTML =
     '<div class="text-center py-5">' +
     '<div class="spinner-border text-primary" role="status"></div>' +
@@ -460,20 +473,6 @@
     // Clear loading-spinner placeholder — h5p-standalone appends to container
     // without clearing, so spinner would otherwise stay visible above the player.
     container.innerHTML = '';
-
-    // ── xAPI state ───────────────────────────────────────────────────────────
-    var allStatements = [];
-    var progressId    = null;  // генерируем до первого POST, используем для PATCH
-    var lastSaved     = 0;
-    var saveInFlight  = false;
-
-    // Генерируем UUID на клиенте — не зависим от заголовков ответа сервера
-    function genUUID() {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        var r = Math.random() * 16 | 0;
-        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-      });
-    }
 
     new H5PS.H5P(container, {
       h5pJsonPath : h5pJsonPath,
