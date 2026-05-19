@@ -182,7 +182,7 @@
       if (res.ok || res.status === 204) {
         showResult('success',
           'Файл <strong>' + escHtml(filename) + '</strong> успешно загружен. ' +
-          '<a href="/h5p-lesson?id=' + recordId + '" class="alert-link">Открыть плеер</a>');
+          '<a href="/h5p-player?id=' + recordId + '" class="alert-link">Открыть плеер</a>');
       } else {
         return res.text().then(function (t) {
           showResult('danger', 'Ошибка загрузки файла (HTTP ' + res.status + '): ' + escHtml(t.slice(0, 200)));
