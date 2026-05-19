@@ -1,7 +1,7 @@
 {% comment %}
   Leaderboard — Рейтинг
-  Монеты = 100 + round(new_scorescaled*50) за каждый completed урок
-  Паттерн: pipe-array с trailing '|'; n_real = size | minus: 1 исключает пустой элемент
+  Монеты = completed_count * 100 + SUM(new_scorescaled) * 50
+  Агрегация делается FetchXML (GROUP BY), а не Liquid-арифметикой.
 {% endcomment %}
 
 {% unless user %}
@@ -13,16 +13,16 @@
 </div>
 {% else %}
 
-{% fetchxml all_progress %}
-<fetch>
+{% comment %}── FetchXML aggregate: GROUP BY new_user, COUNT, SUM(scorescaled) ──{% endcomment %}
+{% fetchxml lb %}
+<fetch aggregate="true">
   <entity name="new_h5pprogress">
-    <attribute name="new_h5pprogressid" />
-    <attribute name="new_user" />
-    <attribute name="new_scorescaled" />
-    <attribute name="new_completion" />
-    <link-entity name="contact" from="contactid" to="new_user" alias="c">
-      <attribute name="fullname" />
-      <attribute name="jobtitle" />
+    <attribute name="new_user" groupby="true" alias="uid" />
+    <attribute name="new_h5pprogressid" aggregate="count" alias="cnt" />
+    <attribute name="new_scorescaled"   aggregate="sum"   alias="scoresum" />
+    <link-entity name="contact" from="contactid" to="new_user" alias="ctc" link-type="outer">
+      <attribute name="fullname" groupby="true" alias="fname" />
+      <attribute name="jobtitle" groupby="true" alias="fjob" />
     </link-entity>
     <filter>
       <condition attribute="new_completion" operator="eq" value="1" />
@@ -31,56 +31,32 @@
 </fetch>
 {% endfetchxml %}
 
-{% comment %}── Считаем монеты: pipe-array, trailing '|' ──{% endcomment %}
+{% comment %}── Строим pipe-arrays из готовых aggregate-строк ──{% endcomment %}
 {% assign user_ids   = '' %}
 {% assign user_names = '' %}
 {% assign user_jobs  = '' %}
 {% assign user_coins = '' %}
 
-{% for p in all_progress.results.entities %}
-  {% assign uid = p.new_user.id %}
+{% for r in lb.results.entities %}
+  {% assign uid = r.uid %}
+  {% if uid == '' or uid == null %}{% continue %}{% endif %}
 
-  {% comment %} Монеты за урок — принудительно числа через | times:1 {% endcomment %}
-  {% assign sc = p.new_scorescaled | times: 1 %}
-  {% assign score_pts  = sc | times: 50 | round %}
-  {% assign lesson_pts = 100 | plus: score_pts %}
+  {% comment %} r.cnt и r.scoresum — уже числа от Dataverse, не строки {% endcomment %}
+  {% assign cnt      = r.cnt      | plus: 0 %}
+  {% assign scoresum = r.scoresum | plus: 0 %}
+  {% assign bonus    = scoresum   | times: 50 | round %}
+  {% assign coins    = cnt        | times: 100 | plus: bonus %}
 
-  {% comment %} Найти индекс пользователя {% endcomment %}
-  {% assign found_idx = -1 %}
-  {% assign ids_arr   = user_ids   | split: '|' %}
-  {% assign coins_arr = user_coins | split: '|' %}
+  {% assign fname = r['ctc.fname'] | default: '' %}
+  {% assign fjob  = r['ctc.fjob']  | default: '' %}
 
-  {% for existing_id in ids_arr %}
-    {% if existing_id == uid %}
-      {% assign found_idx = forloop.index0 %}
-    {% endif %}
-  {% endfor %}
-
-  {% if found_idx == -1 %}
-    {% comment %} Новый пользователь {% endcomment %}
-    {% assign fname = p['c.fullname'] | default: '' %}
-    {% assign fjob  = p['c.jobtitle'] | default: '' %}
-    {% assign user_ids   = user_ids   | append: uid       | append: '|' %}
-    {% assign user_names = user_names | append: fname     | append: '|' %}
-    {% assign user_jobs  = user_jobs  | append: fjob      | append: '|' %}
-    {% assign user_coins = user_coins | append: lesson_pts | append: '|' %}
-  {% else %}
-    {% comment %} Суммируем монеты: times:1 чтобы Liquid воспринял как число {% endcomment %}
-    {% assign old_coins = coins_arr[found_idx] | times: 1 %}
-    {% assign new_coins = old_coins | plus: lesson_pts %}
-    {% assign new_coins_arr = '' %}
-    {% for c in coins_arr %}
-      {% if forloop.index0 == found_idx %}
-        {% assign new_coins_arr = new_coins_arr | append: new_coins | append: '|' %}
-      {% else %}
-        {% assign new_coins_arr = new_coins_arr | append: c | append: '|' %}
-      {% endif %}
-    {% endfor %}
-    {% assign user_coins = new_coins_arr %}
-  {% endif %}
+  {% assign user_ids   = user_ids   | append: uid   | append: '|' %}
+  {% assign user_names = user_names | append: fname | append: '|' %}
+  {% assign user_jobs  = user_jobs  | append: fjob  | append: '|' %}
+  {% assign user_coins = user_coins | append: coins | append: '|' %}
 {% endfor %}
 
-{% comment %}── Итоговые массивы; n_real исключает trailing пустой элемент ──{% endcomment %}
+{% comment %}── Финальные массивы; n_real исключает trailing пустой от split:'|' ──{% endcomment %}
 {% assign ids_arr   = user_ids   | split: '|' %}
 {% assign names_arr = user_names | split: '|' %}
 {% assign jobs_arr  = user_jobs  | split: '|' %}
@@ -89,48 +65,52 @@
 
 {% comment %}── Пузырьковая сортировка по монетам (убывание) ──{% endcomment %}
 {% if n_real > 1 %}
-{% assign last_rt = n_real | minus: 1 %}
-{% assign last_i  = n_real | minus: 2 %}
-{% assign sorted  = false %}
-{% for _outer in (1..20) %}
-  {% unless sorted %}
-    {% assign sorted = true %}
-    {% for i in (0..last_i) %}
-      {% assign j  = i | plus: 1 %}
-      {% assign ci = coins_arr[i] | times: 1 %}
-      {% assign cj = coins_arr[j] | times: 1 %}
-      {% if ci < cj %}
-        {% assign sorted = false %}
-        {% assign tmp_id  = ids_arr[i]   %}{% assign tmp_nm = names_arr[i] %}
-        {% assign tmp_job = jobs_arr[i]  %}{% assign tmp_c  = coins_arr[i] %}
-        {% assign new_ids    = '' %}{% assign new_names  = '' %}
-        {% assign new_jobs   = '' %}{% assign new_coins2 = '' %}
-        {% for k in (0..last_rt) %}
-          {% if k == i %}
-            {% assign new_ids    = new_ids    | append: ids_arr[j]   | append: '|' %}
-            {% assign new_names  = new_names  | append: names_arr[j] | append: '|' %}
-            {% assign new_jobs   = new_jobs   | append: jobs_arr[j]  | append: '|' %}
-            {% assign new_coins2 = new_coins2 | append: coins_arr[j] | append: '|' %}
-          {% elsif k == j %}
-            {% assign new_ids    = new_ids    | append: tmp_id  | append: '|' %}
-            {% assign new_names  = new_names  | append: tmp_nm  | append: '|' %}
-            {% assign new_jobs   = new_jobs   | append: tmp_job | append: '|' %}
-            {% assign new_coins2 = new_coins2 | append: tmp_c   | append: '|' %}
-          {% else %}
-            {% assign new_ids    = new_ids    | append: ids_arr[k]   | append: '|' %}
-            {% assign new_names  = new_names  | append: names_arr[k] | append: '|' %}
-            {% assign new_jobs   = new_jobs   | append: jobs_arr[k]  | append: '|' %}
-            {% assign new_coins2 = new_coins2 | append: coins_arr[k] | append: '|' %}
-          {% endif %}
-        {% endfor %}
-        {% assign ids_arr   = new_ids    | split: '|' %}
-        {% assign names_arr = new_names  | split: '|' %}
-        {% assign jobs_arr  = new_jobs   | split: '|' %}
-        {% assign coins_arr = new_coins2 | split: '|' %}
-      {% endif %}
-    {% endfor %}
-  {% endunless %}
-{% endfor %}
+  {% assign last_rt = n_real | minus: 1 %}
+  {% assign last_i  = n_real | minus: 2 %}
+  {% assign sorted  = false %}
+  {% for _outer in (1..20) %}
+    {% unless sorted %}
+      {% assign sorted = true %}
+      {% for i in (0..last_i) %}
+        {% assign j  = i | plus: 1 %}
+        {% assign ci = coins_arr[i] | plus: 0 %}
+        {% assign cj = coins_arr[j] | plus: 0 %}
+        {% if ci < cj %}
+          {% assign sorted = false %}
+          {% assign tmp_id  = ids_arr[i]   %}
+          {% assign tmp_nm  = names_arr[i] %}
+          {% assign tmp_job = jobs_arr[i]  %}
+          {% assign tmp_c   = coins_arr[i] %}
+          {% assign new_ids    = '' %}
+          {% assign new_names  = '' %}
+          {% assign new_jobs   = '' %}
+          {% assign new_coins2 = '' %}
+          {% for k in (0..last_rt) %}
+            {% if k == i %}
+              {% assign new_ids    = new_ids    | append: ids_arr[j]   | append: '|' %}
+              {% assign new_names  = new_names  | append: names_arr[j] | append: '|' %}
+              {% assign new_jobs   = new_jobs   | append: jobs_arr[j]  | append: '|' %}
+              {% assign new_coins2 = new_coins2 | append: coins_arr[j] | append: '|' %}
+            {% elsif k == j %}
+              {% assign new_ids    = new_ids    | append: tmp_id  | append: '|' %}
+              {% assign new_names  = new_names  | append: tmp_nm  | append: '|' %}
+              {% assign new_jobs   = new_jobs   | append: tmp_job | append: '|' %}
+              {% assign new_coins2 = new_coins2 | append: tmp_c   | append: '|' %}
+            {% else %}
+              {% assign new_ids    = new_ids    | append: ids_arr[k]   | append: '|' %}
+              {% assign new_names  = new_names  | append: names_arr[k] | append: '|' %}
+              {% assign new_jobs   = new_jobs   | append: jobs_arr[k]  | append: '|' %}
+              {% assign new_coins2 = new_coins2 | append: coins_arr[k] | append: '|' %}
+            {% endif %}
+          {% endfor %}
+          {% assign ids_arr   = new_ids    | split: '|' %}
+          {% assign names_arr = new_names  | split: '|' %}
+          {% assign jobs_arr  = new_jobs   | split: '|' %}
+          {% assign coins_arr = new_coins2 | split: '|' %}
+        {% endif %}
+      {% endfor %}
+    {% endunless %}
+  {% endfor %}
 {% endif %}
 
 {% comment %}── Позиция текущего пользователя ──{% endcomment %}
@@ -140,7 +120,7 @@
   {% if uid == '' %}{% continue %}{% endif %}
   {% if uid == user.id %}
     {% assign my_rank  = forloop.index %}
-    {% assign my_coins = coins_arr[forloop.index0] | times: 1 %}
+    {% assign my_coins = coins_arr[forloop.index0] | plus: 0 %}
   {% endif %}
 {% endfor %}
 
@@ -246,11 +226,11 @@
     {% assign podium_order = '1,0,2' | split: ',' %}
     {% assign podium_ranks = '2,1,3' | split: ',' %}
     {% for pi in podium_order %}
-      {% assign idx = pi | times: 1 %}
-      {% assign pr  = podium_ranks[forloop.index0] | times: 1 %}
+      {% assign idx    = pi | plus: 0 %}
+      {% assign pr     = podium_ranks[forloop.index0] | plus: 0 %}
       {% assign pname  = names_arr[idx] | default: 'Участник' %}
       {% assign pjob   = jobs_arr[idx]  | default: '' %}
-      {% assign pcoins = coins_arr[idx] | times: 1 %}
+      {% assign pcoins = coins_arr[idx] | plus: 0 %}
       {% assign initials = pname | split: ' ' %}
       {% assign ini1 = initials[0] | slice: 0, 1 | upcase %}
       {% assign ini2 = '' %}
@@ -284,11 +264,11 @@
       <tbody>
         {% for uid in ids_arr %}
           {% if uid == '' %}{% continue %}{% endif %}
-          {% assign ri    = forloop.index %}
-          {% assign idx   = forloop.index0 %}
+          {% assign ri     = forloop.index %}
+          {% assign idx    = forloop.index0 %}
           {% assign pname  = names_arr[idx] | default: 'Участник' %}
           {% assign pjob   = jobs_arr[idx]  | default: '' %}
-          {% assign pcoins = coins_arr[idx] | times: 1 %}
+          {% assign pcoins = coins_arr[idx] | plus: 0 %}
           {% assign is_me  = false %}
           {% if uid == user.id %}{% assign is_me = true %}{% endif %}
           {% assign initials = pname | split: ' ' %}
