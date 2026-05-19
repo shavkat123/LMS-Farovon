@@ -38,7 +38,7 @@
 {% assign user_coins = '' %}
 
 {% for r in lb.results.entities %}
-  {% assign uid = r.uid %}
+  {% assign uid = r.uid.id %}
   {% if uid == '' or uid == null %}{% continue %}{% endif %}
 
   {% comment %} r.cnt и r.scoresum — уже числа от Dataverse, не строки {% endcomment %}
