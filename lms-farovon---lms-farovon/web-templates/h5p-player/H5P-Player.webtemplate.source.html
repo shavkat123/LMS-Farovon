@@ -136,16 +136,10 @@
 
   // ── xAPI state (IIFE-scope so saveXAPIProgress/saveXAPIWithToken can access) ─
   var allStatements = [];
-  var progressId    = null;
+  var progressId    = null;   // UUID assigned after first successful POST
+  var postPending   = false;  // true while POST is in-flight (no progressId yet)
   var lastSaved     = 0;
   var saveInFlight  = false;
-
-  function genUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-      var r = Math.random() * 16 | 0;
-      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-    });
-  }
 
   container.innerHTML =
     '<div class="text-center py-5">' +
@@ -533,6 +527,15 @@
   function saveXAPIProgress(triggerStmt, isCompleted) {
     // Не блокируем "completed" — он должен сохраниться в любом случае
     if (saveInFlight && !isCompleted) return;
+
+    // POST ещё летит — progressId не известен. Completed ждёт и повторяет.
+    if (postPending) {
+      if (isCompleted) {
+        setTimeout(function () { saveXAPIProgress(triggerStmt, isCompleted); }, 800);
+      }
+      return;
+    }
+
     saveInFlight = true;
     getCsrfToken().then(function (tok) {
       saveXAPIWithToken(triggerStmt, tok);
@@ -545,18 +548,16 @@
 
     var isFirstSave = !progressId;
 
-    // Генерируем UUID ДО запроса — не зависим от заголовков ответа
-    if (isFirstSave) progressId = genUUID();
-
     var body = {
       'new_xapistatements': JSON.stringify(allStatements),
       'new_lastupdated'   : new Date().toISOString()
     };
     if (isFirstSave) {
-      body['new_h5pprogressid']           = progressId;
+      // new_h5pprogressid не включён в Web API — ID присвоит сервер
       body['new_user@odata.bind']         = '/contacts(' + userId + ')';
       body['new_h5pcontent@odata.bind']   = '/new_h5pcontents(' + contentId + ')';
       body['new_name']                    = 'xAPI ' + new Date().toISOString();
+      postPending = true;
     }
 
     // Scalar-поля из текущего стейтмента (score, completion, success, duration)
@@ -591,14 +592,25 @@
     }).then(function (res) {
       saveInFlight = false;
       if (res.ok) {
-        console.log('[H5P] xAPI save OK — progressId:', progressId);
+        if (isFirstSave) {
+          // Извлекаем UUID из заголовка OData-EntityId: .../(UUID)
+          var entityHdr = res.headers.get('OData-EntityId') || res.headers.get('Location') || '';
+          var m = entityHdr.match(/\(([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\)/i);
+          if (m) progressId = m[1];
+          postPending = false;
+          console.log('[H5P] xAPI POST OK — progressId:', progressId || '(header missing)');
+        } else {
+          console.log('[H5P] xAPI PATCH OK — progressId:', progressId);
+        }
       } else {
+        if (isFirstSave) postPending = false;
         res.text().then(function (txt) {
           console.warn('[H5P] xAPI save failed:', res.status, res.statusText, '—', txt.slice(0, 600));
         });
       }
     }).catch(function (e) {
       saveInFlight = false;
+      if (isFirstSave) postPending = false;
       console.error('[H5P] xAPI save error:', e);
     });
   }
