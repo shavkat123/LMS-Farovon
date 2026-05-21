@@ -4,14 +4,7 @@
   Demo cards rendered when no real courses exist (total_courses == 0).
 {% endcomment %}
 
-{% comment %}── 1. Active H5P content ──{% endcomment %}
-{% comment %}
-  NOTE: new_relatedcourse is intentionally NOT requested here.
-  Accessing EntityReference.id on an empty lookup throws in Power Pages DotLiquid.
-  To enable real course grouping: add Table Permissions for msdynce_course in Power Pages
-  Security, then uncomment the attribute below and remove demo_mode logic.
-  <attribute name="new_relatedcourse" />
-{% endcomment %}
+{% comment %}── 1. All active H5P content (no relatedcourse fetch — safe iteration) ──{% endcomment %}
 {% fetchxml all_h5p %}
 <fetch>
   <entity name="new_h5pcontent">
@@ -25,7 +18,22 @@
 </fetch>
 {% endfetchxml %}
 
-{% comment %}── 2. Current user's completed lessons ──{% endcomment %}
+{% comment %}── 2. Only contents WITH a related course (safe: filter pre-excludes nulls) ──{% endcomment %}
+{% fetchxml linked_h5p %}
+<fetch>
+  <entity name="new_h5pcontent">
+    <attribute name="new_h5pcontentid" />
+    <attribute name="new_name" />
+    <attribute name="new_relatedcourse" />
+    <filter type="and">
+      <condition attribute="new_isactive" operator="eq" value="1" />
+      <condition attribute="new_relatedcourse" operator="not-null" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── 3. Current user's completed lessons ──{% endcomment %}
 {% if user %}
 {% fetchxml my_done %}
 <fetch>
@@ -41,19 +49,27 @@
 {% endfetchxml %}
 {% endif %}
 
-{% comment %}
-  Build unique courses. IMPORTANT: only access .id / .name AFTER confirming
-  h.new_relatedcourse is not blank — accessing .id on a null EntityReference
-  throws "Value cannot be null. Parameter name: value" in DotLiquid.
-{% endcomment %}
+{% comment %}── Build unique courses from linked_h5p (all records guaranteed non-null) ──{% endcomment %}
+{% assign seen_cids     = '' %}
+{% assign c_ids_str     = '' %}
+{% assign c_names_str   = '' %}
 {% assign total_courses = 0 %}
-{% comment %}
-  new_relatedcourse is NOT fetched in FetchXML — null EntityReference check
-  throws "Value cannot be null" in DotLiquid even with blank guard.
-  Course grouping disabled until new_relatedcourse is added to FetchXML.
-{% endcomment %}
-{% assign dyn_course_ids   = '' | split: '§' %}
-{% assign dyn_course_names = '' | split: '§' %}
+{% assign linked_count  = 0 %}
+{% assign linked_ids    = '' %}
+{% for h in linked_h5p.results.entities %}
+  {% assign linked_count = linked_count | plus: 1 %}
+  {% assign linked_ids   = linked_ids | append: h.new_h5pcontentid | append: ',' %}
+  {% assign cid   = h.new_relatedcourse.id %}
+  {% assign cname = h.new_relatedcourse.name | default: 'Без названия' %}
+  {% unless seen_cids contains cid %}
+    {% assign seen_cids     = seen_cids   | append: cid   | append: ',' %}
+    {% assign c_ids_str     = c_ids_str   | append: cid   | append: '§' %}
+    {% assign c_names_str   = c_names_str | append: cname | append: '§' %}
+    {% assign total_courses = total_courses | plus: 1 %}
+  {% endunless %}
+{% endfor %}
+{% assign dyn_course_ids   = c_ids_str   | split: '§' %}
+{% assign dyn_course_names = c_names_str | split: '§' %}
 
 {% comment %}── Pre-compute totals ──{% endcomment %}
 {% assign total_lessons = 0 %}
@@ -67,7 +83,7 @@
   {% endfor %}
 {% endif %}
 
-{% comment %}── Demo mode flag ──{% endcomment %}
+{% comment %}── Demo mode triggers when no courses are linked yet ──{% endcomment %}
 {% assign demo_mode = false %}
 {% if total_courses == 0 %}
   {% assign demo_mode = true %}
@@ -272,19 +288,15 @@
 
       {% assign c_total = 0 %}
       {% assign c_done  = 0 %}
-      {% for h in all_h5p.results.entities %}
-        {% if h.new_relatedcourse != blank %}
-          {% if h.new_relatedcourse.id == c_id %}
-            {% assign c_total = c_total | plus: 1 %}
-            {% if user %}
-              {% for p in my_done.results.entities %}
-                {% if p.new_h5pcontent != blank %}
-                  {% if p.new_h5pcontent.id == h.new_h5pcontentid %}
-                    {% assign c_done = c_done | plus: 1 %}
-                  {% endif %}
-                {% endif %}
-              {% endfor %}
-            {% endif %}
+      {% for h in linked_h5p.results.entities %}
+        {% if h.new_relatedcourse.id == c_id %}
+          {% assign c_total = c_total | plus: 1 %}
+          {% if user %}
+            {% for p in my_done.results.entities %}
+              {% if p.new_h5pcontent.id == h.new_h5pcontentid %}
+                {% assign c_done = c_done | plus: 1 %}
+              {% endif %}
+            {% endfor %}
           {% endif %}
         {% endif %}
       {% endfor %}
@@ -317,23 +329,17 @@
       {% endif %}
     {% endfor %}
 
-    {% comment %}── Uncategorized: safe null check on EntityReference ──{% endcomment %}
-    {% assign uncategorized      = 0 %}
+    {% comment %}── Uncategorized = total active minus linked. Done = progress whose content is NOT in linked_ids ──{% endcomment %}
+    {% assign uncategorized      = total_lessons | minus: linked_count %}
     {% assign uncategorized_done = 0 %}
-    {% for h in all_h5p.results.entities %}
-      {% if h.new_relatedcourse == blank %}
-        {% assign uncategorized = uncategorized | plus: 1 %}
-        {% if user %}
-          {% for p in my_done.results.entities %}
-            {% if p.new_h5pcontent != blank %}
-              {% if p.new_h5pcontent.id == h.new_h5pcontentid %}
-                {% assign uncategorized_done = uncategorized_done | plus: 1 %}
-              {% endif %}
-            {% endif %}
-          {% endfor %}
-        {% endif %}
-      {% endif %}
-    {% endfor %}
+    {% if user and uncategorized > 0 %}
+      {% for p in my_done.results.entities %}
+        {% assign pcid = p.new_h5pcontent.id %}
+        {% unless linked_ids contains pcid %}
+          {% assign uncategorized_done = uncategorized_done | plus: 1 %}
+        {% endunless %}
+      {% endfor %}
+    {% endif %}
     {% if uncategorized > 0 %}
       {% assign unc_pct = uncategorized_done | times: 100 | divided_by: uncategorized %}
       <div class="fv-path-card" data-course-card>
