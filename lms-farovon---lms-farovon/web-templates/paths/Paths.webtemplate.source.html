@@ -48,10 +48,9 @@
 {% endcomment %}
 {% assign total_courses = 0 %}
 {% comment %}
-  new_relatedcourse is NOT fetched in the FetchXML (see NOTE above).
-  Accessing a null EntityReference in DotLiquid throws "Value cannot be null"
-  even inside an {% if ... != blank %} guard.
-  Course grouping is disabled until new_relatedcourse is added to the FetchXML.
+  new_relatedcourse is NOT fetched in FetchXML — null EntityReference check
+  throws "Value cannot be null" in DotLiquid even with blank guard.
+  Course grouping disabled until new_relatedcourse is added to FetchXML.
 {% endcomment %}
 {% assign dyn_course_ids   = '' | split: '§' %}
 {% assign dyn_course_names = '' | split: '§' %}
