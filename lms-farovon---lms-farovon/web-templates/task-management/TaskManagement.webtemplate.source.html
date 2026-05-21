@@ -1,0 +1,125 @@
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#94A3B8;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Страница доступна только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+<style>
+  .fv-tm { padding: 28px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
+  .fv-tm-breadcrumb { margin-bottom: 18px; }
+  .fv-tm-breadcrumb ol { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .fv-tm-breadcrumb li { font-size: 12px; color: #94A3B8; display: flex; align-items: center; gap: 6px; }
+  .fv-tm-breadcrumb li::after { content: '/'; color: #CBD5E1; }
+  .fv-tm-breadcrumb li:last-child::after { display: none; }
+  .fv-tm-breadcrumb a { color: #64748B; text-decoration: none; }
+  .fv-tm-breadcrumb a:hover { color: #0D9488; }
+  .fv-tm-breadcrumb li:last-child { color: #0B1220; font-weight: 600; }
+
+  .fv-tm-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+  .fv-tm-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #0D9488; display: block; margin-bottom: 5px; }
+  .fv-tm-title { font-size: 26px; font-weight: 800; color: #0B1220; margin: 0 0 5px; }
+  .fv-tm-sub { font-size: 13px; color: #64748B; margin: 0; }
+  .fv-tm-toolbar { display: flex; gap: 8px; }
+  .fv-tm-btn { background: #fff; border: 1px solid #E5E7EB; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; color: #374151; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .fv-tm-btn:hover { background: #F0FDFA; border-color: #0D9488; color: #0D9488; }
+  .fv-tm-btn.primary { background: #0D9488; color: #fff; border-color: #0D9488; }
+  .fv-tm-btn.primary:hover { background: #0B7A6E; color: #fff; }
+
+  .fv-tm-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  @media (max-width: 1100px) { .fv-tm-board { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px)  { .fv-tm-board { grid-template-columns: 1fr; } }
+
+  .fv-tm-col { background: #F8FAFC; border-radius: 12px; padding: 14px; min-height: 400px; }
+  .fv-tm-col-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 4px; }
+  .fv-tm-col-name { font-size: 12px; font-weight: 700; color: #0B1220; text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: center; gap: 8px; }
+  .fv-tm-col-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .fv-tm-col-count { font-size: 11px; font-weight: 700; color: #64748B; background: #fff; padding: 2px 8px; border-radius: 999px; border: 1px solid #E5E7EB; }
+
+  .fv-tm-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.04); cursor: grab; transition: box-shadow .15s, transform .15s; }
+  .fv-tm-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.08); transform: translateY(-1px); }
+  .fv-tm-card-tag { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; margin-bottom: 8px; }
+  .fv-tm-card-name { font-size: 13px; font-weight: 600; color: #0B1220; margin: 0 0 8px; line-height: 1.4; }
+  .fv-tm-card-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11px; color: #64748B; }
+  .fv-tm-card-avatar { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, #6366F1, #8B5CF6); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; }
+  .fv-tm-card-due { display: flex; align-items: center; gap: 4px; }
+  .fv-tm-card-due.urgent { color: #DC2626; font-weight: 600; }
+  .fv-tm-card-priority { width: 4px; height: 18px; border-radius: 2px; display: inline-block; vertical-align: middle; margin-right: 4px; }
+</style>
+
+<div class="fv-tm container-fluid px-3 px-md-4">
+
+  <nav class="fv-tm-breadcrumb" aria-label="breadcrumb">
+    <ol>
+      <li><a href="/">Главная</a></li>
+      <li aria-current="page">Управление задачами</li>
+    </ol>
+  </nav>
+
+  <div class="fv-tm-header">
+    <div>
+      <span class="fv-tm-eyebrow">Администрирование</span>
+      <h1 class="fv-tm-title">Управление задачами</h1>
+      <p class="fv-tm-sub">Канбан-доска задач адаптации для стажёров.</p>
+    </div>
+    <div class="fv-tm-toolbar">
+      <button class="fv-tm-btn" type="button" disabled><i class="bi bi-funnel"></i> Фильтр</button>
+      <button class="fv-tm-btn primary" type="button" disabled title="Появится после создания таблицы new_task"><i class="bi bi-plus-lg"></i> Новая задача</button>
+    </div>
+  </div>
+
+  <div class="fv-tm-board">
+    {% assign col_names = 'К выполнению,В работе,На проверке,Готово' | split: ',' %}
+    {% assign col_colors = '#94A3B8,#2563EB,#D97706,#22C55E' | split: ',' %}
+
+    {% for col in col_names %}
+      {% assign ci = forloop.index0 %}
+      {% assign col_color = col_colors[ci] %}
+      {% assign count = 0 %}
+      {% case ci %}
+        {% when 0 %}{% assign count = 4 %}
+        {% when 1 %}{% assign count = 3 %}
+        {% when 2 %}{% assign count = 2 %}
+        {% when 3 %}{% assign count = 5 %}
+      {% endcase %}
+      <div class="fv-tm-col">
+        <div class="fv-tm-col-head">
+          <div class="fv-tm-col-name"><span class="fv-tm-col-dot" style="background:{{ col_color }};"></span>{{ col }}</div>
+          <span class="fv-tm-col-count">{{ count }}</span>
+        </div>
+
+        {% comment %}── Демо-карточки в каждой колонке ──{% endcomment %}
+        {% case ci %}
+          {% when 0 %}
+            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#FEE2E2;color:#DC2626;">Срочно</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#DC2626;"></span>Изучить регламент техники безопасности</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">АП</span><span class="fv-tm-card-due urgent"><i class="bi bi-calendar-event"></i>До 22 мая</span></div></div>
+            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#E0F2FE;color:#0369A1;">Обучение</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#2563EB;"></span>Пройти курс «Основы продаж»</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">МС</span><span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>До 30 мая</span></div></div>
+            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#FEF3C7;color:#92400E;">Документы</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#D97706;"></span>Подписать трудовой договор</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">КП</span><span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>До 25 мая</span></div></div>
+            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#F0FDFA;color:#0D9488;">Встреча</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#94A3B8;"></span>Знакомство с командой</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">ИВ</span><span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>До 28 мая</span></div></div>
+          {% when 1 %}
+            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#E0F2FE;color:#0369A1;">Обучение</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#2563EB;"></span>Изучить CRM-систему</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">АП</span><span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>До 31 мая</span></div></div>
+            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#F5F3FF;color:#7C3AED;">Практика</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#7C3AED;"></span>Тестовое задание по продукту</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">МС</span><span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>До 5 июня</span></div></div>
+            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#F0FDFA;color:#0D9488;">Встреча</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#2563EB;"></span>Встреча с наставником</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">КП</span><span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>Сегодня</span></div></div>
+          {% when 2 %}
+            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#FEF3C7;color:#92400E;">Документы</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#D97706;"></span>Отчёт по первой неделе</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">АП</span><span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>На проверке у HR</span></div></div>
+            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#F5F3FF;color:#7C3AED;">Практика</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#D97706;"></span>Финальный кейс по продажам</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">МС</span><span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>На проверке</span></div></div>
+          {% when 3 %}
+            <div class="fv-tm-card" style="opacity:.7;"><span class="fv-tm-card-tag" style="background:#F0FDF4;color:#15803D;">✓ Выполнено</span><h4 class="fv-tm-card-name" style="text-decoration:line-through;color:#94A3B8;">Адаптационная анкета</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">АП</span><span class="fv-tm-card-due"><i class="bi bi-check2"></i>15 мая</span></div></div>
+            <div class="fv-tm-card" style="opacity:.7;"><span class="fv-tm-card-tag" style="background:#F0FDF4;color:#15803D;">✓ Выполнено</span><h4 class="fv-tm-card-name" style="text-decoration:line-through;color:#94A3B8;">Курс «История компании»</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">МС</span><span class="fv-tm-card-due"><i class="bi bi-check2"></i>14 мая</span></div></div>
+            <div class="fv-tm-card" style="opacity:.7;"><span class="fv-tm-card-tag" style="background:#F0FDF4;color:#15803D;">✓ Выполнено</span><h4 class="fv-tm-card-name" style="text-decoration:line-through;color:#94A3B8;">Курс «Корпоративная культура»</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">КП</span><span class="fv-tm-card-due"><i class="bi bi-check2"></i>12 мая</span></div></div>
+            <div class="fv-tm-card" style="opacity:.7;"><span class="fv-tm-card-tag" style="background:#F0FDF4;color:#15803D;">✓ Выполнено</span><h4 class="fv-tm-card-name" style="text-decoration:line-through;color:#94A3B8;">Знакомство с офисом</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">ИВ</span><span class="fv-tm-card-due"><i class="bi bi-check2"></i>10 мая</span></div></div>
+            <div class="fv-tm-card" style="opacity:.7;"><span class="fv-tm-card-tag" style="background:#F0FDF4;color:#15803D;">✓ Выполнено</span><h4 class="fv-tm-card-name" style="text-decoration:line-through;color:#94A3B8;">Получение оборудования</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">АП</span><span class="fv-tm-card-due"><i class="bi bi-check2"></i>8 мая</span></div></div>
+        {% endcase %}
+      </div>
+    {% endfor %}
+  </div>
+
+</div>
+
+<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 16px;margin:20px auto 0;max-width:1200px;font-size:12px;color:#92400E;display:flex;align-items:center;gap:10px;">
+  <i class="bi bi-info-circle-fill" style="color:#F59E0B;flex-shrink:0;"></i>
+  <span>Демо-данные. Drag-and-drop и подключение к таблице new_task — после её создания в Dataverse.</span>
+</div>
+
+{% endunless %}
