@@ -29,6 +29,18 @@
 - adx_name: Webapi/new_rewardpurchase/fields
   adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000002
   adx_value: 'new_user,new_rewarditem,new_pointsspent,new_name'
+- adx_name: Webapi/new_rewarditem/enabled
+  adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000003
+  adx_value: 'true'
+- adx_name: Webapi/new_rewarditem/fields
+  adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000004
+  adx_value: '*'
+- adx_name: Webapi/contact/enabled
+  adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000005
+  adx_value: 'true'
+- adx_name: Webapi/contact/fields
+  adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000006
+  adx_value: 'fullname,emailaddress1'
 - adx_description: Setting controls whether attachments will be displayed on Knowledge articles
   adx_name: KnowledgeManagement/DisplayNotes
   adx_sitesettingid: 1906e5ed-a538-f111-88b5-7ced8d76b3cc
