@@ -53,7 +53,7 @@
 {% for h in all_h5p.results.entities %}
   {% if h.new_relatedcourse != blank %}
     {% assign cid   = h.new_relatedcourse.id %}
-    {% assign cname = h.new_relatedcourse.name %}
+    {% assign cname = h.new_relatedcourse.name | default: '' %}
     {% if cid != blank %}
       {% unless seen_cids contains cid %}
         {% assign seen_cids    = seen_cids   | append: cid   | append: ',' %}
@@ -212,9 +212,9 @@
     </div>
   </div>
 
-  {% assign palette_colors = '#0D9488|#7C3AED|#EA580C|#2563EB|#DB2777|#0369A1' | split: '|' %}
-  {% assign palette_tints  = '#F0FDFA|#F5F3FF|#FFF7ED|#EFF6FF|#FDF2F8|#E0F2FE' | split: '|' %}
-  {% assign palette_icons  = 'bi-bar-chart-line|bi-people|bi-bullseye|bi-code-slash|bi-lightbulb|bi-mortarboard' | split: '|' %}
+  {% assign palette_colors = '#0D9488,#7C3AED,#EA580C,#2563EB,#DB2777,#0369A1' | split: ',' %}
+  {% assign palette_tints  = '#F0FDFA,#F5F3FF,#FFF7ED,#EFF6FF,#FDF2F8,#E0F2FE' | split: ',' %}
+  {% assign palette_icons  = 'bi-bar-chart-line,bi-people,bi-bullseye,bi-code-slash,bi-lightbulb,bi-mortarboard' | split: ',' %}
 
   {% if demo_mode %}
 
@@ -223,9 +223,9 @@
     <span>Демо-режим — курсы ещё не привязаны к урокам. Привяжите поле «Связанный курс» в H5P Content, и данные появятся автоматически.</span>
   </div>
 
-  {% assign demo_names = 'Продажи и переговоры|Управление проектами|Цифровые навыки|Лидерство и коммуникации|Финансовая грамотность|Data-анализ' | split: '|' %}
-  {% assign demo_total = '8|6|5|7|4|8' | split: '|' %}
-  {% assign demo_done  = '5|3|5|1|0|4' | split: '|' %}
+  {% assign demo_names = 'Продажи и переговоры,Управление проектами,Цифровые навыки,Лидерство и коммуникации,Финансовая грамотность,Data-анализ' | split: ',' %}
+  {% assign demo_total = '8,6,5,7,4,8' | split: ',' %}
+  {% assign demo_done  = '5,3,5,1,0,4' | split: ',' %}
 
   <div class="fv-paths-grid">
     {% for dname in demo_names %}
@@ -235,7 +235,11 @@
       {% assign dicon  = palette_icons[di] %}
       {% assign dtotal = demo_total[di] | plus: 0 %}
       {% assign ddone  = demo_done[di]  | plus: 0 %}
-      {% assign dpct   = ddone | times: 100 | divided_by: dtotal %}
+      {% if dtotal > 0 %}
+        {% assign dpct = ddone | times: 100 | divided_by: dtotal %}
+      {% else %}
+        {% assign dpct = 0 %}
+      {% endif %}
       <div class="fv-path-card demo-card" data-course-card>
         <div class="fv-path-icon" style="background:{{ dt }};color:{{ dc }};">
           <i class="{{ dicon }}"></i>
