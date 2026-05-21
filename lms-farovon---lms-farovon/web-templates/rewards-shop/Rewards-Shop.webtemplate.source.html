@@ -400,6 +400,7 @@
   var userId = '{{ user.id }}';
   var pendingItemId = null;
   var pendingItemCost = 0;
+  var pendingItemName = '';
   var pendingCard = null;
 
   /* ── Category filters ── */
@@ -442,8 +443,9 @@
     var card = btn.closest('.fv-reward-card');
     pendingItemId   = card.getAttribute('data-item-id');
     pendingItemCost = parseInt(card.getAttribute('data-item-cost'), 10) || 0;
+    pendingItemName = card.getAttribute('data-item-name') || 'Награда';
     pendingCard     = card;
-    var name  = card.getAttribute('data-item-name') || 'Награда';
+    var name  = pendingItemName;
     var emoji = card.getAttribute('data-item-emoji') || '🎁';
     var after = balance - pendingItemCost;
 
@@ -486,9 +488,13 @@
     btn.textContent = 'Оформление…';
 
     getToken().then(function (token) {
+      /* WORKAROUND: lookup new_rewarditem@odata.bind currently fails with
+         90040106 'permission to associate' despite full Table Permissions +
+         Child Permission + Web API config. Save the item name and id into
+         new_name so history is preserved; the lookup column stays null. */
       var body = {
         'new_pointsspent': pendingItemCost,
-        'new_rewarditem@odata.bind': '/new_rewarditems(' + pendingItemId + ')',
+        'new_name': pendingItemName + ' [' + pendingItemId + ']',
         'new_user@odata.bind': '/contacts(' + userId + ')'
       };
       var headers = {
