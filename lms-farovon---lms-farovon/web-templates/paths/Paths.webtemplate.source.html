@@ -46,26 +46,15 @@
   h.new_relatedcourse is not blank — accessing .id on a null EntityReference
   throws "Value cannot be null. Parameter name: value" in DotLiquid.
 {% endcomment %}
-{% assign seen_cids     = '' %}
-{% assign c_ids_str     = '' %}
-{% assign c_names_str   = '' %}
 {% assign total_courses = 0 %}
-{% for h in all_h5p.results.entities %}
-  {% if h.new_relatedcourse != blank %}
-    {% assign cid   = h.new_relatedcourse.id %}
-    {% assign cname = h.new_relatedcourse.name | default: '' %}
-    {% if cid != blank %}
-      {% unless seen_cids contains cid %}
-        {% assign seen_cids    = seen_cids   | append: cid   | append: ',' %}
-        {% assign c_ids_str    = c_ids_str   | append: cid   | append: '§' %}
-        {% assign c_names_str  = c_names_str | append: cname | append: '§' %}
-        {% assign total_courses = total_courses | plus: 1 %}
-      {% endunless %}
-    {% endif %}
-  {% endif %}
-{% endfor %}
-{% assign dyn_course_ids   = c_ids_str   | split: '§' %}
-{% assign dyn_course_names = c_names_str | split: '§' %}
+{% comment %}
+  new_relatedcourse is NOT fetched in the FetchXML (see NOTE above).
+  Accessing a null EntityReference in DotLiquid throws "Value cannot be null"
+  even inside an {% if ... != blank %} guard.
+  Course grouping is disabled until new_relatedcourse is added to the FetchXML.
+{% endcomment %}
+{% assign dyn_course_ids   = '' | split: '§' %}
+{% assign dyn_course_names = '' | split: '§' %}
 
 {% comment %}── Pre-compute totals ──{% endcomment %}
 {% assign total_lessons = 0 %}
@@ -224,17 +213,23 @@
   </div>
 
   {% assign demo_names = 'Продажи и переговоры,Управление проектами,Цифровые навыки,Лидерство и коммуникации,Финансовая грамотность,Data-анализ' | split: ',' %}
-  {% assign demo_total = '8,6,5,7,4,8' | split: ',' %}
-  {% assign demo_done  = '5,3,5,1,0,4' | split: ',' %}
 
   <div class="fv-paths-grid">
     {% for dname in demo_names %}
-      {% assign di     = forloop.index0 %}
-      {% assign dc     = palette_colors[di] %}
-      {% assign dt     = palette_tints[di] %}
-      {% assign dicon  = palette_icons[di] %}
-      {% assign dtotal = demo_total[di] | plus: 0 %}
-      {% assign ddone  = demo_done[di]  | plus: 0 %}
+      {% assign di    = forloop.index0 %}
+      {% assign dc    = palette_colors[di] %}
+      {% assign dt    = palette_tints[di] %}
+      {% assign dicon = palette_icons[di] %}
+      {% comment %}Integer literals avoid string-concat bug with split+plus:0{% endcomment %}
+      {% assign dtotal = 0 %}{% assign ddone = 0 %}
+      {% case di %}
+        {% when 0 %}{% assign dtotal = 8 %}{% assign ddone = 5 %}
+        {% when 1 %}{% assign dtotal = 6 %}{% assign ddone = 3 %}
+        {% when 2 %}{% assign dtotal = 5 %}{% assign ddone = 5 %}
+        {% when 3 %}{% assign dtotal = 7 %}{% assign ddone = 1 %}
+        {% when 4 %}{% assign dtotal = 4 %}{% assign ddone = 0 %}
+        {% when 5 %}{% assign dtotal = 8 %}{% assign ddone = 4 %}
+      {% endcase %}
       {% if dtotal > 0 %}
         {% assign dpct = ddone | times: 100 | divided_by: dtotal %}
       {% else %}
