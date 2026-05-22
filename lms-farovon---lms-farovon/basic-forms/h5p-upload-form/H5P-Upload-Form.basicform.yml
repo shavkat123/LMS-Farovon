@@ -21,7 +21,6 @@ adx_name: H5P Upload Form
 adx_onsuccess: 756150000
 adx_populatereferenceentitylookupfield: false
 adx_portaluserlookupattributeisactivityparty: false
-adx_portaluserlookupattributename: new_uploadedby
 adx_recommendedfieldsrequired: false
 adx_recordsourceallowcreateonnull: false
 adx_redirecturlappendentityidquerystring: false

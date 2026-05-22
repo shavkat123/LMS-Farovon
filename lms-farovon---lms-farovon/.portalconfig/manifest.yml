@@ -1,5 +1,20 @@
+adx_sitesetting:
+- RecordId: c460e5f3-a538-f111-88b5-7ced8d76b3cc
+  DisplayName: Webapi/contact/enabled
+  CheckSum: 
+  IsDeleted: true
+adx_webpage:
+- RecordId: aa05e5ed-a538-f111-88b5-7ced8d76b3cc
+  DisplayName: '[Админ] Мои программы'
+  CheckSum: 
+  IsDeleted: true
 adx_webrole:
 - RecordId: e330e0ff-a538-f111-88b5-7ced8d76b3cc
   DisplayName: C1 ASP
+  CheckSum: 
+  IsDeleted: true
+annotation:
+- RecordId: 509dfd12-a638-f111-88b5-7ced8d76b3cc
+  DisplayName: customtheme.css
   CheckSum: 
   IsDeleted: true
