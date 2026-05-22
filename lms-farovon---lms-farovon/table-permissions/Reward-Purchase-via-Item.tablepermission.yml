@@ -1,0 +1,20 @@
+adx_accountrelationship: 
+adx_append: true
+adx_appendto: true
+adx_contactrelationship: 
+adx_create: true
+adx_delete: false
+adx_entitylogicalname: new_rewardpurchase
+adx_entityname: Reward Purchase via Item
+adx_entitypermission_webrole:
+- 3b5fe5f3-a538-f111-88b5-7ced8d76b3cc
+- a1b2c3d4-1111-2222-3333-000000000001
+- a1b2c3d4-1111-2222-3333-000000000002
+- a1b2c3d4-1111-2222-3333-000000000003
+- a1b2c3d4-1111-2222-3333-000000000004
+adx_entitypermissionid: 1bae7934-55a3-433c-9b9e-6563ff1f437b
+adx_parententitypermission: b2c3d4e5-f6a7-4b89-9c01-200000000001
+adx_parentrelationship: new_rewardpurchase_rewarditem_new_rewarditem
+adx_read: true
+adx_scope: 756150003
+adx_write: true
