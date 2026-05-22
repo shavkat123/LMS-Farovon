@@ -1,7 +1,8 @@
 {% comment %}
   Rewards Shop — Магазин наград
   Entities required:
-    new_rewarditem   — fields: new_name, new_description, new_pointscost (int),
+    new_rewarditem   — fields: new_column_6348fe57 (primary, display name),
+                               new_description, new_pointscost (int),
                                new_category (text), new_imageurl (text),
                                new_emoji (text), new_stock (int, null=unlimited),
                                new_isactive (bool)
@@ -24,7 +25,7 @@
 <fetch>
   <entity name="new_rewarditem">
     <attribute name="new_rewarditemid" />
-    <attribute name="new_name" />
+    <attribute name="new_column_6348fe57" />
     <attribute name="new_description" />
     <attribute name="new_pointscost" />
     <attribute name="new_category" />
@@ -298,13 +299,13 @@
     <div class="fv-reward-card{% if can_afford and in_stock %} affordable{% endif %}{% unless in_stock %} sold-out{% endunless %}"
          data-cat="{{ item_cat | downcase }}"
          data-item-id="{{ item.id }}"
-         data-item-name="{{ item.new_name | escape }}"
+         data-item-name="{{ item.new_column_6348fe57 | escape }}"
          data-item-cost="{{ item_cost }}"
          data-item-emoji="{{ item_emoji }}"
          data-in-stock="{{ in_stock }}">
       <div class="fv-reward-img">
         {% if item.new_imageurl and item.new_imageurl != '' %}
-        <img src="{{ item.new_imageurl }}" alt="{{ item.new_name }}" onerror="this.style.display='none'">
+        <img src="{{ item.new_imageurl }}" alt="{{ item.new_column_6348fe57 }}" onerror="this.style.display='none'">
         {% endif %}
         <span style="z-index:1;">{{ item_emoji }}</span>
         <span class="fv-cat-badge">{{ item_cat }}</span>
@@ -318,7 +319,7 @@
         {% endif %}
       </div>
       <div class="fv-reward-body">
-        <div class="fv-reward-name">{{ item.new_name }}</div>
+        <div class="fv-reward-name">{{ item.new_column_6348fe57 }}</div>
         {% if item.new_description and item.new_description != '' %}
         <div class="fv-reward-desc">{{ item.new_description }}</div>
         {% else %}
@@ -488,13 +489,10 @@
     btn.textContent = 'Оформление…';
 
     getToken().then(function (token) {
-      /* WORKAROUND: lookup new_rewarditem@odata.bind currently fails with
-         90040106 'permission to associate' despite full Table Permissions +
-         Child Permission + Web API config. Save the item name and id into
-         new_name so history is preserved; the lookup column stays null. */
       var body = {
         'new_pointsspent': pendingItemCost,
-        'new_name': pendingItemName + ' [' + pendingItemId + ']',
+        'new_name': pendingItemName,
+        'new_rewarditem@odata.bind': '/new_rewarditems(' + pendingItemId + ')',
         'new_user@odata.bind': '/contacts(' + userId + ')'
       };
       var headers = {
