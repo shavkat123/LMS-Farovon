@@ -175,6 +175,12 @@
 - adx_name: Webapi/new_rewarditem/fields
   adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000004
   adx_value: '*'
+- adx_name: Webapi/new_task/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-400000000001
+  adx_value: true
+- adx_name: Webapi/new_task/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-400000000002
+  adx_value: '*'
 - adx_name: Webapi/contact/enabled
   adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000005
   adx_value: true

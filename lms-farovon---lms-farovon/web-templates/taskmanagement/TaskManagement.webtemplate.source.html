@@ -7,6 +7,33 @@
 </div>
 {% else %}
 
+{% comment %}── Real tasks from Dataverse ──{% endcomment %}
+{% fetchxml all_tasks %}
+<fetch>
+  <entity name="new_task">
+    <attribute name="new_taskid" />
+    <attribute name="new_name" />
+    <attribute name="new_description" />
+    <attribute name="new_taskstatus" />
+    <attribute name="new_priority" />
+    <attribute name="new_category" />
+    <attribute name="new_assignee" />
+    <attribute name="new_mentor" />
+    <attribute name="new_duedate" />
+    <attribute name="createdon" />
+    <filter>
+      <condition attribute="statecode" operator="eq" value="0" />
+    </filter>
+    <order attribute="new_duedate" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign tasks_count = 0 %}
+{% for t in all_tasks.results.entities %}
+  {% assign tasks_count = tasks_count | plus: 1 %}
+{% endfor %}
+
 <style>
   .fv-tm { padding: 28px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
   .fv-tm-breadcrumb { margin-bottom: 18px; }
@@ -66,60 +93,103 @@
     </div>
     <div class="fv-tm-toolbar">
       <button class="fv-tm-btn" type="button" disabled><i class="bi bi-funnel"></i> Фильтр</button>
-      <button class="fv-tm-btn primary" type="button" disabled title="Появится после создания таблицы new_task"><i class="bi bi-plus-lg"></i> Новая задача</button>
+      <a class="fv-tm-btn primary" href="/task-edit" role="button"><i class="bi bi-plus-lg"></i> Новая задача</a>
     </div>
   </div>
 
-  <div class="fv-tm-board">
-    {% assign col_names = 'К выполнению,В работе,На проверке,Готово' | split: ',' %}
-    {% assign col_colors = '#94A3B8,#2563EB,#D97706,#22C55E' | split: ',' %}
+  {% comment %}── Status integer values from local option set (alpha-create order) ──{% endcomment %}
+  {% assign status_todo   = 100000000 %}
+  {% assign status_doing  = 100000001 %}
+  {% assign status_review = 100000002 %}
+  {% assign status_done   = 100000003 %}
 
-    {% for col in col_names %}
-      {% assign ci = forloop.index0 %}
-      {% assign col_color = col_colors[ci] %}
-      {% assign count = 0 %}
+  <div class="fv-tm-board">
+    {% comment %}── 4 Kanban columns: К выполнению / В работе / На проверке / Готово ──{% endcomment %}
+    {% for ci in (0..3) %}
+      {% assign col_color = '#94A3B8' %}
+      {% assign col_label = 'К выполнению' %}
+      {% assign col_status = status_todo %}
       {% case ci %}
-        {% when 0 %}{% assign count = 4 %}
-        {% when 1 %}{% assign count = 3 %}
-        {% when 2 %}{% assign count = 2 %}
-        {% when 3 %}{% assign count = 5 %}
+        {% when 0 %}{% assign col_label = 'К выполнению' %}{% assign col_color = '#94A3B8' %}{% assign col_status = status_todo %}
+        {% when 1 %}{% assign col_label = 'В работе'      %}{% assign col_color = '#2563EB' %}{% assign col_status = status_doing %}
+        {% when 2 %}{% assign col_label = 'На проверке'   %}{% assign col_color = '#D97706' %}{% assign col_status = status_review %}
+        {% when 3 %}{% assign col_label = 'Готово'        %}{% assign col_color = '#22C55E' %}{% assign col_status = status_done %}
       {% endcase %}
+
+      {% comment %}── Count tasks in this column ──{% endcomment %}
+      {% assign col_count = 0 %}
+      {% for t in all_tasks.results.entities %}
+        {% if t.new_taskstatus == col_status %}{% assign col_count = col_count | plus: 1 %}{% endif %}
+      {% endfor %}
+
       <div class="fv-tm-col">
         <div class="fv-tm-col-head">
-          <div class="fv-tm-col-name"><span class="fv-tm-col-dot" style="background:{{ col_color }};"></span>{{ col }}</div>
-          <span class="fv-tm-col-count">{{ count }}</span>
+          <div class="fv-tm-col-name"><span class="fv-tm-col-dot" style="background:{{ col_color }};"></span>{{ col_label }}</div>
+          <span class="fv-tm-col-count">{{ col_count }}</span>
         </div>
 
-        {% comment %}── Демо-карточки в каждой колонке ──{% endcomment %}
-        {% case ci %}
-          {% when 0 %}
-            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#FEE2E2;color:#DC2626;">Срочно</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#DC2626;"></span>Изучить регламент техники безопасности</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">АП</span><span class="fv-tm-card-due urgent"><i class="bi bi-calendar-event"></i>До 22 мая</span></div></div>
-            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#E0F2FE;color:#0369A1;">Обучение</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#2563EB;"></span>Пройти курс «Основы продаж»</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">МС</span><span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>До 30 мая</span></div></div>
-            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#FEF3C7;color:#92400E;">Документы</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#D97706;"></span>Подписать трудовой договор</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">КП</span><span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>До 25 мая</span></div></div>
-            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#F0FDFA;color:#0D9488;">Встреча</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#94A3B8;"></span>Знакомство с командой</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">ИВ</span><span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>До 28 мая</span></div></div>
-          {% when 1 %}
-            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#E0F2FE;color:#0369A1;">Обучение</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#2563EB;"></span>Изучить CRM-систему</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">АП</span><span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>До 31 мая</span></div></div>
-            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#F5F3FF;color:#7C3AED;">Практика</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#7C3AED;"></span>Тестовое задание по продукту</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">МС</span><span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>До 5 июня</span></div></div>
-            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#F0FDFA;color:#0D9488;">Встреча</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#2563EB;"></span>Встреча с наставником</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">КП</span><span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>Сегодня</span></div></div>
-          {% when 2 %}
-            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#FEF3C7;color:#92400E;">Документы</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#D97706;"></span>Отчёт по первой неделе</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">АП</span><span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>На проверке у HR</span></div></div>
-            <div class="fv-tm-card"><span class="fv-tm-card-tag" style="background:#F5F3FF;color:#7C3AED;">Практика</span><h4 class="fv-tm-card-name"><span class="fv-tm-card-priority" style="background:#D97706;"></span>Финальный кейс по продажам</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">МС</span><span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>На проверке</span></div></div>
-          {% when 3 %}
-            <div class="fv-tm-card" style="opacity:.7;"><span class="fv-tm-card-tag" style="background:#F0FDF4;color:#15803D;">✓ Выполнено</span><h4 class="fv-tm-card-name" style="text-decoration:line-through;color:#94A3B8;">Адаптационная анкета</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">АП</span><span class="fv-tm-card-due"><i class="bi bi-check2"></i>15 мая</span></div></div>
-            <div class="fv-tm-card" style="opacity:.7;"><span class="fv-tm-card-tag" style="background:#F0FDF4;color:#15803D;">✓ Выполнено</span><h4 class="fv-tm-card-name" style="text-decoration:line-through;color:#94A3B8;">Курс «История компании»</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">МС</span><span class="fv-tm-card-due"><i class="bi bi-check2"></i>14 мая</span></div></div>
-            <div class="fv-tm-card" style="opacity:.7;"><span class="fv-tm-card-tag" style="background:#F0FDF4;color:#15803D;">✓ Выполнено</span><h4 class="fv-tm-card-name" style="text-decoration:line-through;color:#94A3B8;">Курс «Корпоративная культура»</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">КП</span><span class="fv-tm-card-due"><i class="bi bi-check2"></i>12 мая</span></div></div>
-            <div class="fv-tm-card" style="opacity:.7;"><span class="fv-tm-card-tag" style="background:#F0FDF4;color:#15803D;">✓ Выполнено</span><h4 class="fv-tm-card-name" style="text-decoration:line-through;color:#94A3B8;">Знакомство с офисом</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">ИВ</span><span class="fv-tm-card-due"><i class="bi bi-check2"></i>10 мая</span></div></div>
-            <div class="fv-tm-card" style="opacity:.7;"><span class="fv-tm-card-tag" style="background:#F0FDF4;color:#15803D;">✓ Выполнено</span><h4 class="fv-tm-card-name" style="text-decoration:line-through;color:#94A3B8;">Получение оборудования</h4><div class="fv-tm-card-meta"><span class="fv-tm-card-avatar">АП</span><span class="fv-tm-card-due"><i class="bi bi-check2"></i>8 мая</span></div></div>
-        {% endcase %}
+        {% comment %}── Real task cards in this column ──{% endcomment %}
+        {% for t in all_tasks.results.entities %}
+          {% if t.new_taskstatus == col_status %}
+            {% comment %}─ Priority colour ─{% endcomment %}
+            {% assign prio_color = '#94A3B8' %}
+            {% case t.new_priority %}
+              {% when 100000000 %}{% assign prio_color = '#94A3B8' %}
+              {% when 100000001 %}{% assign prio_color = '#2563EB' %}
+              {% when 100000002 %}{% assign prio_color = '#D97706' %}
+              {% when 100000003 %}{% assign prio_color = '#DC2626' %}
+            {% endcase %}
+
+            {% comment %}─ Category tag colour (text-based fallback) ─{% endcomment %}
+            {% assign tag_bg = '#F1F5F9' %}{% assign tag_fg = '#64748B' %}
+            {% assign cat = t.new_category | default: '' %}
+            {% if cat contains 'Срочно' %}{% assign tag_bg = '#FEE2E2' %}{% assign tag_fg = '#DC2626' %}
+            {% elsif cat contains 'Обучение' %}{% assign tag_bg = '#E0F2FE' %}{% assign tag_fg = '#0369A1' %}
+            {% elsif cat contains 'Документ' %}{% assign tag_bg = '#FEF3C7' %}{% assign tag_fg = '#92400E' %}
+            {% elsif cat contains 'Встреча' %}{% assign tag_bg = '#F0FDFA' %}{% assign tag_fg = '#0D9488' %}
+            {% elsif cat contains 'Практика' %}{% assign tag_bg = '#F5F3FF' %}{% assign tag_fg = '#7C3AED' %}
+            {% endif %}
+
+            {% comment %}─ Assignee initials ─{% endcomment %}
+            {% assign assignee_name = t.new_assignee.name | default: '' %}
+            {% assign initials_parts = assignee_name | split: ' ' %}
+            {% assign ini1 = '' %}{% assign ini2 = '' %}
+            {% if initials_parts.size > 0 %}{% assign ini1 = initials_parts[0] | slice: 0, 1 | upcase %}{% endif %}
+            {% if initials_parts.size > 1 %}{% assign ini2 = initials_parts[1] | slice: 0, 1 | upcase %}{% endif %}
+
+            {% comment %}─ Due date display ─{% endcomment %}
+            {% assign due_text = '' %}
+            {% if t.new_duedate %}
+              {% assign due_text = t.new_duedate | date: 'd MMM' %}
+            {% endif %}
+
+            <div class="fv-tm-card">
+              {% if cat != '' %}<span class="fv-tm-card-tag" style="background:{{ tag_bg }};color:{{ tag_fg }};">{{ cat }}</span>{% endif %}
+              <h4 class="fv-tm-card-name">
+                <span class="fv-tm-card-priority" style="background:{{ prio_color }};"></span>{{ t.new_name }}
+              </h4>
+              <div class="fv-tm-card-meta">
+                {% if assignee_name != '' %}<span class="fv-tm-card-avatar" title="{{ assignee_name | escape }}">{{ ini1 }}{{ ini2 }}</span>{% else %}<span class="fv-tm-card-avatar" style="background:#CBD5E1;">?</span>{% endif %}
+                {% if due_text != '' %}<span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>{{ due_text }}</span>{% endif %}
+              </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+
+        {% if col_count == 0 %}
+          <div style="text-align:center;padding:20px 8px;font-size:11px;color:#94A3B8;">Нет задач</div>
+        {% endif %}
       </div>
     {% endfor %}
   </div>
 
 </div>
 
+{% if tasks_count == 0 %}
 <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 16px;margin:20px auto 0;max-width:1200px;font-size:12px;color:#92400E;display:flex;align-items:center;gap:10px;">
   <i class="bi bi-info-circle-fill" style="color:#F59E0B;flex-shrink:0;"></i>
-  <span>Демо-данные. Drag-and-drop и подключение к таблице new_task — после её создания в Dataverse.</span>
+  <span>Пока ни одной задачи. Добавь задачи в Dataverse — таблица <code>new_task</code> — и они появятся в досках.</span>
 </div>
+{% endif %}
 
 {% endunless %}
