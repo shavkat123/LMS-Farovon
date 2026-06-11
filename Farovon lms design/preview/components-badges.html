@@ -1,0 +1,31 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Components · Badges</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 22px; background: #fff; font-family: var(--font-sans); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 9999px; font-size: 14px; font-weight: 500; }
+  .badge.sm { padding: 2px 8px; font-size: 12px; }
+  .b-primary { background: #DBEAFE; color: #1E40AF; }
+  .b-success { background: #DCFCE7; color: #166534; }
+  .b-warning { background: #FEF3C7; color: #92400E; }
+  .b-danger { background: #FEE2E2; color: #991B1B; }
+  .b-gray { background: #F1F3F5; color: #343A40; }
+  .lbl { font-size: 11px; color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.12em; min-width: 56px; }
+</style></head>
+<body>
+  <div class="row"><div class="lbl">Default</div>
+    <span class="badge b-primary">Active</span>
+    <span class="badge b-success">Completed</span>
+    <span class="badge b-warning">In progress</span>
+    <span class="badge b-danger">Required</span>
+    <span class="badge b-gray">Shared</span>
+  </div>
+  <div class="row"><div class="lbl">Small</div>
+    <span class="badge b-primary sm">Active</span>
+    <span class="badge b-success sm">Completed</span>
+    <span class="badge b-warning sm">Pending review</span>
+    <span class="badge b-danger sm">Required</span>
+    <span class="badge b-gray sm">Your course</span>
+  </div>
+</body></html>

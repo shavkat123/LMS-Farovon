@@ -1,0 +1,38 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Components · Progress + Points</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 22px; background: #fff; font-family: var(--font-sans); }
+  .row { margin-bottom: 16px; }
+  .head { display: flex; justify-content: space-between; font-size: 14px; font-weight: 500; color: var(--color-gray-700); margin-bottom: 4px; }
+  .track { width: 100%; background: var(--color-gray-200); border-radius: 9999px; overflow: hidden; }
+  .fill { border-radius: 9999px; transition: width 500ms ease-out; }
+  .points-large { display: flex; align-items: baseline; gap: 8px; padding-top: 6px; }
+  .points-large .star { color: #FBBF24; font-size: 30px; line-height: 1; }
+  .points-large .num { font: 900 36px/1 var(--font-mono); color: var(--color-gray-900); font-variant-numeric: tabular-nums; }
+  .points-large .pts { font-size: 11px; font-weight: 700; color: #ADB5BD; text-transform: uppercase; letter-spacing: 0.18em; }
+  .points-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 9999px; background: #FEF9C3; font-size: 14px; font-weight: 700; color: #92400E; }
+</style></head>
+<body>
+  <div class="row">
+    <div class="head"><span>Course progress</span><span>60%</span></div>
+    <div class="track" style="height:10px"><div class="fill" style="background:var(--color-primary);height:10px;width:60%"></div></div>
+  </div>
+  <div class="row">
+    <div class="head"><span>Mandatory</span><span>40%</span></div>
+    <div class="track" style="height:6px"><div class="fill" style="background:#DC2626;height:6px;width:40%"></div></div>
+  </div>
+  <div class="row">
+    <div class="head"><span>Completed</span><span>100%</span></div>
+    <div class="track" style="height:6px"><div class="fill" style="background:#28A745;height:6px;width:100%"></div></div>
+  </div>
+  <hr style="border:0;border-top:1px solid var(--border-1);margin:18px 0">
+  <div style="display:flex;align-items:center;gap:24px;">
+    <div class="points-large">
+      <span class="star">⭐</span>
+      <span class="num">1,250</span>
+      <span class="pts">pts</span>
+    </div>
+    <span class="points-pill">⭐ 1,250 pts</span>
+  </div>
+</body></html>

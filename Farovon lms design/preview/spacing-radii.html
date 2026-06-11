@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Spacing · Radii</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 22px; background: #fff; font-family: var(--font-sans); }
+  .row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .demo { width: 64px; height: 64px; background: var(--color-primary-100); border: 1px solid var(--color-primary); }
+  .lbl { font-size: 11px; color: var(--fg-3); font-family: var(--font-mono); }
+  .lbl b { display: block; color: var(--fg-1); font-family: var(--font-sans); font-size: 12px; }
+</style></head>
+<body>
+  <div class="row">
+    <div class="item"><div class="demo" style="border-radius:4px"></div><div class="lbl"><b>sm</b>4px · subtle</div></div>
+    <div class="item"><div class="demo" style="border-radius:6px"></div><div class="lbl"><b>md</b>6px · buttons, inputs</div></div>
+    <div class="item"><div class="demo" style="border-radius:8px"></div><div class="lbl"><b>lg</b>8px · cards</div></div>
+    <div class="item"><div class="demo" style="border-radius:12px"></div><div class="lbl"><b>xl</b>12px · banners</div></div>
+    <div class="item"><div class="demo" style="border-radius:16px"></div><div class="lbl"><b>2xl</b>16px · modals</div></div>
+    <div class="item"><div class="demo" style="border-radius:9999px"></div><div class="lbl"><b>pill</b>full · badges</div></div>
+  </div>
+</body></html>

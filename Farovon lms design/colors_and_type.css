@@ -1,0 +1,198 @@
+/* ─────────────────────────────────────────────────────────────
+   Farovon LMS — Colors & Type
+   Source of truth: shavkat123/farovon-lms (src/index.css + components)
+   ────────────────────────────────────────────────────────────── */
+
+@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap");
+
+:root {
+  /* ── BRAND ──────────────────────────────────────────────────── */
+  /* Logomark uses two reds. Product uses blue primary. */
+  --brand-red:        #FF1F1F;   /* logomark — bottom petals */
+  --brand-coral:      #F2A088;   /* logomark — top petals */
+  --brand-red-deep:   #D91A1A;
+
+  /* ── PRIMARY (product UI) ───────────────────────────────────── */
+  --color-primary:        #007BFF;
+  --color-primary-hover:  #0056B3;
+  --color-primary-50:     #EFF6FF;
+  --color-primary-100:    #DBEAFE;
+  --color-primary-600:    #2563EB;
+  --color-primary-800:    #1E40AF;
+
+  /* ── SUCCESS ────────────────────────────────────────────────── */
+  --color-success:        #28A745;
+  --color-success-hover:  #1E7E34;
+  --color-success-100:    #DCFCE7;
+  --color-success-800:    #166534;
+
+  /* ── WARNING / DANGER ───────────────────────────────────────── */
+  --color-warning:        #F59E0B;
+  --color-warning-100:    #FEF3C7;
+  --color-warning-800:    #92400E;
+
+  --color-danger:         #DC2626;
+  --color-danger-100:     #FEE2E2;
+  --color-danger-800:     #991B1B;
+
+  /* ── ACCENT (mentor / HR banners) ──────────────────────────── */
+  --color-indigo-600:     #4F46E5;
+  --color-purple-500:     #A855F7;
+
+  /* ── GAMIFICATION ───────────────────────────────────────────── */
+  --color-points:         #FBBF24;   /* yellow-400 — star / pts */
+  --color-points-bg:      #FEF9C3;
+
+  /* ── NEUTRALS (Tailwind gray scale used in product) ─────────── */
+  --color-gray-50:   #F8F9FA;
+  --color-gray-100:  #F1F3F5;
+  --color-gray-200:  #E9ECEF;
+  --color-gray-300:  #DEE2E6;
+  --color-gray-400:  #ADB5BD;
+  --color-gray-500:  #6C757D;
+  --color-gray-600:  #495057;
+  --color-gray-700:  #343A40;
+  --color-gray-800:  #212529;
+  --color-gray-900:  #111827;
+
+  /* ── SEMANTIC ───────────────────────────────────────────────── */
+  --bg-app:        var(--color-gray-50);
+  --bg-surface:    #FFFFFF;
+  --bg-muted:      var(--color-gray-100);
+  --fg-1:          var(--color-gray-800);     /* primary text */
+  --fg-2:          var(--color-gray-600);     /* secondary text */
+  --fg-3:          var(--color-gray-500);     /* tertiary / hint */
+  --fg-on-primary: #FFFFFF;
+  --border-1:      var(--color-gray-200);
+  --border-2:      var(--color-gray-300);
+
+  /* ── RADII ──────────────────────────────────────────────────── */
+  --radius-sm:  4px;
+  --radius-md:  6px;     /* buttons (rounded-md) */
+  --radius-lg:  8px;     /* cards (rounded-lg) */
+  --radius-xl:  12px;    /* welcome banners (rounded-xl) */
+  --radius-2xl: 16px;    /* modals (rounded-2xl) */
+  --radius-pill: 9999px; /* badges, pills */
+
+  /* ── ELEVATION ──────────────────────────────────────────────── */
+  --shadow-sm:  0 1px 2px 0 rgba(0,0,0,0.05);                              /* card */
+  --shadow-md:  0 4px 6px -1px rgba(0,0,0,0.10), 0 2px 4px -2px rgba(0,0,0,0.06);
+  --shadow-lg:  0 10px 15px -3px rgba(0,0,0,0.10), 0 4px 6px -4px rgba(0,0,0,0.05);
+  --shadow-2xl: 0 25px 50px -12px rgba(0,0,0,0.25);                        /* modal */
+
+  /* ── SPACING (Tailwind 4px-grid subset used) ───────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ── MOTION ─────────────────────────────────────────────────── */
+  --motion-fast:   150ms;
+  --motion-base:   200ms;
+  --motion-slow:   500ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out:      cubic-bezier(0, 0, 0.2, 1);
+
+  /* ── TYPE ───────────────────────────────────────────────────── */
+  --font-sans: "Roboto", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+               sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-bold:     700;
+  --weight-black:    900;
+
+  /* Type scale — matches Tailwind text-xs..text-3xl observed in product */
+  --text-2xs: 10px;       /* metadata, micro-labels (uppercase tracking) */
+  --text-xs:  12px;       /* hints, helper text */
+  --text-sm:  14px;       /* secondary, dense UI */
+  --text-base:16px;       /* body */
+  --text-lg:  18px;       /* card titles, lg buttons */
+  --text-xl:  20px;       /* section headings */
+  --text-2xl: 24px;       /* page H1 */
+  --text-3xl: 30px;       /* welcome banner */
+  --text-4xl: 36px;       /* G-Token large balance */
+
+  --leading-tight:  1.2;
+  --leading-snug:   1.35;
+  --leading-normal: 1.5;
+  --leading-relaxed:1.65;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Base
+   ────────────────────────────────────────────────────────────── */
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--fg-1);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Semantic typography classes (mirror inline tailwind usage)
+   ────────────────────────────────────────────────────────────── */
+.fl-h1 {
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+  color: var(--fg-on-primary); /* used inside gradient banners */
+}
+.fl-h2 {
+  font-size: var(--text-2xl);
+  font-weight: 800; /* extrabold (login heading) */
+  line-height: var(--leading-tight);
+  color: var(--color-gray-900);
+}
+.fl-h3 {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+  color: var(--fg-1);
+}
+.fl-card-title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--fg-1);
+}
+.fl-body {
+  font-size: var(--text-base);
+  font-weight: var(--weight-regular);
+  color: var(--fg-1);
+}
+.fl-body-sm {
+  font-size: var(--text-sm);
+  color: var(--fg-2);
+}
+.fl-meta {
+  font-size: var(--text-xs);
+  color: var(--fg-3);
+}
+.fl-eyebrow {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-black);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--fg-3);
+}
+.fl-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-black);
+}
+.fl-link {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+.fl-link:hover { text-decoration: underline; }
