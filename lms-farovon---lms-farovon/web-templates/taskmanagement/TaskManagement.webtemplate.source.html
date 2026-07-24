@@ -1,6 +1,6 @@
 {% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
 <div class="container py-5 text-center">
-  <i class="bi bi-shield-lock" style="font-size:52px;color:#94A3B8;"></i>
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
   <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
   <p style="font-size:13px;color:#64748B;">Страница доступна только администраторам, HR, наставникам и руководителям.</p>
   <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
@@ -35,25 +35,25 @@
 {% endfor %}
 
 <style>
-  .fv-tm { padding: 28px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
+  .fv-tm { padding: 12px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
   .fv-tm-breadcrumb { margin-bottom: 18px; }
   .fv-tm-breadcrumb ol { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .fv-tm-breadcrumb li { font-size: 12px; color: #94A3B8; display: flex; align-items: center; gap: 6px; }
+  .fv-tm-breadcrumb li { font-size: 12px; color: #64748B; display: flex; align-items: center; gap: 6px; }
   .fv-tm-breadcrumb li::after { content: '/'; color: #CBD5E1; }
   .fv-tm-breadcrumb li:last-child::after { display: none; }
   .fv-tm-breadcrumb a { color: #64748B; text-decoration: none; }
-  .fv-tm-breadcrumb a:hover { color: #0D9488; }
+  .fv-tm-breadcrumb a:hover { color: #15803D; }
   .fv-tm-breadcrumb li:last-child { color: #0B1220; font-weight: 600; }
 
   .fv-tm-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
-  .fv-tm-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #0D9488; display: block; margin-bottom: 5px; }
+  .fv-tm-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #15803D; display: block; margin-bottom: 5px; }
   .fv-tm-title { font-size: 26px; font-weight: 800; color: #0B1220; margin: 0 0 5px; }
   .fv-tm-sub { font-size: 13px; color: #64748B; margin: 0; }
   .fv-tm-toolbar { display: flex; gap: 8px; }
   .fv-tm-btn { background: #fff; border: 1px solid #E5E7EB; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; color: #374151; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
-  .fv-tm-btn:hover { background: #F0FDFA; border-color: #0D9488; color: #0D9488; }
-  .fv-tm-btn.primary { background: #0D9488; color: #fff; border-color: #0D9488; }
-  .fv-tm-btn.primary:hover { background: #0B7A6E; color: #fff; }
+  .fv-tm-btn:hover { background: #ECF6EF; border-color: #15803D; color: #15803D; }
+  .fv-tm-btn.primary { background: #1E3A8A; color: #fff; border-color: #1E3A8A; }
+  .fv-tm-btn.primary:hover { background: #15306E; color: #fff; }
 
   .fv-tm-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
   @media (max-width: 1100px) { .fv-tm-board { grid-template-columns: repeat(2, 1fr); } }
@@ -67,10 +67,10 @@
 
   .fv-tm-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.04); cursor: grab; transition: box-shadow .15s, transform .15s; }
   .fv-tm-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.08); transform: translateY(-1px); }
-  .fv-tm-card-tag { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; margin-bottom: 8px; }
+  .fv-tm-card-tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; margin-bottom: 8px; }
   .fv-tm-card-name { font-size: 13px; font-weight: 600; color: #0B1220; margin: 0 0 8px; line-height: 1.4; }
   .fv-tm-card-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11px; color: #64748B; }
-  .fv-tm-card-avatar { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, #6366F1, #8B5CF6); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; }
+  .fv-tm-card-avatar { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, #6366F1, #1E3A8A); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
   .fv-tm-card-due { display: flex; align-items: center; gap: 4px; }
   .fv-tm-card-due.urgent { color: #DC2626; font-weight: 600; }
   .fv-tm-card-priority { width: 4px; height: 18px; border-radius: 2px; display: inline-block; vertical-align: middle; margin-right: 4px; }
@@ -146,8 +146,8 @@
             {% if cat contains 'Срочно' %}{% assign tag_bg = '#FEE2E2' %}{% assign tag_fg = '#DC2626' %}
             {% elsif cat contains 'Обучение' %}{% assign tag_bg = '#E0F2FE' %}{% assign tag_fg = '#0369A1' %}
             {% elsif cat contains 'Документ' %}{% assign tag_bg = '#FEF3C7' %}{% assign tag_fg = '#92400E' %}
-            {% elsif cat contains 'Встреча' %}{% assign tag_bg = '#F0FDFA' %}{% assign tag_fg = '#0D9488' %}
-            {% elsif cat contains 'Практика' %}{% assign tag_bg = '#F5F3FF' %}{% assign tag_fg = '#7C3AED' %}
+            {% elsif cat contains 'Встреча' %}{% assign tag_bg = '#ECF6EF' %}{% assign tag_fg = '#15803D' %}
+            {% elsif cat contains 'Практика' %}{% assign tag_bg = '#EEF2F9' %}{% assign tag_fg = '#1E3A8A' %}
             {% endif %}
 
             {% comment %}─ Assignee initials ─{% endcomment %}
@@ -177,7 +177,7 @@
         {% endfor %}
 
         {% if col_count == 0 %}
-          <div style="text-align:center;padding:20px 8px;font-size:11px;color:#94A3B8;">Нет задач</div>
+          <div style="text-align:center;padding:20px 8px;font-size:11px;color:#64748B;">Нет задач</div>
         {% endif %}
       </div>
     {% endfor %}

@@ -89,9 +89,9 @@
 {% endif %}
 
 <style>
-  .fv-prog { padding: 28px 0 48px; }
+  .fv-prog { padding: 12px 0 48px; }
   .fv-prog-header { margin-bottom: 24px; }
-  .fv-prog-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #94A3B8; display: block; margin-bottom: 4px; }
+  .fv-prog-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #64748B; display: block; margin-bottom: 4px; }
   .fv-prog-title { font-size: 22px; font-weight: 700; color: #0B1220; margin: 0 0 4px; }
   .fv-prog-sub { font-size: 13px; color: #64748B; margin: 0; }
 
@@ -105,19 +105,19 @@
   .fv-tbl-head { padding: 14px 20px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .fv-tbl-title { font-size: 15px; font-weight: 700; color: #0B1220; }
   .fv-search-wrap { display: flex; align-items: center; gap: 7px; background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: 7px; padding: 7px 12px; }
-  .fv-search-wrap i { color: #94A3B8; font-size: 13px; }
+  .fv-search-wrap i { color: #64748B; font-size: 13px; }
   .fv-search-input { border: none; background: transparent; outline: none; font-size: 13px; color: #0B1220; width: 180px; }
-  .fv-search-input::placeholder { color: #94A3B8; }
+  .fv-search-input::placeholder { color: #64748B; }
 
   .fv-table { width: 100%; border-collapse: collapse; }
-  .fv-table th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #94A3B8; padding: 8px 20px; text-align: left; border-bottom: 1px solid #F1F5F9; background: #FAFBFC; }
+  .fv-table th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #64748B; padding: 8px 20px; text-align: left; border-bottom: 1px solid #F1F5F9; background: #FAFBFC; }
   .fv-table td { padding: 12px 20px; font-size: 13px; color: #0B1220; border-bottom: 1px solid #F1F5F9; vertical-align: middle; }
   .fv-table tr:last-child td { border-bottom: none; }
   .fv-table tr:hover td { background: #FAFBFC; }
   .fv-table .fv-user-cell { display: flex; align-items: center; gap: 10px; }
   .fv-avatar { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,#EEF2F9,#D8DFEF); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #1E3A8A; flex-shrink: 0; }
   .fv-badge-yes { display: inline-flex; align-items: center; gap: 4px; background: #ECF6EF; color: #15803D; border-radius: 20px; font-size: 11px; font-weight: 600; padding: 3px 8px; }
-  .fv-badge-no  { display: inline-flex; align-items: center; gap: 4px; background: #F1F5F9; color: #94A3B8; border-radius: 20px; font-size: 11px; font-weight: 600; padding: 3px 8px; }
+  .fv-badge-no  { display: inline-flex; align-items: center; gap: 4px; background: #F1F5F9; color: #64748B; border-radius: 20px; font-size: 11px; font-weight: 600; padding: 3px 8px; }
   .fv-score-bar { display: flex; align-items: center; gap: 8px; }
   .fv-score-track { flex: 1; height: 4px; background: #E5E7EB; border-radius: 2px; overflow: hidden; min-width: 60px; }
   .fv-score-fill { height: 100%; border-radius: 2px; background: #1E3A8A; }
@@ -125,20 +125,20 @@
   .fv-lesson-outer { display: flex; align-items: stretch; gap: 8px; margin-bottom: 10px; }
   .fv-lesson-row { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; display: flex; align-items: center; gap: 14px; padding: 14px 16px; flex: 1; transition: box-shadow 0.14s; text-decoration: none !important; color: inherit !important; }
   .fv-lesson-row:hover { box-shadow: 0 4px 12px rgba(11,18,32,0.08); }
-  .fv-lesson-thumb-sm { width: 56px; height: 40px; border-radius: 6px; background: linear-gradient(135deg,#EEF2F9,#D8DFEF); flex-shrink: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 18px; }
+  .fv-lesson-thumb-sm { width: 56px; height: 40px; border-radius: 6px; background: linear-gradient(135deg,#EEF2F9,#D8DFEF); flex-shrink: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; color: #64748B; font-size: 18px; }
   .fv-lesson-thumb-sm img { width: 100%; height: 100%; object-fit: cover; }
   .fv-prog-bar-wrap { flex: 1; min-width: 100px; }
   .fv-prog-bar-track { height: 4px; background: #E5E7EB; border-radius: 2px; overflow: hidden; margin-top: 6px; }
 
-  .fv-empty { text-align: center; padding: 56px 20px; color: #94A3B8; }
+  .fv-empty { text-align: center; padding: 56px 20px; color: #64748B; }
   .fv-empty i { font-size: 48px; display: block; margin-bottom: 12px; }
   .fv-empty h3 { font-size: 16px; font-weight: 600; color: #475569; margin-bottom: 6px; }
   .fv-empty p { font-size: 13px; }
   .fv-empty a { color: #1E3A8A; font-weight: 600; }
 
   /* ── Кнопка «Детали» ── */
-  .fv-btn-detail { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; font-size: 12px; font-weight: 600; color: #EC4899; background: #FFF1F5; border: 1.5px solid #FBCFE8; border-radius: 8px; cursor: pointer; transition: all .14s; white-space: nowrap; flex-shrink: 0; }
-  .fv-btn-detail:hover { background: #EC4899; color: #fff; border-color: #EC4899; }
+  .fv-btn-detail { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; font-size: 12px; font-weight: 600; color: #475569; background: #FFF1F5; border: 1.5px solid #FBCFE8; border-radius: 8px; cursor: pointer; transition: all .14s; white-space: nowrap; flex-shrink: 0; }
+  .fv-btn-detail:hover { background: #475569; color: #fff; border-color: #475569; }
   .fv-btn-detail i { font-size: 13px; }
   .fv-btn-detail-sm { align-self: center; }
 
@@ -161,19 +161,19 @@
   .fv-q-chip-skip { background: #F1F5F9; color: #64748B; }
 
   .fv-q-table { width: 100%; border-collapse: collapse; }
-  .fv-q-table th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94A3B8; background: #F8FAFC; padding: 8px 14px; text-align: left; border-bottom: 1px solid #F1F5F9; }
+  .fv-q-table th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #64748B; background: #F8FAFC; padding: 8px 14px; text-align: left; border-bottom: 1px solid #F1F5F9; }
   .fv-q-table td { padding: 11px 14px; font-size: 13px; color: #334155; border-bottom: 1px solid #F8FAFC; vertical-align: top; }
   .fv-q-table tr:last-child td { border-bottom: none; }
   .fv-q-result-ok   { display: inline-flex; align-items: center; gap: 4px; background: #DCFCE7; color: #15803D; border-radius: 20px; font-size: 11px; font-weight: 600; padding: 3px 9px; white-space: nowrap; }
   .fv-q-result-err  { display: inline-flex; align-items: center; gap: 4px; background: #FEE2E2; color: #B91C1C; border-radius: 20px; font-size: 11px; font-weight: 600; padding: 3px 9px; white-space: nowrap; }
-  .fv-q-result-skip { display: inline-flex; align-items: center; gap: 4px; background: #F1F5F9; color: #94A3B8; border-radius: 20px; font-size: 11px; font-weight: 600; padding: 3px 9px; white-space: nowrap; }
+  .fv-q-result-skip { display: inline-flex; align-items: center; gap: 4px; background: #F1F5F9; color: #64748B; border-radius: 20px; font-size: 11px; font-weight: 600; padding: 3px 9px; white-space: nowrap; }
 
-  .fv-detail-spinner { text-align: center; padding: 40px 20px; color: #94A3B8; }
+  .fv-detail-spinner { text-align: center; padding: 40px 20px; color: #64748B; }
   .fv-detail-spinner i { font-size: 28px; display: block; margin-bottom: 10px; animation: fvSpin 1s linear infinite; }
   @keyframes fvSpin { to { transform: rotate(360deg); } }
   .fv-detail-error { text-align: center; padding: 32px 20px; color: #B91C1C; }
   .fv-detail-error i { font-size: 28px; display: block; margin-bottom: 8px; }
-  .fv-detail-noq { text-align: center; padding: 32px 20px; color: #94A3B8; }
+  .fv-detail-noq { text-align: center; padding: 32px 20px; color: #64748B; }
   .fv-detail-noq i { font-size: 28px; display: block; margin-bottom: 8px; }
 </style>
 
@@ -253,7 +253,7 @@
               </div>
             </div>
             {% else %}
-            <span style="color:#94A3B8;font-size:12px;">—</span>
+            <span style="color:#64748B;font-size:12px;">—</span>
             {% endif %}
           </td>
           <td>
@@ -263,10 +263,10 @@
               <span class="fv-badge-no"><i class="bi bi-hourglass-split"></i> Нет</span>
             {% endif %}
           </td>
-          <td style="color:#94A3B8;font-size:12px;">{{ p.new_lastupdated | date: 'dd.MM.yyyy HH:mm' }}</td>
+          <td style="color:#64748B;font-size:12px;">{{ p.new_lastupdated | date: 'dd.MM.yyyy HH:mm' }}</td>
           <td>
             <button type="button" class="fv-btn-detail"
-                    onclick="fvOpenDetail('{{ p.new_h5pprogressid }}', '{{ safe_lesson }}')"
+                    data-progress-id="{{ p.new_h5pprogressid }}" data-lesson="{{ safe_lesson | escape }}"
                     title="Статистика по вопросам">
               <i class="bi bi-list-check"></i> Детали
             </button>
@@ -311,7 +311,7 @@
       <div><div class="fv-kpi-val">{{ avg_score }}%</div><div class="fv-kpi-lbl">средний балл</div></div>
     </div>
     <div class="fv-kpi">
-      <div class="fv-kpi-icon" style="background:#F5F3FF;color:#7C3AED;"><i class="bi bi-collection-play"></i></div>
+      <div class="fv-kpi-icon" style="background:#EEF2F9;color:#1E3A8A;"><i class="bi bi-collection-play"></i></div>
       <div><div class="fv-kpi-val">{{ h5p_all.results.entities.size }}</div><div class="fv-kpi-lbl">доступно</div></div>
     </div>
   </div>
@@ -355,7 +355,7 @@
           {% endif %}
         </div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#94A3B8;">{{ item.new_librarytype | default: 'H5P' }}</div>
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#64748B;">{{ item.new_librarytype | default: 'H5P' }}</div>
           <div style="font-size:14px;font-weight:600;color:#0B1220;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ item.new_name }}</div>
           {% if prog_score != '' %}
             <div class="fv-prog-bar-wrap">
@@ -373,13 +373,13 @@
             <span class="fv-badge-no"><i class="bi bi-play-fill"></i> В процессе</span>
           {% endif %}
           {% if prog_updated %}
-          <div style="font-size:11px;color:#94A3B8;margin-top:4px;">{{ prog_updated | date: 'dd.MM.yyyy' }}</div>
+          <div style="font-size:11px;color:#64748B;margin-top:4px;">{{ prog_updated | date: 'dd.MM.yyyy' }}</div>
           {% endif %}
         </div>
       </a>
       {% if prog_id != '' %}
       <button type="button" class="fv-btn-detail fv-btn-detail-sm"
-              onclick="fvOpenDetail('{{ prog_id }}', '{{ safe_item_name }}')"
+              data-progress-id="{{ prog_id }}" data-lesson="{{ safe_item_name | escape }}"
               title="Статистика по вопросам">
         <i class="bi bi-list-check"></i> Детали
       </button>
@@ -409,11 +409,11 @@
 </div>
 
 <!-- ─── Модальное окно: Статистика по вопросам ──────────────────────── -->
-<div class="fv-detail-backdrop" id="fvDetailBackdrop" onclick="fvCloseDetail(event)">
+<div class="fv-detail-backdrop" id="fvDetailBackdrop">
   <div class="fv-detail-modal" role="dialog" aria-modal="true" aria-labelledby="fvDetailTitle">
     <div class="fv-detail-header">
       <span class="fv-detail-title" id="fvDetailTitle">Статистика по вопросам</span>
-      <button type="button" class="fv-detail-close" onclick="fvCloseDetail()" aria-label="Закрыть">×</button>
+      <button type="button" class="fv-detail-close" id="fvDetailClose" aria-label="Закрыть">×</button>
     </div>
     <div class="fv-detail-body" id="fvDetailBody">
       <div class="fv-detail-spinner">
@@ -452,6 +452,14 @@
   }
 
   /* ── Открыть модалку и загрузить данные ── */
+  /* Кнопки «Детали» и закрытие модалки — data-атрибуты вместо inline onclick (CSP) */
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('.fv-btn-detail[data-progress-id]');
+    if (b) window.fvOpenDetail(b.getAttribute('data-progress-id'), b.getAttribute('data-lesson'));
+  });
+  document.getElementById('fvDetailBackdrop').addEventListener('click', function (e) { window.fvCloseDetail(e); });
+  document.getElementById('fvDetailClose').addEventListener('click', function () { window.fvCloseDetail(); });
+
   window.fvOpenDetail = function (progressId, lessonName) {
     var backdrop = document.getElementById('fvDetailBackdrop');
     var body     = document.getElementById('fvDetailBody');
@@ -508,7 +516,7 @@
         '<div class="fv-detail-error">' +
         '<i class="bi bi-exclamation-circle"></i>' +
         '<p style="font-weight:600;margin:0;">Не удалось загрузить данные</p>' +
-        '<p style="font-size:12px;margin:4px 0 0;color:#94A3B8;">' + err.message + '</p>' +
+        '<p style="font-size:12px;margin:4px 0 0;color:#64748B;">' + err.message + '</p>' +
         '</div>';
     });
   };
@@ -563,7 +571,7 @@
       }
 
       html += '<tr>';
-      html += '<td style="color:#94A3B8;font-size:12px;font-weight:700;">' + (idx + 1) + '</td>';
+      html += '<td style="color:#64748B;font-size:12px;font-weight:700;">' + (idx + 1) + '</td>';
       html += '<td style="max-width:260px;">' + fvEsc(qText) + '</td>';
       html += '<td style="max-width:160px;color:#64748B;">' + fvEsc(response) + '</td>';
       html += '<td>' + resultHtml + '</td>';

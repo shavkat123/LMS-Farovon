@@ -13,7 +13,7 @@
 
 {% unless user %}
 <div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
-  <i class="bi bi-shop" style="font-size:52px;color:#94A3B8;display:block;margin-bottom:16px;"></i>
+  <i class="bi bi-shop" style="font-size:52px;color:#64748B;display:block;margin-bottom:16px;"></i>
   <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin-bottom:6px;">Войдите в систему</h2>
   <p style="font-size:13px;color:#64748B;margin-bottom:20px;">Для доступа к магазину наград необходимо авторизоваться.</p>
   <a href="/SignIn" class="btn btn-primary" style="border-radius:8px;">Войти</a>
@@ -101,11 +101,11 @@
 {% endfor %}
 
 <style>
-  .fv-shop { padding: 28px 0 56px; font-family: 'Inter', ui-sans-serif, sans-serif; }
+  .fv-shop { padding: 12px 0 56px; font-family: 'Inter', ui-sans-serif, sans-serif; }
 
   /* ── Header ── */
   .fv-shop-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 24px; flex-wrap: wrap; }
-  .fv-shop-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #94A3B8; display: block; margin-bottom: 4px; }
+  .fv-shop-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #64748B; display: block; margin-bottom: 4px; }
   .fv-shop-title { font-size: 22px; font-weight: 700; color: #0B1220; margin: 0 0 3px; }
   .fv-shop-sub { font-size: 13px; color: #64748B; margin: 0; }
 
@@ -117,8 +117,8 @@
   }
   .fv-balance-label { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; opacity: .8; margin-bottom: 6px; }
   .fv-balance-amount { font-size: 32px; font-weight: 800; line-height: 1; display: flex; align-items: center; gap: 8px; }
-  .fv-coin-img { width: 52px; height: 52px; object-fit: contain; vertical-align: middle; display: inline-block; }
-  .fv-coin-img-sm { width: 32px; height: 32px; object-fit: contain; vertical-align: middle; display: inline-block; }
+  .fv-coin-img { font-size: 30px; line-height: 1; vertical-align: middle; display: inline-block; }
+  .fv-coin-img-sm { font-size: 17px; line-height: 1; vertical-align: middle; display: inline-block; }
   .fv-balance-sub { font-size: 11px; opacity: .72; margin-top: 5px; }
 
   /* ── Stats ── */
@@ -126,7 +126,7 @@
   .fv-shop-stat { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 10px 16px; display: flex; align-items: center; gap: 10px; }
   .fv-shop-stat-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
   .fv-shop-stat-val { font-size: 17px; font-weight: 700; color: #0B1220; line-height: 1; }
-  .fv-shop-stat-lbl { font-size: 11px; color: #94A3B8; margin-top: 1px; }
+  .fv-shop-stat-lbl { font-size: 11px; color: #64748B; margin-top: 1px; }
 
   /* ── Earn tip ── */
   .fv-earn-tip { background: #EFF6FF; border: 1px solid #DBEAFE; border-radius: 10px; padding: 12px 16px; font-size: 12px; color: #1E40AF; display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
@@ -153,7 +153,7 @@
   .fv-reward-img img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
   .fv-cat-badge { position: absolute; top: 8px; left: 8px; background: rgba(255,255,255,.92); border: 1px solid #E5E7EB; border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 600; color: #64748B; backdrop-filter: blur(4px); }
   .fv-stock-low { position: absolute; top: 8px; right: 8px; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 600; color: #DC2626; }
-  .fv-stock-out { position: absolute; top: 8px; right: 8px; background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 600; color: #94A3B8; }
+  .fv-stock-out { position: absolute; top: 8px; right: 8px; background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 600; color: #64748B; }
 
   .fv-reward-body { padding: 14px 16px; flex: 1; display: flex; flex-direction: column; }
   .fv-reward-name { font-size: 14px; font-weight: 700; color: #0B1220; margin: 0 0 5px; line-height: 1.35; }
@@ -164,25 +164,25 @@
   .fv-buy-btn { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; transition: all .14s; white-space: nowrap; }
   .fv-buy-btn-can { background: linear-gradient(135deg, #F59E0B, #D97706); color: #fff; }
   .fv-buy-btn-can:hover { opacity: .88; }
-  .fv-buy-btn-no { background: #F1F5F9; color: #94A3B8; cursor: not-allowed; }
-  .fv-buy-btn-out { background: #F1F5F9; color: #94A3B8; cursor: not-allowed; }
+  .fv-buy-btn-no { background: #F1F5F9; color: #64748B; cursor: not-allowed; }
+  .fv-buy-btn-out { background: #F1F5F9; color: #64748B; cursor: not-allowed; }
 
   /* ── Empty state ── */
   .fv-shop-empty { text-align: center; padding: 56px 24px; background: #fff; border: 1.5px dashed #E5E7EB; border-radius: 14px; }
   .fv-shop-empty i { font-size: 48px; color: #CBD5E1; display: block; margin-bottom: 14px; }
   .fv-shop-empty h3 { font-size: 15px; font-weight: 700; color: #64748B; margin: 0 0 6px; }
-  .fv-shop-empty p { font-size: 13px; color: #94A3B8; margin: 0; }
+  .fv-shop-empty p { font-size: 13px; color: #64748B; margin: 0; }
 
   /* ── Purchase history ── */
   .fv-history { background: #fff; border: 1px solid #E5E7EB; border-radius: 14px; padding: 20px 24px; margin-top: 32px; }
   .fv-history-head { font-size: 15px; font-weight: 700; color: #0B1220; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-  .fv-history-empty { text-align: center; padding: 24px; color: #94A3B8; font-size: 13px; }
+  .fv-history-empty { text-align: center; padding: 24px; color: #64748B; font-size: 13px; }
   .fv-history-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid #F1F5F9; }
   .fv-history-row:last-child { border-bottom: none; }
   .fv-history-ico { width: 36px; height: 36px; background: #FEF3C7; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
   .fv-history-info { flex: 1; min-width: 0; }
   .fv-history-name { font-size: 13px; font-weight: 600; color: #0B1220; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .fv-history-date { font-size: 11px; color: #94A3B8; margin-top: 1px; }
+  .fv-history-date { font-size: 11px; color: #64748B; margin-top: 1px; }
   .fv-history-cost { font-size: 13px; font-weight: 700; color: #D97706; white-space: nowrap; }
 
   /* ── Modal ── */
@@ -232,7 +232,7 @@
     </div>
     <div class="fv-balance-card">
       <div class="fv-balance-label">Ваш баланс</div>
-      <div class="fv-balance-amount"><img src="https://raw.githubusercontent.com/shavkat123/farovon-lms-system/main/frontend/src/assets/coin.png" class="fv-coin-img" alt="coin"> <span id="fv-balance-val">{{ current_balance }}</span></div>
+      <div class="fv-balance-amount"><i class="bi bi-award-fill fv-coin-img" aria-hidden="true"></i> <span id="fv-balance-val">{{ current_balance }}</span></div>
       <div class="fv-balance-sub">
         Заработано: {{ total_earned }} · Потрачено: {{ total_spent }}
       </div>
@@ -326,11 +326,11 @@
         <div class="fv-reward-desc" style="color:#CBD5E1;font-style:italic;">Описание отсутствует</div>
         {% endif %}
         <div class="fv-reward-foot">
-          <div class="fv-coin-cost"><img src="https://raw.githubusercontent.com/shavkat123/farovon-lms-system/main/frontend/src/assets/coin.png" class="fv-coin-img-sm" alt="coin"> {{ item_cost }}</div>
+          <div class="fv-coin-cost"><i class="bi bi-award-fill fv-coin-img-sm" aria-hidden="true"></i> {{ item_cost }}</div>
           {% if in_stock == false %}
           <button class="fv-buy-btn fv-buy-btn-out" disabled>Нет в наличии</button>
           {% elsif can_afford %}
-          <button class="fv-buy-btn fv-buy-btn-can" onclick="fvOpenModal(this)">Купить</button>
+          <button class="fv-buy-btn fv-buy-btn-can">Купить</button>
           {% else %}
           <button class="fv-buy-btn fv-buy-btn-no" disabled title="Недостаточно монет">Не хватает</button>
           {% endif %}
@@ -357,7 +357,7 @@
         <div class="fv-history-name">{{ pur.new_rewarditem.name | default: 'Награда' }}</div>
         <div class="fv-history-date">{{ pur.createdon | date: 'dd.MM.yyyy, HH:mm' }}</div>
       </div>
-      <div class="fv-history-cost">-<img src="https://raw.githubusercontent.com/shavkat123/farovon-lms-system/main/frontend/src/assets/coin.png" class="fv-coin-img-sm" alt="coin"> {{ pur.new_pointsspent }}</div>
+      <div class="fv-history-cost">-<i class="bi bi-award-fill fv-coin-img-sm" aria-hidden="true"></i> {{ pur.new_pointsspent }}</div>
     </div>
     {% endfor %}
     {% endif %}
@@ -379,12 +379,12 @@
     <div class="fv-modal-title" id="fvModalTitle">Подтвердите покупку</div>
     <div class="fv-modal-desc" id="fvModalDesc">Вы уверены, что хотите приобрести эту награду?</div>
     <div class="fv-modal-cost-box">
-      <div class="fv-modal-cost-num"><img src="https://raw.githubusercontent.com/shavkat123/farovon-lms-system/main/frontend/src/assets/coin.png" class="fv-coin-img-sm" alt="coin"> <span id="fvModalCost">0</span></div>
-      <div class="fv-modal-cost-after">Баланс после покупки: <img src="https://raw.githubusercontent.com/shavkat123/farovon-lms-system/main/frontend/src/assets/coin.png" class="fv-coin-img-sm" alt="coin"> <span id="fvModalAfter">0</span></div>
+      <div class="fv-modal-cost-num"><i class="bi bi-award-fill fv-coin-img-sm" aria-hidden="true"></i> <span id="fvModalCost">0</span></div>
+      <div class="fv-modal-cost-after">Баланс после покупки: <i class="bi bi-award-fill fv-coin-img-sm" aria-hidden="true"></i> <span id="fvModalAfter">0</span></div>
     </div>
     <div class="fv-modal-btns">
-      <button class="fv-modal-cancel" onclick="fvCloseModal()">Отмена</button>
-      <button class="fv-modal-confirm" id="fvModalConfirm" onclick="fvConfirmPurchase()">Подтвердить</button>
+      <button class="fv-modal-cancel">Отмена</button>
+      <button class="fv-modal-confirm" id="fvModalConfirm">Подтвердить</button>
     </div>
   </div>
 </div>
@@ -468,6 +468,15 @@
   document.getElementById('fvBuyOverlay').addEventListener('click', function (e) {
     if (e.target === this) fvCloseModal();
   });
+
+  /* Кнопки покупки и модалки — слушатели вместо inline onclick (CSP) */
+  document.querySelectorAll('.fv-buy-btn-can').forEach(function (b) {
+    b.addEventListener('click', function () { window.fvOpenModal(b); });
+  });
+  document.querySelectorAll('.fv-modal-cancel').forEach(function (b) {
+    b.addEventListener('click', function () { window.fvCloseModal(); });
+  });
+  document.getElementById('fvModalConfirm').addEventListener('click', function () { window.fvConfirmPurchase(); });
 
   /* ── Get CSRF token ── */
   function getToken() {

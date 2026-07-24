@@ -1,11 +1,13 @@
-{% comment %}── Step 3: lessons + user progress ──{% endcomment %}
+{% comment %}── Step 1: lessons + user progress ──{% endcomment %}
 {% fetchxml h5p_all %}
 <fetch>
   <entity name="new_h5pcontent">
     <attribute name="new_h5pcontentid" />
     <attribute name="new_name" />
     <attribute name="new_librarytype" />
+    <attribute name="new_description" />
     <attribute name="new_thumbnailurl" />
+    <attribute name="new_durationseconds" />
     <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
     <order attribute="new_name" descending="false" />
   </entity>
@@ -22,6 +24,13 @@
 {% assign in_progress_count = 0 %}
 {% assign last_in_progress_id = '' %}
 {% assign last_lesson = null %}
+{% assign last_pos = 0 %}
+{% assign ach_sharp = false %}
+
+{% assign is_admin_role = false %}
+{% if user %}
+  {% if user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}{% assign is_admin_role = true %}{% endif %}
+{% endif %}
 
 {% if user %}
   {% fetchxml user_progress %}
@@ -31,6 +40,7 @@
       <attribute name="new_h5pcontent" />
       <attribute name="new_completion" />
       <attribute name="new_scorescaled" />
+      <attribute name="new_lastposition" />
       <filter>
         <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
       </filter>
@@ -44,9 +54,13 @@
     {% assign started_count = started_count | plus: 1 %}
     {% if p.new_completion %}
       {% assign completed_count = completed_count | plus: 1 %}
+      {% if p.new_scorescaled %}
+        {% if p.new_scorescaled >= 1 %}{% assign ach_sharp = true %}{% endif %}
+      {% endif %}
     {% else %}
       {% unless found_last_inprogress %}
         {% assign last_in_progress_id = p.new_h5pcontent.id %}
+        {% if p.new_lastposition %}{% assign last_pos = p.new_lastposition %}{% endif %}
         {% assign found_last_inprogress = true %}
       {% endunless %}
     {% endif %}
@@ -60,7 +74,110 @@
       {% endif %}
     {% endfor %}
   {% endif %}
+
+  {% comment %}── Процент прохождения текущего урока: lastposition / durationseconds ──{% endcomment %}
+  {% assign cont_pct = -1 %}
+  {% if last_lesson %}
+    {% if last_lesson.new_durationseconds and last_pos > 0 %}
+      {% assign cont_dur = last_lesson.new_durationseconds %}
+      {% if cont_dur > 0 %}
+        {% assign cont_pct = last_pos | times: 100 | divided_by: cont_dur | round %}
+        {% if cont_pct > 98 %}{% assign cont_pct = 98 %}{% endif %}
+        {% if cont_pct < 2 %}{% assign cont_pct = 2 %}{% endif %}
+      {% endif %}
+    {% endif %}
+  {% endif %}
+
+  {% comment %}── Step 2: leaderboard top-3 (aggregate; числа от Dataverse — арифметика безопасна) ──{% endcomment %}
+  {% fetchxml home_lb %}
+  <fetch aggregate="true">
+    <entity name="new_h5pprogress">
+      <attribute name="new_user" groupby="true" alias="uid" />
+      <attribute name="new_h5pprogressid" aggregate="count" alias="cnt" />
+      <attribute name="new_scorescaled"   aggregate="sum"   alias="scoresum" />
+      <link-entity name="contact" from="contactid" to="new_user" alias="ctc" link-type="outer">
+        <attribute name="fullname" groupby="true" alias="fname" />
+        <attribute name="jobtitle" groupby="true" alias="fjob" />
+      </link-entity>
+      <filter>
+        <condition attribute="new_completion" operator="eq" value="1" />
+      </filter>
+    </entity>
+  </fetch>
+  {% endfetchxml %}
+
+  {% assign lb_top1_c = -1 %}{% assign lb_top1_n = '' %}{% assign lb_top1_j = '' %}
+  {% assign lb_top2_c = -1 %}{% assign lb_top2_n = '' %}{% assign lb_top2_j = '' %}
+  {% assign lb_top3_c = -1 %}{% assign lb_top3_n = '' %}{% assign lb_top3_j = '' %}
+  {% assign lb_my_coins = -1 %}
+  {% assign lb_count = 0 %}
+
+  {% for r in home_lb.results.entities %}
+    {% assign r_uid = r.uid.id %}
+    {% if r_uid == '' or r_uid == null %}{% continue %}{% endif %}
+    {% assign lb_count = lb_count | plus: 1 %}
+    {% assign r_cnt = r.cnt | plus: 0 %}
+    {% assign r_sum = r.scoresum | plus: 0 %}
+    {% assign r_bonus = r_sum | times: 50 | round %}
+    {% assign r_coins = r_cnt | times: 100 | plus: r_bonus %}
+    {% if r_uid == user.id %}{% assign lb_my_coins = r_coins %}{% endif %}
+    {% assign r_name = r['ctc.fname'] | default: 'Участник' %}
+    {% assign r_job = r['ctc.fjob'] | default: '' %}
+    {% if r_coins > lb_top1_c %}
+      {% assign lb_top3_c = lb_top2_c %}{% assign lb_top3_n = lb_top2_n %}{% assign lb_top3_j = lb_top2_j %}
+      {% assign lb_top2_c = lb_top1_c %}{% assign lb_top2_n = lb_top1_n %}{% assign lb_top2_j = lb_top1_j %}
+      {% assign lb_top1_c = r_coins %}{% assign lb_top1_n = r_name %}{% assign lb_top1_j = r_job %}
+    {% elsif r_coins > lb_top2_c %}
+      {% assign lb_top3_c = lb_top2_c %}{% assign lb_top3_n = lb_top2_n %}{% assign lb_top3_j = lb_top2_j %}
+      {% assign lb_top2_c = r_coins %}{% assign lb_top2_n = r_name %}{% assign lb_top2_j = r_job %}
+    {% elsif r_coins > lb_top3_c %}
+      {% assign lb_top3_c = r_coins %}{% assign lb_top3_n = r_name %}{% assign lb_top3_j = r_job %}
+    {% endif %}
+  {% endfor %}
+
+  {% assign lb_my_rank = 0 %}
+  {% if lb_my_coins >= 0 %}
+    {% assign lb_my_rank = 1 %}
+    {% for r in home_lb.results.entities %}
+      {% assign r_uid = r.uid.id %}
+      {% if r_uid == '' or r_uid == null %}{% continue %}{% endif %}
+      {% assign r_cnt = r.cnt | plus: 0 %}
+      {% assign r_sum = r.scoresum | plus: 0 %}
+      {% assign r_bonus = r_sum | times: 50 | round %}
+      {% assign r_coins = r_cnt | times: 100 | plus: r_bonus %}
+      {% if r_coins > lb_my_coins %}{% assign lb_my_rank = lb_my_rank | plus: 1 %}{% endif %}
+    {% endfor %}
+  {% endif %}
+
+  {% comment %}── Step 3: achievements from own progress ──{% endcomment %}
+  {% assign ach_rocket = false %}
+  {% assign ach_trophy = false %}
+  {% assign ach_fire = false %}
+  {% if completed_count >= 1 %}{% assign ach_rocket = true %}{% endif %}
+  {% if completed_count >= 3 %}{% assign ach_trophy = true %}{% endif %}
+  {% if completed_count >= 10 %}{% assign ach_fire = true %}{% endif %}
+  {% assign ach_got = 0 %}
+  {% if ach_rocket %}{% assign ach_got = ach_got | plus: 1 %}{% endif %}
+  {% if ach_sharp %}{% assign ach_got = ach_got | plus: 1 %}{% endif %}
+  {% if ach_trophy %}{% assign ach_got = ach_got | plus: 1 %}{% endif %}
+  {% if ach_fire %}{% assign ach_got = ach_got | plus: 1 %}{% endif %}
 {% endif %}
+
+{% assign fv_mon_n = 'now' | date: 'MM' %}
+{% case fv_mon_n %}
+  {% when '01' %}{% assign fv_mon = 'января' %}
+  {% when '02' %}{% assign fv_mon = 'февраля' %}
+  {% when '03' %}{% assign fv_mon = 'марта' %}
+  {% when '04' %}{% assign fv_mon = 'апреля' %}
+  {% when '05' %}{% assign fv_mon = 'мая' %}
+  {% when '06' %}{% assign fv_mon = 'июня' %}
+  {% when '07' %}{% assign fv_mon = 'июля' %}
+  {% when '08' %}{% assign fv_mon = 'августа' %}
+  {% when '09' %}{% assign fv_mon = 'сентября' %}
+  {% when '10' %}{% assign fv_mon = 'октября' %}
+  {% when '11' %}{% assign fv_mon = 'ноября' %}
+  {% else %}{% assign fv_mon = 'декабря' %}
+{% endcase %}
 
 <style>
   .fv-dash { padding: 24px 0 48px; }
@@ -74,43 +191,128 @@
   .fv-hero p { font-size: 14px; color: rgba(255,255,255,0.72); margin: 0 0 28px; }
   .fv-hero-stats { display: flex; align-items: center; gap: 32px; flex-wrap: wrap; }
   .fv-hero-stat { display: flex; flex-direction: column; gap: 2px; }
-  .fv-hero-stat .fv-big { font-size: 22px; font-weight: 700; line-height: 1; }
+  .fv-hero-stat .fv-big { font-size: 22px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
   .fv-hero-stat .fv-lbl { font-size: 11px; opacity: 0.65; font-weight: 500; }
   .fv-hero-div { width: 1px; height: 38px; background: rgba(255,255,255,0.18); }
 
-  .fv-stat-tile { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 1px 3px rgba(11,18,32,0.05); }
-  .fv-stat-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-  .fv-stat-value { font-size: 28px; font-weight: 700; color: #0B1220; line-height: 1; }
-  .fv-stat-label { font-size: 13px; font-weight: 500; color: #475569; }
-  .fv-stat-sub { font-size: 11px; color: #94A3B8; margin-top: 2px; }
+  /* ── Stat tiles (анатомия кита: иконка + «...», eyebrow, число + подпись) ── */
+  .fv-stat-tile { background: #fff; border: 1px solid #E5E7EB; border-radius: 14px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(11,18,32,0.05); height: 100%; }
+  .fv-stat-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+  .fv-stat-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .fv-stat-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #64748B; margin-bottom: 4px; }
+  .fv-stat-line { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .fv-stat-value { font-size: 26px; font-weight: 800; color: #0B1220; line-height: 1; font-variant-numeric: tabular-nums; }
+  .fv-stat-sub { font-size: 12px; font-weight: 600; color: #15803D; }
 
-  .fv-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; box-shadow: 0 1px 3px rgba(11,18,32,0.05); overflow: hidden; }
+  .fv-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 14px; box-shadow: 0 1px 3px rgba(11,18,32,0.05); overflow: hidden; }
   .fv-card-head { padding: 18px 20px 0; display: flex; align-items: center; justify-content: space-between; }
   .fv-card-title { font-size: 15px; font-weight: 700; color: #0B1220; margin: 0; }
+  .fv-card-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; display: block; margin-bottom: 2px; }
   .fv-card-link { font-size: 12px; font-weight: 600; color: #1E3A8A !important; text-decoration: none !important; }
   .fv-card-body { padding: 16px 20px 20px; }
+  .fv-demo-chip { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #64748B; margin-left: 6px; }
 
-  .fv-action-btn { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 8px; border: 1px solid #E5E7EB; background: #fff; text-decoration: none !important; color: #0B1220 !important; font-size: 13px; font-weight: 500; transition: background 0.14s; }
-  .fv-action-btn:hover { background: #EEF2F9 !important; border-color: #1E3A8A !important; color: #1E3A8A !important; }
-  .fv-action-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  /* ── Continue learning — split-карта из кита ── */
+  .fv-cont-grid { display: grid; grid-template-columns: 1.4fr 1fr; }
+  @media (max-width: 767.98px) { .fv-cont-grid { grid-template-columns: 1fr; } .fv-cont-cover { min-height: 140px; } }
+  .fv-cont-left { padding: 26px 28px; }
+  .fv-cont-title { font-size: 24px; font-weight: 800; line-height: 1.15; color: #0B1220; letter-spacing: -0.01em; margin: 6px 0 8px; }
+  .fv-cont-sub { font-size: 14px; color: #475569; margin: 0 0 18px; }
+  .fv-cont-bar-row { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .fv-cont-track { flex: 1; height: 8px; border-radius: 20px; background: #E5E7EB; overflow: hidden; }
+  .fv-cont-fill { height: 100%; border-radius: 20px; background: linear-gradient(90deg, #1E3A8A, #3B82F6); transition: width 0.5s ease-out; }
+  .fv-cont-pct { font-size: 13px; font-weight: 700; color: #1E3A8A; font-variant-numeric: tabular-nums; }
+  .fv-cont-btn { display: inline-flex; align-items: center; gap: 8px; background: #1E3A8A; color: #fff !important; border-radius: 12px; padding: 10px 20px; font-size: 13px; font-weight: 600; text-decoration: none !important; transition: background 0.14s; }
+  .fv-cont-btn:hover { background: #15306E; }
+  .fv-cont-cover { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; padding: 20px; background: linear-gradient(135deg, #F6F7F9 0%, #E5E7EB 100%); }
+  .fv-cont-cover::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(0deg, transparent 23px, rgba(11,18,32,0.04) 24px),
+      linear-gradient(90deg, transparent 23px, rgba(11,18,32,0.04) 24px);
+    background-size: 24px 24px;
+    opacity: 0.6;
+  }
+  .fv-cont-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .fv-cont-cover-label { position: relative; font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #64748B; }
+  .fv-cont-cover-title { position: relative; font-size: 20px; font-weight: 700; line-height: 1.1; color: #0B1220; letter-spacing: -0.01em; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .fv-cont-chip { position: relative; display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; background: #fff; border: 1px solid #E5E7EB; border-radius: 8px; padding: 5px 10px; font-size: 12px; font-weight: 600; color: #475569; align-self: flex-start; }
+  .fv-cont-chip i { color: #D97706; }
 
-  .fv-continue-btn { display: flex; align-items: center; gap: 16px; padding: 16px; border-radius: 10px; border: 1px solid #E5E7EB; background: #fff; text-decoration: none !important; color: #0B1220 !important; transition: box-shadow 0.14s, border-color 0.14s; }
-  .fv-continue-btn:hover { box-shadow: 0 4px 12px rgba(30,58,138,0.10); border-color: #1E3A8A !important; text-decoration: none !important; }
-  .fv-continue-thumb { width: 88px; height: 60px; border-radius: 8px; overflow: hidden; flex-shrink: 0; background: linear-gradient(135deg,#EEF2F9,#D8DFEF); display: flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 22px; }
-  .fv-continue-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  /* ── Траектория развития — step trail из кита ── */
+  .fv-path-track { position: relative; margin-top: 24px; }
+  .fv-path-line { position: absolute; top: 20px; left: 20px; right: 20px; height: 2px; background: #E5E7EB; }
+  .fv-path-line-fill { position: absolute; top: 20px; left: 20px; height: 2px; background: linear-gradient(90deg, #15803D, #D97706); }
+  .fv-path-steps { display: grid; grid-template-columns: repeat(5, 1fr); position: relative; }
+  .fv-path-step { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 4px; }
+  .fv-path-dot { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; position: relative; }
+  .fv-path-lbl { margin-top: 8px; font-size: 11px; font-weight: 500; color: #0B1220; line-height: 1.3; max-width: 90px; }
+  .fv-path-now { margin-top: 4px; padding: 1px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; background: #FAF3E8; color: #B45309; }
 
-  .fv-lesson-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(11,18,32,0.04); transition: box-shadow 0.18s, transform 0.18s; text-decoration: none !important; color: inherit !important; }
+  /* ── События (правый рейл) ── */
+  .fv-ev-row { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; transition: background 0.14s; }
+  .fv-ev-row:hover { background: #F0F2F5; }
+  .fv-ev-date { text-align: center; border-radius: 12px; background: #F0F2F5; padding: 8px 0; min-width: 48px; flex-shrink: 0; }
+  .fv-ev-day { font-size: 18px; font-weight: 800; color: #0B1220; line-height: 1; font-variant-numeric: tabular-nums; }
+  .fv-ev-mon { font-size: 10px; font-weight: 700; color: #64748B; text-transform: uppercase; margin-top: 2px; }
+  .fv-ev-tag { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+  .fv-ev-name { font-size: 13px; font-weight: 600; color: #0B1220; margin-top: 3px; line-height: 1.3; }
+  .fv-ev-time { font-size: 11px; color: #64748B; margin-top: 1px; }
+
+  /* ── Лидеры ── */
+  .fv-lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; }
+  .fv-lb-row.first { background: linear-gradient(90deg, #FAF3E8, transparent); }
+  .fv-lb-medal { font-size: 20px; line-height: 1; width: 26px; text-align: center; flex-shrink: 0; }
+  .fv-lb-name { font-size: 13px; font-weight: 600; color: #0B1220; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fv-lb-job { font-size: 11px; color: #64748B; }
+  .fv-lb-pts { font-size: 13px; font-weight: 800; color: #D97706; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .fv-lb-me { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding-top: 12px; border-top: 1px solid #E5E7EB; }
+  .fv-lb-me-rank { width: 28px; height: 28px; border-radius: 50%; background: #1E3A8A; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+  /* ── Достижения ── */
+  .fv-ach-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .fv-ach { padding: 12px 8px; border-radius: 12px; border: 1px solid #E5E7EB; text-align: center; background: #F0F2F5; }
+  .fv-ach.locked { background: #fff; opacity: 0.55; }
+  .fv-ach i { font-size: 20px; color: #1E3A8A; }
+  .fv-ach.locked i { color: #64748B; }
+  .fv-ach-title { font-size: 12px; font-weight: 700; color: #0B1220; margin-top: 4px; }
+  .fv-ach-sub { font-size: 10px; color: #64748B; margin-top: 2px; }
+
+  /* ── Сетка уроков ── */
+  .fv-lesson-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(11,18,32,0.04); transition: box-shadow 0.18s, transform 0.18s; text-decoration: none !important; color: inherit !important; height: 100%; }
   .fv-lesson-card:hover { box-shadow: 0 4px 14px rgba(11,18,32,0.10); transform: translateY(-2px); }
-  .fv-lesson-thumb { height: 110px; background: linear-gradient(135deg,#EEF2F9,#D8DFEF); display: flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 32px; position: relative; overflow: hidden; }
+  .fv-lesson-thumb { height: 110px; background: linear-gradient(135deg,#EEF2F9,#D8DFEF); display: flex; align-items: center; justify-content: center; color: #64748B; font-size: 32px; position: relative; overflow: hidden; }
   .fv-lesson-thumb img { width: 100%; height: 100%; object-fit: cover; }
-  .fv-lesson-badge { position: absolute; top: 6px; right: 6px; border-radius: 20px; font-size: 10px; font-weight: 600; padding: 2px 7px; line-height: 1.6; }
+  .fv-lesson-badge { position: absolute; top: 6px; right: 6px; border-radius: 20px; font-size: 10px; font-weight: 600; padding: 2px 7px; line-height: 1.6; z-index: 1; }
   .fv-lesson-body { padding: 12px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
-  .fv-lesson-type { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #94A3B8; }
+  .fv-lesson-type { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #64748B; }
   .fv-lesson-title { font-size: 13px; font-weight: 600; color: #0B1220; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .fv-lesson-foot { padding: 8px 12px; border-top: 1px solid #F1F3F5; font-size: 11px; color: #94A3B8; display: flex; align-items: center; gap: 4px; }
-  .fv-sec-hdr { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; }
+  .fv-lesson-desc { font-size: 12px; color: #64748B; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .fv-lesson-foot { padding: 8px 12px; border-top: 1px solid #F1F3F5; font-size: 11px; color: #64748B; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .fv-lesson-status { display: flex; align-items: center; gap: 4px; }
+  .fv-lesson-pts { display: flex; align-items: center; gap: 4px; font-weight: 600; color: #D97706; white-space: nowrap; }
+  .fv-sec-hdr { display: flex; align-items: flex-end; justify-content: space-between; margin: 24px 0 16px; }
   .fv-sec-title { font-size: 18px; font-weight: 700; color: #0B1220; margin: 0; }
-  .fv-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #94A3B8; display: block; margin-bottom: 2px; }
+  .fv-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #64748B; display: block; margin-bottom: 2px; }
+
+  /* Типографические обложки уроков (v2-cover) */
+  .fv-cover { position: relative; height: 110px; overflow: hidden; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; }
+  .fv-cover::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(0deg, transparent 23px, rgba(11,18,32,0.04) 24px),
+      linear-gradient(90deg, transparent 23px, rgba(11,18,32,0.04) 24px);
+    background-size: 24px 24px;
+    opacity: 0.6;
+  }
+  .fv-cover--navy  { background: linear-gradient(135deg, #1E3A8A 0%, #15306E 100%); }
+  .fv-cover--warm  { background: linear-gradient(135deg, #FAF3E8 0%, #F4E5C9 100%); }
+  .fv-cover--slate { background: linear-gradient(135deg, #475569 0%, #334155 100%); }
+  .fv-cover--paper { background: linear-gradient(135deg, #F6F7F9 0%, #E5E7EB 100%); }
+  .fv-cover-label { position: relative; font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+  .fv-cover-title { position: relative; font-weight: 700; line-height: 1.15; font-size: 15px; letter-spacing: -0.01em; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 </style>
 
 <div class="container fv-dash">
@@ -120,7 +322,7 @@
   <!-- HERO -->
   <div class="fv-hero" style="margin-bottom:24px;">
     <span class="fv-hero-eyebrow">Добро пожаловать</span>
-    <h1>{{ user.firstname }}, продолжайте развиваться!</h1>
+    <h1>{{ user.firstname }}, у вас отличный темп — продолжайте!</h1>
     <p>Ваш персональный центр обучения. Отслеживайте прогресс и открывайте новые знания.</p>
     <div class="fv-hero-stats">
       <div class="fv-hero-stat">
@@ -142,173 +344,368 @@
 
   <!-- STAT TILES -->
   <div class="row g-4 mb-4">
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-xl-3">
       <div class="fv-stat-tile">
-        <div class="fv-stat-icon" style="background:#EEF2F9;color:#1E3A8A;"><i class="bi bi-book-half"></i></div>
-        <div>
-          <div class="fv-stat-value">{{ in_progress_count }}</div>
-          <div class="fv-stat-label">В обучении</div>
-          <div class="fv-stat-sub">активных уроков</div>
+        <div class="fv-stat-top">
+          <span class="fv-stat-icon" style="background:#EEF2F9;color:#1E3A8A;"><i class="bi bi-book-half"></i></span>
+          <i class="bi bi-three-dots" style="color:#CBD5E1;"></i>
+        </div>
+        <div class="fv-stat-eyebrow">В обучении</div>
+        <div class="fv-stat-line">
+          <span class="fv-stat-value">{{ in_progress_count }}</span>
+          <span class="fv-stat-sub">активных уроков</span>
         </div>
       </div>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-xl-3">
       <div class="fv-stat-tile">
-        <div class="fv-stat-icon" style="background:#ECF6EF;color:#15803D;"><i class="bi bi-check-circle"></i></div>
-        <div>
-          <div class="fv-stat-value">{{ completed_count }}</div>
-          <div class="fv-stat-label">Завершено</div>
-          <div class="fv-stat-sub">уроков пройдено</div>
+        <div class="fv-stat-top">
+          <span class="fv-stat-icon" style="background:#ECF6EF;color:#15803D;"><i class="bi bi-check-circle"></i></span>
+          <i class="bi bi-three-dots" style="color:#CBD5E1;"></i>
+        </div>
+        <div class="fv-stat-eyebrow">Завершено</div>
+        <div class="fv-stat-line">
+          <span class="fv-stat-value">{{ completed_count }}</span>
+          <span class="fv-stat-sub">уроков пройдено</span>
         </div>
       </div>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-xl-3">
       <div class="fv-stat-tile">
-        <div class="fv-stat-icon" style="background:#FAF3E8;color:#B45309;"><i class="bi bi-collection-play"></i></div>
-        <div>
-          <div class="fv-stat-value">{{ total_available }}</div>
-          <div class="fv-stat-label">Доступно</div>
-          <div class="fv-stat-sub">уроков в каталоге</div>
+        <div class="fv-stat-top">
+          <span class="fv-stat-icon" style="background:#FAF3E8;color:#B45309;"><i class="bi bi-collection-play"></i></span>
+          <i class="bi bi-three-dots" style="color:#CBD5E1;"></i>
+        </div>
+        <div class="fv-stat-eyebrow">Доступно</div>
+        <div class="fv-stat-line">
+          <span class="fv-stat-value">{{ total_available }}</span>
+          <span class="fv-stat-sub">уроков в каталоге</span>
         </div>
       </div>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-xl-3">
       <div class="fv-stat-tile">
-        <div class="fv-stat-icon" style="background:#FBEAEA;color:#B91C1C;"><i class="bi bi-person-check"></i></div>
-        <div>
-          <div class="fv-stat-value">{{ started_count }}</div>
-          <div class="fv-stat-label">Начато</div>
-          <div class="fv-stat-sub">всего за всё время</div>
+        <div class="fv-stat-top">
+          <span class="fv-stat-icon" style="background:#FBEAEA;color:#B91C1C;"><i class="bi bi-person-check"></i></span>
+          <i class="bi bi-three-dots" style="color:#CBD5E1;"></i>
+        </div>
+        <div class="fv-stat-eyebrow">Начато</div>
+        <div class="fv-stat-line">
+          <span class="fv-stat-value">{{ started_count }}</span>
+          <span class="fv-stat-sub">всего за всё время</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- MAIN 2/3 + 1/3 -->
-  <div class="row g-4 mb-4">
-    <div class="col-md-8">
+  <!-- MAIN 2/3 + правый рейл 1/3 (как в дизайн-ките DashboardV2) -->
+  <div class="row g-4">
+
+    <div class="col-lg-8">
+
+      <!-- CONTINUE LEARNING — split-карта -->
       <div class="fv-card mb-4">
         {% if last_lesson %}
-          <div class="fv-card-head" style="padding-bottom:14px;">
-            <h2 class="fv-card-title">Продолжить обучение</h2>
-            <a href="/h5p-catalog" class="fv-card-link">Все уроки →</a>
+        <div class="fv-cont-grid">
+          <div class="fv-cont-left">
+            <span class="fv-card-eyebrow" style="color:#1E3A8A;">Продолжить обучение</span>
+            <h2 class="fv-cont-title">{{ last_lesson.new_name }}</h2>
+            <p class="fv-cont-sub">{{ last_lesson.new_librarytype | default: 'H5P' }} · вы остановились на этом уроке</p>
+            {% if cont_pct >= 0 %}
+            <div class="fv-cont-bar-row">
+              <div class="fv-cont-track"><div class="fv-cont-fill" style="width:{{ cont_pct }}%;"></div></div>
+              <span class="fv-cont-pct">{{ cont_pct }}%</span>
+            </div>
+            {% endif %}
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+              <a href="/h5p-player?id={{ last_lesson.new_h5pcontentid }}" class="fv-cont-btn">
+                Продолжить <i class="bi bi-arrow-right"></i>
+              </a>
+              <a href="/h5p-catalog" class="fv-card-link">Все уроки →</a>
+            </div>
           </div>
-          <div class="fv-card-body">
-            <a href="/h5p-player?id={{ last_lesson.new_h5pcontentid }}" class="fv-continue-btn">
-              <div class="fv-continue-thumb">
-                {% if last_lesson.new_thumbnailurl and last_lesson.new_thumbnailurl != '' %}
-                  <img src="{{ last_lesson.new_thumbnailurl }}" alt="{{ last_lesson.new_name | escape }}" onerror="this.style.display='none'" />
-                {% else %}
-                  <i class="bi bi-play-circle-fill"></i>
-                {% endif %}
-              </div>
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#94A3B8;margin-bottom:4px;">{{ last_lesson.new_librarytype | default: 'H5P' }}</div>
-                <div style="font-size:14px;font-weight:600;color:#0B1220;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ last_lesson.new_name }}</div>
-                <div style="font-size:12px;color:#1E3A8A;margin-top:6px;font-weight:500;"><i class="bi bi-play-circle"></i> Продолжить урок →</div>
-              </div>
-            </a>
+          <div class="fv-cont-cover">
+            {% if last_lesson.new_thumbnailurl and last_lesson.new_thumbnailurl != '' %}
+              <img src="{{ last_lesson.new_thumbnailurl }}" alt="{{ last_lesson.new_name | escape }}" onerror="this.style.display='none'" />
+            {% else %}
+              <span class="fv-cont-cover-label">{{ last_lesson.new_librarytype | default: 'H5P' }}</span>
+              <span class="fv-cont-cover-title">{{ last_lesson.new_name }}</span>
+              <span class="fv-cont-chip"><i class="bi bi-award-fill"></i> +100 баллов</span>
+            {% endif %}
           </div>
+        </div>
         {% else %}
-          <div class="fv-card-body text-center py-4">
-            <i class="bi bi-mortarboard" style="font-size:48px;color:#94A3B8;"></i>
-            <h3 style="font-size:16px;font-weight:700;color:#0B1220;margin:12px 0 6px;">Начните обучение</h3>
-            <p style="font-size:13px;color:#94A3B8;margin-bottom:16px;">Откройте каталог и выберите первый урок!</p>
-            <a href="/h5p-catalog" class="btn btn-primary">
-              <i class="bi bi-collection-play"></i> Открыть каталог уроков
-            </a>
-          </div>
+        <div class="fv-card-body text-center py-4">
+          <i class="bi bi-mortarboard" style="font-size:48px;color:#64748B;"></i>
+          <h3 style="font-size:16px;font-weight:700;color:#0B1220;margin:12px 0 6px;">Начните обучение</h3>
+          <p style="font-size:13px;color:#64748B;margin-bottom:16px;">Откройте каталог и выберите первый урок!</p>
+          <a href="/h5p-catalog" class="btn btn-primary">
+            <i class="bi bi-collection-play"></i> Открыть каталог уроков
+          </a>
+        </div>
         {% endif %}
       </div>
-    </div>
 
-    <div class="col-md-4">
+      <!-- ТРАЕКТОРИЯ РАЗВИТИЯ (демо до появления реальных траекторий) -->
       <div class="fv-card mb-4">
-        <div class="fv-card-head" style="padding-bottom:12px;">
-          <h2 class="fv-card-title">Быстрые действия</h2>
+        <div class="fv-card-head" style="padding-bottom:2px;">
+          <div>
+            <span class="fv-card-eyebrow" style="color:#15803D;">Траектория развития<span class="fv-demo-chip">демо</span></span>
+            <h2 class="fv-card-title">Ваш путь развития</h2>
+          </div>
+          <a href="/paths" class="fv-card-link">Открыть полностью →</a>
         </div>
-        <div class="fv-card-body" style="display:flex;flex-direction:column;gap:8px;">
-          <a href="/h5p-catalog" class="fv-action-btn">
-            <div class="fv-action-icon" style="background:#EEF2F9;color:#1E3A8A;"><i class="bi bi-collection-play-fill"></i></div>
-            Каталог уроков
-          </a>
-          <a href="/h5p-progress" class="fv-action-btn">
-            <div class="fv-action-icon" style="background:#ECF6EF;color:#15803D;"><i class="bi bi-bar-chart-line-fill"></i></div>
-            Мой прогресс
-          </a>
-          <a href="/профиль" class="fv-action-btn">
-            <div class="fv-action-icon" style="background:#FAF3E8;color:#B45309;"><i class="bi bi-person-circle"></i></div>
-            Мой профиль
-          </a>
+        <div class="fv-card-body">
+          <div class="fv-path-track">
+            <div class="fv-path-line"></div>
+            <div class="fv-path-line-fill" style="width:40%;"></div>
+            <div class="fv-path-steps">
+              <div class="fv-path-step">
+                <div class="fv-path-dot" style="background:#15803D;color:#fff;border:4px solid #ECF6EF;"><i class="bi bi-check"></i></div>
+                <div class="fv-path-lbl">Основы</div>
+              </div>
+              <div class="fv-path-step">
+                <div class="fv-path-dot" style="background:#15803D;color:#fff;border:4px solid #ECF6EF;"><i class="bi bi-check"></i></div>
+                <div class="fv-path-lbl">Работа с данными</div>
+              </div>
+              <div class="fv-path-step">
+                <div class="fv-path-dot" style="background:#B45309;color:#fff;border:4px solid #FAF3E8;">3</div>
+                <div class="fv-path-lbl" style="font-weight:700;">Презентации</div>
+                <div class="fv-path-now">сейчас</div>
+              </div>
+              <div class="fv-path-step">
+                <div class="fv-path-dot" style="background:#fff;color:#475569;border:4px solid #E5E7EB;">4</div>
+                <div class="fv-path-lbl">Анализ данных</div>
+              </div>
+              <div class="fv-path-step">
+                <div class="fv-path-dot" style="background:#F0F2F5;color:#64748B;border:4px solid #E5E7EB;"><i class="bi bi-lock"></i></div>
+                <div class="fv-path-lbl" style="color:#64748B;">Финальный проект</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- LESSON GRID -->
-  <div class="fv-sec-hdr">
-    <div>
-      <span class="fv-eyebrow">Каталог</span>
-      <h2 class="fv-sec-title">Доступные уроки</h2>
-    </div>
-    <a href="/h5p-catalog" class="fv-card-link">Открыть полный каталог →</a>
-  </div>
-  <div class="row g-3">
-    {% assign card_count = 0 %}
-    {% for item in h5p_all.results.entities %}
-      {% if card_count < 6 %}
-        {% assign lesson_status = 'not_started' %}
-        {% assign found_status = false %}
-        {% for p in user_progress.results.entities %}
-          {% unless found_status %}
-            {% if p.new_h5pcontent.id == item.id %}
-              {% assign found_status = true %}
-              {% if p.new_completion %}
-                {% assign lesson_status = 'completed' %}
-              {% else %}
-                {% assign lesson_status = 'in_progress' %}
-              {% endif %}
-            {% endif %}
-          {% endunless %}
-        {% endfor %}
-        <div class="col-6 col-md-4 col-lg-2">
-          <a href="/h5p-player?id={{ item.new_h5pcontentid }}" class="fv-lesson-card">
-            <div class="fv-lesson-thumb">
-              {% if item.new_thumbnailurl and item.new_thumbnailurl != '' %}
-                <img src="{{ item.new_thumbnailurl }}" alt="{{ item.new_name | escape }}" onerror="this.style.display='none'" />
-              {% else %}
-                <i class="bi bi-play-circle-fill"></i>
-              {% endif %}
-              {% if lesson_status == 'completed' %}
-                <span class="fv-lesson-badge" style="background:#15803D;color:#fff;"><i class="bi bi-check2"></i></span>
-              {% elsif lesson_status == 'in_progress' %}
-                <span class="fv-lesson-badge" style="background:#1E3A8A;color:#fff;"><i class="bi bi-play-fill"></i></span>
-              {% endif %}
-            </div>
-            <div class="fv-lesson-body">
-              <span class="fv-lesson-type">{{ item.new_librarytype | default: 'H5P' }}</span>
-              <span class="fv-lesson-title">{{ item.new_name }}</span>
-            </div>
-            <div class="fv-lesson-foot">
-              {% if lesson_status == 'completed' %}
-                <i class="bi bi-check-circle-fill" style="color:#15803D;"></i> Завершён
-              {% elsif lesson_status == 'in_progress' %}
-                <i class="bi bi-play-circle-fill" style="color:#1E3A8A;"></i> В процессе
-              {% else %}
-                <i class="bi bi-circle" style="color:#94A3B8;"></i> Не начат
-              {% endif %}
-            </div>
-          </a>
+      <!-- LESSON GRID -->
+      <div class="fv-sec-hdr">
+        <div>
+          <span class="fv-eyebrow" style="color:#B45309;">Каталог</span>
+          <h2 class="fv-sec-title">Доступные уроки</h2>
         </div>
-        {% assign card_count = card_count | plus: 1 %}
-      {% endif %}
-    {% endfor %}
-  </div>
+        <a href="/h5p-catalog" class="fv-card-link">Весь каталог →</a>
+      </div>
+      <div class="row g-3">
+        {% assign card_count = 0 %}
+        {% for item in h5p_all.results.entities %}
+          {% if card_count < 6 %}
+            {% assign lesson_status = 'not_started' %}
+            {% assign found_status = false %}
+            {% for p in user_progress.results.entities %}
+              {% unless found_status %}
+                {% if p.new_h5pcontent.id == item.id %}
+                  {% assign found_status = true %}
+                  {% if p.new_completion %}
+                    {% assign lesson_status = 'completed' %}
+                  {% else %}
+                    {% assign lesson_status = 'in_progress' %}
+                  {% endif %}
+                {% endif %}
+              {% endunless %}
+            {% endfor %}
+            {% assign cov_mod = card_count | modulo: 4 %}
+            {% case cov_mod %}
+              {% when 0 %}{% assign cov = 'paper' %}{% assign cov_dark = false %}
+              {% when 1 %}{% assign cov = 'navy' %}{% assign cov_dark = true %}
+              {% when 2 %}{% assign cov = 'warm' %}{% assign cov_dark = false %}
+              {% else %}{% assign cov = 'slate' %}{% assign cov_dark = true %}
+            {% endcase %}
+            <div class="col-6 col-md-4">
+              <a href="/h5p-player?id={{ item.new_h5pcontentid }}" class="fv-lesson-card">
+                {% if item.new_thumbnailurl and item.new_thumbnailurl != '' %}
+                <div class="fv-lesson-thumb">
+                  <img src="{{ item.new_thumbnailurl }}" alt="{{ item.new_name | escape }}" onerror="this.style.display='none'" />
+                  {% if lesson_status == 'completed' %}
+                    <span class="fv-lesson-badge" style="background:#15803D;color:#fff;"><i class="bi bi-check2"></i></span>
+                  {% elsif lesson_status == 'in_progress' %}
+                    <span class="fv-lesson-badge" style="background:#1E3A8A;color:#fff;"><i class="bi bi-play-fill"></i></span>
+                  {% endif %}
+                </div>
+                {% else %}
+                <div class="fv-cover fv-cover--{{ cov }}">
+                  <span class="fv-cover-label" style="color:{% if cov_dark %}rgba(255,255,255,0.7){% else %}#94A3B8{% endif %};">{{ item.new_librarytype | default: 'H5P' }}</span>
+                  <span class="fv-cover-title" style="color:{% if cov_dark %}#FFFFFF{% else %}#0B1220{% endif %};">{{ item.new_name }}</span>
+                  {% if lesson_status == 'completed' %}
+                    <span class="fv-lesson-badge" style="background:#15803D;color:#fff;"><i class="bi bi-check2"></i></span>
+                  {% elsif lesson_status == 'in_progress' %}
+                    <span class="fv-lesson-badge" style="background:#1E3A8A;color:#fff;"><i class="bi bi-play-fill"></i></span>
+                  {% endif %}
+                </div>
+                {% endif %}
+                <div class="fv-lesson-body">
+                  <span class="fv-lesson-type">{{ item.new_librarytype | default: 'H5P' }}{% if item.new_durationseconds and item.new_durationseconds >= 60 %} · {{ item.new_durationseconds | divided_by: 60 }} мин{% endif %}</span>
+                  <span class="fv-lesson-title">{{ item.new_name }}</span>
+                  {% if item.new_description %}<span class="fv-lesson-desc">{{ item.new_description }}</span>{% endif %}
+                </div>
+                <div class="fv-lesson-foot">
+                  <span class="fv-lesson-status">
+                  {% if lesson_status == 'completed' %}
+                    <i class="bi bi-check-circle-fill" style="color:#15803D;"></i> Завершён
+                  {% elsif lesson_status == 'in_progress' %}
+                    <i class="bi bi-play-circle-fill" style="color:#1E3A8A;"></i> В процессе
+                  {% else %}
+                    <i class="bi bi-circle" style="color:#64748B;"></i> Не начат
+                  {% endif %}
+                  </span>
+                  <span class="fv-lesson-pts"><i class="bi bi-award-fill" aria-hidden="true"></i> +100</span>
+                </div>
+              </a>
+            </div>
+            {% assign card_count = card_count | plus: 1 %}
+          {% endif %}
+        {% endfor %}
+      </div>
+
+    </div><!-- /col-lg-8 -->
+
+    <!-- ПРАВЫЙ РЕЙЛ -->
+    <div class="col-lg-4">
+
+      <!-- БЛИЖАЙШИЕ СОБЫТИЯ (демо до создания таблицы new_event) -->
+      <div class="fv-card mb-4">
+        <div class="fv-card-head" style="padding-bottom:10px;">
+          <div>
+            <span class="fv-card-eyebrow" style="color:#1E3A8A;">Ближайшие события<span class="fv-demo-chip">демо</span></span>
+            <h2 class="fv-card-title">Календарь</h2>
+          </div>
+          {% if is_admin_role %}<a href="/admin/events" class="fv-card-link">Все →</a>{% endif %}
+        </div>
+        <div class="fv-card-body" style="padding-top:4px;">
+          <div class="fv-ev-row">
+            <div class="fv-ev-date"><div class="fv-ev-day">08</div><div class="fv-ev-mon">июл</div></div>
+            <div style="flex:1;min-width:0;">
+              <span class="fv-ev-tag" style="background:#F0F2F5;color:#475569;">live</span>
+              <div class="fv-ev-name">Вебинар: культура обратной связи</div>
+              <div class="fv-ev-time">14:00 · онлайн</div>
+            </div>
+          </div>
+          <div class="fv-ev-row">
+            <div class="fv-ev-date"><div class="fv-ev-day">15</div><div class="fv-ev-mon">июл</div></div>
+            <div style="flex:1;min-width:0;">
+              <span class="fv-ev-tag" style="background:#EEF2F9;color:#1E3A8A;">1:1</span>
+              <div class="fv-ev-name">Ревью с наставником</div>
+              <div class="fv-ev-time">11:30 · MS Teams</div>
+            </div>
+          </div>
+          <div class="fv-ev-row">
+            <div class="fv-ev-date"><div class="fv-ev-day">22</div><div class="fv-ev-mon">июл</div></div>
+            <div style="flex:1;min-width:0;">
+              <span class="fv-ev-tag" style="background:#ECF6EF;color:#15803D;">офис</span>
+              <div class="fv-ev-name">Тимбилдинг: командные игры</div>
+              <div class="fv-ev-time">17:00 · офис</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEADERBOARD -->
+      <div class="fv-card mb-4">
+        <div class="fv-card-head" style="padding-bottom:12px;">
+          <div>
+            <span class="fv-card-eyebrow" style="color:#D97706;">Рейтинг {{ fv_mon }}</span>
+            <h2 class="fv-card-title">Лидеры</h2>
+          </div>
+          <a href="/leaderboard" class="fv-card-link">Полный рейтинг →</a>
+        </div>
+        <div class="fv-card-body" style="padding-top:4px;">
+          {% if lb_count > 0 %}
+            {% if lb_top1_c >= 0 %}
+            <div class="fv-lb-row first">
+              <span class="fv-lb-medal">🥇</span>
+              <div style="flex:1;min-width:0;">
+                <div class="fv-lb-name">{{ lb_top1_n }}</div>
+                {% if lb_top1_j != '' %}<div class="fv-lb-job">{{ lb_top1_j }}</div>{% endif %}
+              </div>
+              <span class="fv-lb-pts">{{ lb_top1_c }}</span>
+            </div>
+            {% endif %}
+            {% if lb_top2_c >= 0 %}
+            <div class="fv-lb-row">
+              <span class="fv-lb-medal">🥈</span>
+              <div style="flex:1;min-width:0;">
+                <div class="fv-lb-name">{{ lb_top2_n }}</div>
+                {% if lb_top2_j != '' %}<div class="fv-lb-job">{{ lb_top2_j }}</div>{% endif %}
+              </div>
+              <span class="fv-lb-pts">{{ lb_top2_c }}</span>
+            </div>
+            {% endif %}
+            {% if lb_top3_c >= 0 %}
+            <div class="fv-lb-row">
+              <span class="fv-lb-medal">🥉</span>
+              <div style="flex:1;min-width:0;">
+                <div class="fv-lb-name">{{ lb_top3_n }}</div>
+                {% if lb_top3_j != '' %}<div class="fv-lb-job">{{ lb_top3_j }}</div>{% endif %}
+              </div>
+              <span class="fv-lb-pts">{{ lb_top3_c }}</span>
+            </div>
+            {% endif %}
+            {% if lb_my_rank > 0 %}
+            <div class="fv-lb-me">
+              <div class="fv-lb-me-rank">{{ lb_my_rank }}</div>
+              <div style="flex:1;min-width:0;">
+                <div class="fv-lb-name">Вы</div>
+                <div class="fv-lb-job">ваша позиция в рейтинге</div>
+              </div>
+              <span class="fv-lb-pts" style="color:#0B1220;">{{ lb_my_coins }}</span>
+            </div>
+            {% endif %}
+          {% else %}
+            <p style="font-size:13px;color:#64748B;margin:0;text-align:center;padding:12px 0;">Рейтинг пока пуст — проходите уроки, чтобы попасть в него!</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- ACHIEVEMENTS -->
+      <div class="fv-card">
+        <div class="fv-card-head" style="padding-bottom:12px;">
+          <div>
+            <span class="fv-card-eyebrow" style="color:#B45309;">Достижения</span>
+            <h2 class="fv-card-title">{{ ach_got }} из 4 получено</h2>
+          </div>
+        </div>
+        <div class="fv-card-body" style="padding-top:4px;">
+          <div class="fv-ach-grid">
+            <div class="fv-ach{% unless ach_rocket %} locked{% endunless %}">
+              <i class="bi bi-rocket-takeoff"></i>
+              <div class="fv-ach-title">Быстрый старт</div>
+              <div class="fv-ach-sub">Первый завершённый урок</div>
+            </div>
+            <div class="fv-ach{% unless ach_sharp %} locked{% endunless %}">
+              <i class="bi bi-bullseye"></i>
+              <div class="fv-ach-title">Меткий стрелок</div>
+              <div class="fv-ach-sub">Урок сдан на 100%</div>
+            </div>
+            <div class="fv-ach{% unless ach_trophy %} locked{% endunless %}">
+              <i class="bi bi-trophy"></i>
+              <div class="fv-ach-title">Покоритель</div>
+              <div class="fv-ach-sub">3 урока завершено</div>
+            </div>
+            <div class="fv-ach{% unless ach_fire %} locked{% endunless %}">
+              <i class="bi bi-fire"></i>
+              <div class="fv-ach-title">Марафонец</div>
+              <div class="fv-ach-sub">10 уроков завершено</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /col-lg-4 -->
+
+  </div><!-- /row -->
 
   {% else %}
   <!-- NOT LOGGED IN -->
   <div class="text-center py-5">
-    <i class="bi bi-mortarboard" style="font-size:64px;color:#94A3B8;"></i>
+    <i class="bi bi-mortarboard" style="font-size:64px;color:#64748B;"></i>
     <h1 style="font-size:28px;font-weight:700;color:#0B1220;margin:16px 0 8px;">Добро пожаловать в FAROVON LMS</h1>
     <p style="font-size:16px;color:#475569;max-width:480px;margin:0 auto 28px;">Войдите в систему, чтобы получить доступ к курсам и отслеживать прогресс.</p>
     <a href="{{ website.sign_in_url_substitution }}" class="btn btn-primary btn-lg">Войти в систему</a>

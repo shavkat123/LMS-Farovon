@@ -43,29 +43,29 @@
 {% assign forum_user = user %}
 
 <style>
-  .fv-forum { padding: 28px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
+  .fv-forum { padding: 12px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
 
   .fv-breadcrumb { margin-bottom: 18px; }
   .fv-breadcrumb ol { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; }
-  .fv-breadcrumb li { font-size: 12px; color: #94A3B8; display: flex; align-items: center; gap: 6px; }
+  .fv-breadcrumb li { font-size: 12px; color: #64748B; display: flex; align-items: center; gap: 6px; }
   .fv-breadcrumb li::after { content: '/'; color: #CBD5E1; }
   .fv-breadcrumb li:last-child::after { display: none; }
   .fv-breadcrumb a { color: #64748B; text-decoration: none; }
-  .fv-breadcrumb a:hover { color: #EC4899; }
+  .fv-breadcrumb a:hover { color: #475569; }
   .fv-breadcrumb li:last-child { color: #0B1220; font-weight: 600; }
 
   .fv-forum-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
-  .fv-eyebrow-pink { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #EC4899; display: block; margin-bottom: 5px; }
+  .fv-eyebrow-pink { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #475569; display: block; margin-bottom: 5px; }
   .fv-forum-title { font-size: 26px; font-weight: 800; color: #0B1220; margin: 0 0 4px; }
   .fv-forum-sub { font-size: 13px; color: #64748B; margin: 0; }
-  .fv-new-btn { display: inline-flex; align-items: center; gap: 6px; background: #EC4899; color: #fff; border: none; border-radius: 12px; padding: 10px 18px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s; white-space: nowrap; text-decoration: none; }
+  .fv-new-btn { display: inline-flex; align-items: center; gap: 6px; background: #1E3A8A; color: #fff; border: none; border-radius: 12px; padding: 10px 18px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s; white-space: nowrap; text-decoration: none; }
   .fv-new-btn:hover { opacity: .88; color: #fff; }
 
   .fv-forum-stats { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
   .fv-fstat { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 12px 18px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
   .fv-fstat-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
   .fv-fstat-val { font-size: 18px; font-weight: 800; color: #0B1220; line-height: 1; }
-  .fv-fstat-lbl { font-size: 11px; color: #94A3B8; margin-top: 1px; }
+  .fv-fstat-lbl { font-size: 11px; color: #64748B; margin-top: 1px; }
 
   .fv-demo-banner { display: flex; align-items: center; gap: 10px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px; padding: 10px 16px; margin-bottom: 18px; font-size: 12px; color: #92400E; }
   .fv-demo-banner i { color: #F59E0B; flex-shrink: 0; }
@@ -73,18 +73,18 @@
   .fv-forum-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
   .fv-filter-tabs { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
   .fv-ftab { padding: 6px 14px; border-radius: 9px; font-size: 12px; font-weight: 600; border: 1px solid #E5E7EB; background: #fff; color: #64748B; cursor: pointer; transition: all .15s; }
-  .fv-ftab.active, .fv-ftab:hover { background: #FDF2F8; border-color: #EC4899; color: #EC4899; }
+  .fv-ftab.active, .fv-ftab:hover { background: #F0F2F5; border-color: #475569; color: #475569; }
   .fv-search-wrap { position: relative; }
   .fv-search-input { padding: 7px 12px 7px 34px; border: 1px solid #E5E7EB; border-radius: 10px; font-size: 13px; color: #0B1220; outline: none; width: 200px; transition: border-color .15s; }
-  .fv-search-input:focus { border-color: #EC4899; }
-  .fv-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #94A3B8; font-size: 14px; pointer-events: none; }
+  .fv-search-input:focus { border-color: #1E3A8A; }
+  .fv-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #64748B; font-size: 14px; pointer-events: none; }
 
   .fv-thread-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 14px; padding: 16px 18px; display: flex; align-items: center; gap: 14px; margin-bottom: 8px; cursor: pointer; transition: box-shadow .18s, border-color .18s; }
   .fv-thread-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.07); border-color: #d0d7e3; }
 
   .fv-vote { display: flex; flex-direction: column; align-items: center; gap: 2px; background: #F8FAFC; border-radius: 10px; padding: 8px 10px; min-width: 42px; flex-shrink: 0; }
-  .fv-vote-btn { background: none; border: none; cursor: pointer; color: #94A3B8; padding: 1px; line-height: 1; font-size: 14px; transition: color .12s; }
-  .fv-vote-btn:hover { color: #EC4899; }
+  .fv-vote-btn { background: none; border: none; cursor: pointer; color: #64748B; padding: 1px; line-height: 1; font-size: 14px; transition: color .12s; }
+  .fv-vote-btn:hover { color: #475569; }
   .fv-vote-num { font-size: 14px; font-weight: 800; color: #0B1220; line-height: 1.2; }
 
   .fv-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; background: linear-gradient(135deg, #DCE4FF, #EFEAFF); color: #2563EB; }
@@ -94,24 +94,41 @@
   .fv-tag { display: inline-block; padding: 2px 8px; border-radius: 5px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
   .fv-tag-pinned { background: #FEF3C7; color: #D97706; }
   .fv-tag-help    { background: #DBEAFE; color: #1D4ED8; }
-  .fv-tag-disc    { background: #EDE9FE; color: #6D28D9; }
+  .fv-tag-disc    { background: #D8DFEF; color: #15306E; }
   .fv-tag-bug     { background: #FEE2E2; color: #DC2626; }
   .fv-tag-idea    { background: #D1FAE5; color: #059669; }
-  .fv-tag-news    { background: #CCFBF1; color: #0F766E; }
+  .fv-tag-news    { background: #D8EEDD; color: #166534; }
   .fv-tag-general { background: #F1F5F9; color: #64748B; }
-  .fv-thread-when { font-size: 11px; color: #94A3B8; }
+  .fv-thread-when { font-size: 11px; color: #64748B; }
   .fv-thread-title { font-size: 15px; font-weight: 700; color: #0B1220; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
 
   .fv-replies { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: #64748B; flex-shrink: 0; white-space: nowrap; }
 
   .fv-pagination { display: none; align-items: center; justify-content: center; gap: 10px; margin-top: 20px; }
   .fv-page-btn { background: #fff; border: 1px solid #E5E7EB; border-radius: 9px; padding: 7px 16px; font-size: 13px; font-weight: 600; color: #374151; cursor: pointer; transition: all .15s; }
-  .fv-page-btn:hover:not(:disabled) { background: #FDF2F8; border-color: #EC4899; color: #EC4899; }
+  .fv-page-btn:hover:not(:disabled) { background: #F0F2F5; border-color: #475569; color: #475569; }
   .fv-page-btn:disabled { opacity: .4; cursor: default; }
   .fv-page-info { font-size: 13px; color: #64748B; min-width: 100px; text-align: center; }
 
   .fv-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 9999; align-items: center; justify-content: center; padding: 20px; }
   .fv-modal-overlay.open { display: flex; }
+
+  /* Инлайн-ошибка формы (вместо alert) */
+  .fv-form-error { display: flex; align-items: center; gap: 8px; background: #FBEAEA; border: 1px solid #F3C1C1; color: #B91C1C; border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 14px; }
+  .fv-form-error[hidden] { display: none; }
+  .fv-input.invalid, .fv-select.invalid { border-color: #B91C1C !important; }
+
+  /* Тост-уведомление (вместо alert) */
+  .fv-toast { position: fixed; right: 20px; bottom: 20px; z-index: 10000; max-width: 360px; background: #0B1220; color: #fff; border-radius: 12px; padding: 12px 16px; font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(11,18,32,.25); opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity .25s ease-out, transform .25s ease-out; }
+  .fv-toast.show { opacity: 1; transform: translateY(0); }
+  .fv-toast.success { background: #15803D; }
+  .fv-toast.error { background: #B91C1C; }
+
+  /* Мобайл: модалка на весь экран */
+  @media (max-width: 576px) {
+    .fv-modal-overlay { padding: 0; align-items: stretch; }
+    .fv-modal { max-width: none; border-radius: 0; height: 100svh; overflow-y: auto; }
+  }
   .fv-modal { background: #fff; border-radius: 20px; padding: 28px; width: 100%; max-width: 540px; box-shadow: 0 20px 60px rgba(0,0,0,.18); position: relative; }
   .fv-modal-title { font-size: 18px; font-weight: 800; color: #0B1220; margin: 0 0 20px; }
   .fv-modal-close { position: absolute; top: 20px; right: 20px; background: #F1F5F9; border: none; border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; color: #64748B; }
@@ -119,12 +136,12 @@
   .fv-field { margin-bottom: 16px; }
   .fv-label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 5px; }
   .fv-input, .fv-textarea, .fv-select { width: 100%; padding: 9px 12px; border: 1px solid #E5E7EB; border-radius: 10px; font-size: 13px; color: #0B1220; outline: none; font-family: inherit; transition: border-color .15s; box-sizing: border-box; }
-  .fv-input:focus, .fv-textarea:focus, .fv-select:focus { border-color: #EC4899; }
+  .fv-input:focus, .fv-textarea:focus, .fv-select:focus { border-color: #475569; }
   .fv-textarea { resize: vertical; min-height: 100px; }
-  .fv-submit-btn { width: 100%; padding: 11px; background: #EC4899; color: #fff; border: none; border-radius: 11px; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity .15s; }
+  .fv-submit-btn { width: 100%; padding: 11px; background: #475569; color: #fff; border: none; border-radius: 11px; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity .15s; }
   .fv-submit-btn:hover { opacity: .88; }
 
-  .fv-empty { text-align: center; padding: 50px 20px; color: #94A3B8; }
+  .fv-empty { text-align: center; padding: 50px 20px; color: #64748B; }
   .fv-empty i { font-size: 40px; display: block; margin-bottom: 10px; }
 </style>
 
@@ -144,7 +161,7 @@
       <p class="fv-forum-sub">Спрашивайте, отвечайте — за полезные ответы начисляются баллы.</p>
     </div>
     {% if forum_user %}
-    <button type="button" class="fv-new-btn" onclick="fvOpenModal()">
+    <button type="button" class="fv-new-btn" id="fvNewBtn">
       <i class="bi bi-plus-lg"></i> Новая тема
     </button>
     {% endif %}
@@ -156,7 +173,7 @@
 
   <div class="fv-forum-stats">
     <div class="fv-fstat">
-      <div class="fv-fstat-icon" style="background:#FDF2F8;color:#EC4899;"><i class="bi bi-chat-square-text"></i></div>
+      <div class="fv-fstat-icon" style="background:#F0F2F5;color:#475569;"><i class="bi bi-chat-square-text"></i></div>
       <div><div class="fv-fstat-val" id="fvStatThreads">{{ stat_threads }}</div><div class="fv-fstat-lbl">Тем</div></div>
     </div>
     <div class="fv-fstat">
@@ -178,17 +195,17 @@
 
   <div class="fv-forum-toolbar">
     <div class="fv-filter-tabs">
-      <button type="button" class="fv-ftab active" onclick="fvFilter('all',this)">Все</button>
-      <button type="button" class="fv-ftab" onclick="fvFilter('Закреплено',this)">📌 Закреплено</button>
-      <button type="button" class="fv-ftab" onclick="fvFilter('Помощь',this)">🙋 Помощь</button>
-      <button type="button" class="fv-ftab" onclick="fvFilter('Дискуссия',this)">💬 Дискуссия</button>
-      <button type="button" class="fv-ftab" onclick="fvFilter('Баг',this)">🐛 Баг</button>
-      <button type="button" class="fv-ftab" onclick="fvFilter('Идея',this)">💡 Идея</button>
-      <button type="button" class="fv-ftab" onclick="fvFilter('Новости',this)">📢 Новости</button>
+      <button type="button" class="fv-ftab active" data-filter="all">Все</button>
+      <button type="button" class="fv-ftab" data-filter="Закреплено">📌 Закреплено</button>
+      <button type="button" class="fv-ftab" data-filter="Помощь">🙋 Помощь</button>
+      <button type="button" class="fv-ftab" data-filter="Дискуссия">💬 Дискуссия</button>
+      <button type="button" class="fv-ftab" data-filter="Баг">🐛 Баг</button>
+      <button type="button" class="fv-ftab" data-filter="Идея">💡 Идея</button>
+      <button type="button" class="fv-ftab" data-filter="Новости">📢 Новости</button>
     </div>
     <div class="fv-search-wrap">
       <i class="bi bi-search fv-search-icon"></i>
-      <input type="text" class="fv-search-input" id="fvSearch" placeholder="Поиск по темам…" oninput="fvSearch()" />
+      <input type="text" class="fv-search-input" id="fvSearch" placeholder="Поиск по темам…" />
     </div>
   </div>
 
@@ -198,7 +215,7 @@
 
     {% comment %}── Demo threads ──{% endcomment %}
     <div class="fv-thread-card" data-tag="Закреплено" data-id="d1">
-      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('d1',1,event)"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d1">64</span><button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('d1',-1,event)"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" data-vote="d1" data-dir="1"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d1">64</span><button type="button" class="fv-vote-btn" title="Голосовать против" data-vote="d1" data-dir="-1"><i class="bi bi-chevron-down"></i></button></div>
       <div class="fv-avatar">👤</div>
       <div class="fv-thread-body">
         <div class="fv-thread-meta"><span class="fv-tag fv-tag-pinned">Закреплено</span><span class="fv-thread-when">2 нед. назад · автор CEO</span></div>
@@ -208,7 +225,7 @@
     </div>
 
     <div class="fv-thread-card" data-tag="Новости" data-id="d2">
-      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('d2',1,event)"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d2">31</span><button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('d2',-1,event)"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" data-vote="d2" data-dir="1"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d2">31</span><button type="button" class="fv-vote-btn" title="Голосовать против" data-vote="d2" data-dir="-1"><i class="bi bi-chevron-down"></i></button></div>
       <div class="fv-avatar">HR</div>
       <div class="fv-thread-body">
         <div class="fv-thread-meta"><span class="fv-tag fv-tag-news">Новости</span><span class="fv-thread-when">1 нед. назад · автор HR Team</span></div>
@@ -218,7 +235,7 @@
     </div>
 
     <div class="fv-thread-card" data-tag="Дискуссия" data-id="d3">
-      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('d3',1,event)"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d3">22</span><button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('d3',-1,event)"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" data-vote="d3" data-dir="1"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d3">22</span><button type="button" class="fv-vote-btn" title="Голосовать против" data-vote="d3" data-dir="-1"><i class="bi bi-chevron-down"></i></button></div>
       <div class="fv-avatar">К</div>
       <div class="fv-thread-body">
         <div class="fv-thread-meta"><span class="fv-tag fv-tag-disc">Дискуссия</span><span class="fv-thread-when">5 д. назад · автор Kamol D.</span></div>
@@ -228,7 +245,7 @@
     </div>
 
     <div class="fv-thread-card" data-tag="Идея" data-id="d4">
-      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('d4',1,event)"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d4">19</span><button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('d4',-1,event)"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" data-vote="d4" data-dir="1"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d4">19</span><button type="button" class="fv-vote-btn" title="Голосовать против" data-vote="d4" data-dir="-1"><i class="bi bi-chevron-down"></i></button></div>
       <div class="fv-avatar">А</div>
       <div class="fv-thread-body">
         <div class="fv-thread-meta"><span class="fv-tag fv-tag-idea">Идея</span><span class="fv-thread-when">3 д. назад · автор Aziz T.</span></div>
@@ -238,7 +255,7 @@
     </div>
 
     <div class="fv-thread-card" data-tag="Дискуссия" data-id="d5">
-      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('d5',1,event)"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d5">14</span><button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('d5',-1,event)"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" data-vote="d5" data-dir="1"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d5">14</span><button type="button" class="fv-vote-btn" title="Голосовать против" data-vote="d5" data-dir="-1"><i class="bi bi-chevron-down"></i></button></div>
       <div class="fv-avatar">Б</div>
       <div class="fv-thread-body">
         <div class="fv-thread-meta"><span class="fv-tag fv-tag-disc">Дискуссия</span><span class="fv-thread-when">5 ч. назад · автор Bekhzod K.</span></div>
@@ -248,7 +265,7 @@
     </div>
 
     <div class="fv-thread-card" data-tag="Помощь" data-id="d6">
-      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('d6',1,event)"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d6">8</span><button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('d6',-1,event)"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" data-vote="d6" data-dir="1"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d6">8</span><button type="button" class="fv-vote-btn" title="Голосовать против" data-vote="d6" data-dir="-1"><i class="bi bi-chevron-down"></i></button></div>
       <div class="fv-avatar">М</div>
       <div class="fv-thread-body">
         <div class="fv-thread-meta"><span class="fv-tag fv-tag-help">Помощь</span><span class="fv-thread-when">2 ч. назад · автор Madina S.</span></div>
@@ -258,7 +275,7 @@
     </div>
 
     <div class="fv-thread-card" data-tag="Помощь" data-id="d7">
-      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('d7',1,event)"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d7">6</span><button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('d7',-1,event)"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" data-vote="d7" data-dir="1"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d7">6</span><button type="button" class="fv-vote-btn" title="Голосовать против" data-vote="d7" data-dir="-1"><i class="bi bi-chevron-down"></i></button></div>
       <div class="fv-avatar">З</div>
       <div class="fv-thread-body">
         <div class="fv-thread-meta"><span class="fv-tag fv-tag-help">Помощь</span><span class="fv-thread-when">4 д. назад · автор Zulfiya O.</span></div>
@@ -268,7 +285,7 @@
     </div>
 
     <div class="fv-thread-card" data-tag="Баг" data-id="d8">
-      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('d8',1,event)"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d8">2</span><button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('d8',-1,event)"><i class="bi bi-chevron-down"></i></button></div>
+      <div class="fv-vote"><button type="button" class="fv-vote-btn" title="Голосовать за" data-vote="d8" data-dir="1"><i class="bi bi-chevron-up"></i></button><span class="fv-vote-num" id="fv-v-d8">2</span><button type="button" class="fv-vote-btn" title="Голосовать против" data-vote="d8" data-dir="-1"><i class="bi bi-chevron-down"></i></button></div>
       <div class="fv-avatar">Н</div>
       <div class="fv-thread-body">
         <div class="fv-thread-meta"><span class="fv-tag fv-tag-bug">Баг</span><span class="fv-thread-when">1 д. назад · автор Nigora R.</span></div>
@@ -310,9 +327,9 @@
 
       <div class="fv-thread-card" data-tag="{{ t_filter }}" data-id="{{ t_id }}">
         <div class="fv-vote">
-          <button type="button" class="fv-vote-btn" title="Голосовать за" onclick="fvVote('{{ t_id }}',1,event)"><i class="bi bi-chevron-up"></i></button>
+          <button type="button" class="fv-vote-btn" title="Голосовать за" data-vote="{{ t_id }}" data-dir="1"><i class="bi bi-chevron-up"></i></button>
           <span class="fv-vote-num" id="fv-v-{{ t_id }}">{{ t_votes }}</span>
-          <button type="button" class="fv-vote-btn" title="Голосовать против" onclick="fvVote('{{ t_id }}',-1,event)"><i class="bi bi-chevron-down"></i></button>
+          <button type="button" class="fv-vote-btn" title="Голосовать против" data-vote="{{ t_id }}" data-dir="-1"><i class="bi bi-chevron-down"></i></button>
         </div>
         <div class="fv-avatar">{{ t_avatar }}</div>
         <div class="fv-thread-body">
@@ -336,17 +353,17 @@
   </div>
 
   <div class="fv-pagination" id="fvPagination">
-    <button type="button" class="fv-page-btn" id="fvPrevBtn" onclick="fvPageChange(-1)">&#8249; Назад</button>
+    <button type="button" class="fv-page-btn" id="fvPrevBtn">&#8249; Назад</button>
     <span class="fv-page-info" id="fvPageInfo"></span>
-    <button type="button" class="fv-page-btn" id="fvNextBtn" onclick="fvPageChange(1)">Вперёд &#8250;</button>
+    <button type="button" class="fv-page-btn" id="fvNextBtn">Вперёд &#8250;</button>
   </div>
 
 </div>
 
-<div class="fv-modal-overlay" id="fvModal" onclick="fvCloseModalOutside(event)">
-  <div class="fv-modal">
-    <h2 class="fv-modal-title">Новая тема</h2>
-    <button type="button" class="fv-modal-close" onclick="fvCloseModal()"><i class="bi bi-x"></i></button>
+<div class="fv-modal-overlay" id="fvModal">
+  <div class="fv-modal" role="dialog" aria-modal="true" aria-labelledby="fvModalTitle">
+    <h2 class="fv-modal-title" id="fvModalTitle">Новая тема</h2>
+    <button type="button" class="fv-modal-close" id="fvModalClose" aria-label="Закрыть окно"><i class="bi bi-x"></i></button>
     <div class="fv-field">
       <label class="fv-label" for="fvNewTitle">Заголовок темы</label>
       <input type="text" id="fvNewTitle" class="fv-input" placeholder="Кратко опишите вопрос или тему…" />
@@ -365,9 +382,14 @@
       <label class="fv-label" for="fvNewBody">Описание</label>
       <textarea id="fvNewBody" class="fv-textarea" placeholder="Подробно опишите вопрос или предложение…"></textarea>
     </div>
-    <button type="button" class="fv-submit-btn" onclick="fvSubmitThread()">Опубликовать тему</button>
+    <div class="fv-form-error" id="fvFormError" role="alert" hidden>
+      <i class="bi bi-exclamation-circle" aria-hidden="true"></i> <span id="fvFormErrorText"></span>
+    </div>
+    <button type="button" class="fv-submit-btn" id="fvSubmitBtn">Опубликовать тему</button>
   </div>
 </div>
+
+<div class="fv-toast" id="fvToast" role="status" aria-live="polite"></div>
 
 <script>
 (function () {
@@ -418,43 +440,99 @@
     if (stat) stat.textContent = total;
   }
 
-  window.fvFilter = function (tag, el) {
-    curFilter = tag; curPage = 1;
-    document.querySelectorAll('.fv-ftab').forEach(function (b) { b.classList.remove('active'); });
-    el.classList.add('active');
-    render();
-  };
+  /* Фильтры по категориям */
+  document.querySelectorAll('.fv-ftab[data-filter]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      curFilter = b.getAttribute('data-filter');
+      curPage = 1;
+      document.querySelectorAll('.fv-ftab').forEach(function (x) { x.classList.remove('active'); });
+      b.classList.add('active');
+      render();
+    });
+  });
 
-  window.fvSearch = function () {
-    curSearch = document.getElementById('fvSearch').value.trim().toLowerCase();
-    curPage = 1;
-    render();
-  };
+  /* Поиск с debounce 300мс */
+  var searchEl = document.getElementById('fvSearch');
+  var debounceT = null;
+  if (searchEl) {
+    searchEl.addEventListener('input', function () {
+      clearTimeout(debounceT);
+      debounceT = setTimeout(function () {
+        curSearch = searchEl.value.trim().toLowerCase();
+        curPage = 1;
+        render();
+      }, 300);
+    });
+  }
 
-  window.fvPageChange = function (dir) {
-    curPage = Math.max(1, curPage + dir);
-    render();
-  };
+  /* Пагинация */
+  document.getElementById('fvPrevBtn').addEventListener('click', function () { curPage = Math.max(1, curPage - 1); render(); });
+  document.getElementById('fvNextBtn').addEventListener('click', function () { curPage = curPage + 1; render(); });
 
-  window.fvVote = function (id, dir, e) {
+  /* Голоса — делегирование по data-атрибутам */
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.fv-vote-btn[data-vote]');
+    if (!btn) return;
     e.stopPropagation();
-    var el = document.getElementById('fv-v-' + id);
-    if (el) el.textContent = Math.max(0, parseInt(el.textContent) + dir);
-  };
+    var el = document.getElementById('fv-v-' + btn.getAttribute('data-vote'));
+    if (el) el.textContent = Math.max(0, parseInt(el.textContent, 10) + parseInt(btn.getAttribute('data-dir'), 10));
+  });
 
-  window.fvOpenModal  = function () { document.getElementById('fvModal').classList.add('open'); };
-  window.fvCloseModal = function () { document.getElementById('fvModal').classList.remove('open'); };
-  window.fvCloseModalOutside = function (e) {
-    if (e.target === document.getElementById('fvModal')) fvCloseModal();
-  };
+  /* Модалка: Esc, клик по фону, возврат фокуса */
+  var modal  = document.getElementById('fvModal');
+  var newBtn = document.getElementById('fvNewBtn');
+  function openModal() {
+    modal.classList.add('open');
+    document.getElementById('fvNewTitle').focus();
+  }
+  function closeModal() {
+    modal.classList.remove('open');
+    if (newBtn) newBtn.focus();
+  }
+  if (newBtn) newBtn.addEventListener('click', openModal);
+  document.getElementById('fvModalClose').addEventListener('click', closeModal);
+  modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
+  });
 
-  window.fvSubmitThread = function () {
-    var title = document.getElementById('fvNewTitle').value.trim();
-    var tag   = document.getElementById('fvNewTag').value;
-    if (!title || !tag) { alert('Заполните заголовок и категорию.'); return; }
-    alert('Тема «' + title + '» будет сохранена в Dataverse после настройки Web API.');
-    fvCloseModal();
-  };
+  /* Инлайн-валидация вместо alert() */
+  function clearFormError() {
+    document.getElementById('fvFormError').hidden = true;
+    document.getElementById('fvNewTitle').classList.remove('invalid');
+    document.getElementById('fvNewTag').classList.remove('invalid');
+  }
+  function showFormError(msg) {
+    document.getElementById('fvFormErrorText').textContent = msg;
+    document.getElementById('fvFormError').hidden = false;
+  }
+
+  /* Тост вместо alert() */
+  var toastT = null;
+  function showToast(msg, type) {
+    var t = document.getElementById('fvToast');
+    if (!t) return;
+    t.textContent = msg;
+    t.className = 'fv-toast show' + (type ? ' ' + type : '');
+    clearTimeout(toastT);
+    toastT = setTimeout(function () { t.classList.remove('show'); }, 4000);
+  }
+
+  document.getElementById('fvSubmitBtn').addEventListener('click', function () {
+    clearFormError();
+    var titleEl = document.getElementById('fvNewTitle');
+    var tagEl   = document.getElementById('fvNewTag');
+    var title = titleEl.value.trim();
+    var tag   = tagEl.value;
+    if (!title || !tag) {
+      if (!title) titleEl.classList.add('invalid');
+      if (!tag)   tagEl.classList.add('invalid');
+      showFormError('Заполните заголовок и категорию.');
+      return;
+    }
+    closeModal();
+    showToast('Тема «' + title + '» будет сохранена после настройки Web API.');
+  });
 
   render();
 })();

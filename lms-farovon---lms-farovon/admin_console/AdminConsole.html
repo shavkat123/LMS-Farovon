@@ -1,0 +1,1940 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Farovon LMS — Admin Console</title>
+<meta name="viewport" content="width=1440">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+/* Farovon LMS Admin — denser corporate tokens, sharper corners */
+:root {
+  --adm-bg-app:     #F4F5F7;
+  --adm-bg-surface: #FFFFFF;
+  --adm-bg-rail:    #0E1A35;       /* deep navy rail */
+  --adm-bg-rail-2:  #182849;
+  --adm-bg-muted:   #EEF0F4;
+
+  --adm-fg-1:       #0B1220;
+  --adm-fg-2:       #475569;
+  --adm-fg-3:       #94A3B8;
+  --adm-fg-rail:    #C7D2E8;
+  --adm-fg-rail-2:  #8A99BD;
+
+  --adm-primary:    #1E3A8A;
+  --adm-primary-50: #EEF2F9;
+  --adm-primary-100:#D8DFEF;
+  --adm-accent:     #B45309;
+  --adm-accent-50:  #FAF3E8;
+  --adm-success:    #15803D;
+  --adm-success-50: #ECF6EF;
+  --adm-danger:     #B91C1C;
+  --adm-danger-50:  #FBEAEA;
+  --adm-warn:       #B45309;
+  --adm-warn-50:    #FAF3E8;
+
+  --adm-border-1:   #E5E7EB;
+  --adm-border-2:   #D1D5DB;
+  --adm-border-rail:rgba(255,255,255,0.08);
+
+  --adm-radius-sm: 6px;
+  --adm-radius-md: 8px;
+  --adm-radius-lg: 12px;
+
+  --adm-shadow-card:  0 1px 2px rgba(11, 18, 32, 0.04), 0 1px 3px rgba(11, 18, 32, 0.04);
+  --adm-shadow-pop:   0 4px 16px rgba(11, 18, 32, 0.08);
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+
+.adm-body {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  background: var(--adm-bg-app);
+  color: var(--adm-fg-1);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+.adm-num { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+.adm-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+.adm-eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--adm-fg-3);
+}
+
+/* Lucide thin strokes */
+.adm-body [data-lucide],
+.adm-body svg.lucide { stroke-width: 1.5 !important; }
+
+/* Card */
+.adm-card {
+  background: var(--adm-bg-surface);
+  border: 1px solid var(--adm-border-1);
+  border-radius: var(--adm-radius-lg);
+}
+
+/* Status pills (small, dense) */
+.adm-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  line-height: 1.4;
+}
+.adm-pill--success { background: var(--adm-success-50); color: var(--adm-success); }
+.adm-pill--danger  { background: var(--adm-danger-50);  color: var(--adm-danger); }
+.adm-pill--warn    { background: var(--adm-warn-50);    color: var(--adm-warn); }
+.adm-pill--info    { background: var(--adm-primary-50); color: var(--adm-primary); }
+.adm-pill--neutral { background: var(--adm-bg-muted);   color: var(--adm-fg-2); }
+.adm-pill--dot::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor;
+}
+
+/* Table */
+.adm-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.adm-table th {
+  text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--adm-fg-3);
+  padding: 10px 14px; background: #FAFBFC;
+  border-bottom: 1px solid var(--adm-border-1);
+  position: sticky; top: 0;
+}
+.adm-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--adm-border-1);
+  font-size: 13px; color: var(--adm-fg-1);
+  vertical-align: middle;
+}
+.adm-table tr:hover td { background: #FAFBFC; }
+.adm-table tr:last-child td { border-bottom: none; }
+
+/* Avatar */
+.adm-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, #DCE4FF, #EFEAFF);
+  color: var(--adm-primary);
+  font-size: 11px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Sidebar styling */
+.adm-rail {
+  background: var(--adm-bg-rail);
+  color: var(--adm-fg-rail);
+}
+.adm-rail-link {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 12px; border-radius: 8px;
+  font-size: 13px; font-weight: 500;
+  color: var(--adm-fg-rail-2);
+  cursor: pointer; transition: all 0.12s;
+}
+.adm-rail-link:hover { background: rgba(255,255,255,0.04); color: #fff; }
+.adm-rail-link.active {
+  background: var(--adm-bg-rail-2);
+  color: #fff;
+  box-shadow: inset 2px 0 0 var(--adm-accent);
+}
+.adm-rail-section {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--adm-fg-rail-2); opacity: 0.55;
+  padding: 14px 12px 6px;
+}
+
+/* Input */
+.adm-input {
+  width: 100%; padding: 8px 12px;
+  background: #fff;
+  border: 1px solid var(--adm-border-2);
+  border-radius: 8px;
+  font-size: 13px; color: var(--adm-fg-1);
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.adm-input:focus { outline: none; border-color: var(--adm-primary); box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.12); }
+
+.adm-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px;
+  font-size: 13px; font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.adm-btn--primary { background: var(--adm-primary); color: #fff; }
+.adm-btn--primary:hover { background: #15306E; }
+.adm-btn--ghost { background: #fff; color: var(--adm-fg-1); border-color: var(--adm-border-2); }
+.adm-btn--ghost:hover { background: var(--adm-bg-muted); }
+.adm-btn--danger-ghost { background: #fff; color: var(--adm-danger); border-color: var(--adm-border-2); }
+
+body { margin: 0; }
+ol, ul { list-style: none; margin: 0; padding: 0; }
+table { border-collapse: collapse; }
+</style>
+</head>
+<body class="adm-body">
+<div id="root"></div>
+<script type="text/babel" data-presets="env,react">
+
+/* ==================== AdminSidebar.jsx ==================== */
+function AdminSidebar({ active, onNav }) {
+  const sections = [
+    {
+      label: 'Обзор',
+      items: [
+        { k: 'dashboard', t: 'Дашборд', i: 'layout-dashboard' },
+        { k: 'analytics', t: 'Аналитика', i: 'bar-chart-3' },
+      ],
+    },
+    {
+      label: 'Контент',
+      items: [
+        { k: 'courses',   t: 'Курсы',         i: 'book-open',  count: 47 },
+        { k: 'paths',     t: 'Траектории',    i: 'route',      count: 12 },
+        { k: 'tests',     t: 'Тесты',         i: 'clipboard-check', count: 84 },
+        { k: 'library',   t: 'Библиотека',    i: 'library' },
+      ],
+    },
+    {
+      label: 'Люди',
+      items: [
+        { k: 'users',     t: 'Сотрудники',    i: 'users',         count: 312 },
+        { k: 'groups',    t: 'Группы',         i: 'users-round' },
+        { k: 'roles',     t: 'Роли и доступы', i: 'shield' },
+      ],
+    },
+    {
+      label: 'Коммуникации',
+      items: [
+        { k: 'broadcasts', t: 'Рассылки',      i: 'send' },
+        { k: 'forum',      t: 'Форум',         i: 'messages-square', count: 3 },
+        { k: 'events',     t: 'События',       i: 'calendar' },
+      ],
+    },
+    {
+      label: 'Система',
+      items: [
+        { k: 'settings',   t: 'Настройки',     i: 'settings-2' },
+        { k: 'integrations', t: 'Интеграции', i: 'plug' },
+        { k: 'audit',      t: 'Журнал',         i: 'file-text' },
+      ],
+    },
+  ];
+
+  return (
+    <aside className="adm-rail flex flex-col shrink-0" style={{ width: 248, height: '100vh' }}>
+      <div className="px-4 pt-5 pb-4 flex items-center gap-2.5" style={{ borderBottom: '1px solid var(--adm-border-rail)' }}>
+        <div className="rounded-md flex items-center justify-center"
+             style={{ width: 32, height: 32, background: '#fff', flexShrink: 0 }}>
+          <img src="../../assets/farovon-logo.png" alt="Farovon" style={{ width: 22, height: 22, objectFit: 'contain' }} />
+        </div>
+        <div className="min-w-0">
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em', lineHeight: 1.1 }}>Farovon LMS</div>
+          <div style={{ fontSize: 10, color: 'var(--adm-fg-rail-2)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Admin Console</div>
+        </div>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto px-3 pb-4">
+        {sections.map((s, si) => (
+          <div key={si}>
+            <div className="adm-rail-section">{s.label}</div>
+            <ul className="space-y-0.5">
+              {s.items.map(it => (
+                <li key={it.k}>
+                  <button onClick={() => onNav(it.k)}
+                          className={'adm-rail-link w-full ' + (active === it.k ? 'active' : '')}>
+                    <i data-lucide={it.i} style={{ width: 16, height: 16 }} />
+                    <span className="flex-1 text-left">{it.t}</span>
+                    {it.count !== undefined && (
+                      <span className="adm-num"
+                            style={{ fontSize: 10, fontWeight: 600, color: 'var(--adm-fg-rail-2)' }}>
+                        {it.count}
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </nav>
+
+      <div className="px-3 pb-4 pt-3" style={{ borderTop: '1px solid var(--adm-border-rail)' }}>
+        <div className="flex items-center gap-2.5 px-2 py-2 rounded-lg"
+             style={{ background: 'rgba(255,255,255,0.03)' }}>
+          <div className="rounded-full flex items-center justify-center font-bold"
+               style={{ width: 32, height: 32, background: 'linear-gradient(135deg, #2D4FBF, #7B5BFF)', color: '#fff', fontSize: 12 }}>
+            МС
+          </div>
+          <div className="flex-1 min-w-0">
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }} className="truncate">Мадина Саидова</div>
+            <div style={{ fontSize: 10, color: 'var(--adm-fg-rail-2)' }}>HR Lead · Admin</div>
+          </div>
+          <i data-lucide="more-vertical" style={{ width: 14, height: 14, color: 'var(--adm-fg-rail-2)' }} />
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+
+/* ==================== AdminTopBar.jsx ==================== */
+function AdminTopBar({ title, breadcrumb, actions }) {
+  return (
+    <header className="flex items-center px-7 py-3.5"
+            style={{ background: '#fff', borderBottom: '1px solid var(--adm-border-1)', minHeight: 60 }}>
+      <div className="flex-1 min-w-0">
+        {breadcrumb && (
+          <div className="flex items-center gap-1.5 mb-0.5" style={{ fontSize: 11, color: 'var(--adm-fg-3)' }}>
+            {breadcrumb.map((b, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && <i data-lucide="chevron-right" style={{ width: 11, height: 11 }} />}
+                <span style={{ fontWeight: i === breadcrumb.length - 1 ? 600 : 400, color: i === breadcrumb.length - 1 ? 'var(--adm-fg-2)' : 'inherit' }}>{b}</span>
+              </React.Fragment>
+            ))}
+          </div>
+        )}
+        <h1 style={{ fontSize: 18, fontWeight: 700, color: 'var(--adm-fg-1)', letterSpacing: '-0.01em' }}>{title}</h1>
+      </div>
+
+      <div className="flex items-center gap-2.5">
+        <div className="relative">
+          <i data-lucide="search" style={{ width: 14, height: 14, color: 'var(--adm-fg-3)', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+          <input className="adm-input" style={{ paddingLeft: 32, width: 240 }} placeholder="Поиск (⌘K)" />
+        </div>
+        <button className="adm-btn adm-btn--ghost" style={{ padding: 8 }} aria-label="Уведомления">
+          <i data-lucide="bell" style={{ width: 15, height: 15 }} />
+        </button>
+        <button className="adm-btn adm-btn--ghost" style={{ padding: 8 }} aria-label="Помощь">
+          <i data-lucide="circle-help" style={{ width: 15, height: 15 }} />
+        </button>
+        {actions}
+      </div>
+    </header>
+  );
+}
+
+
+/* ==================== Dashboard.jsx ==================== */
+// Admin Dashboard
+
+function KPICard({ label, value, delta, deltaPositive, icon, sub }) {
+  return (
+    <div className="adm-card p-5">
+      <div className="flex items-start justify-between mb-4">
+        <span className="adm-eyebrow">{label}</span>
+        <i data-lucide={icon} style={{ width: 16, height: 16, color: 'var(--adm-fg-3)' }} />
+      </div>
+      <div className="adm-num" style={{ fontSize: 28, fontWeight: 700, color: 'var(--adm-fg-1)', letterSpacing: '-0.02em', lineHeight: 1 }}>
+        {value}
+      </div>
+      <div className="flex items-center gap-2 mt-2">
+        {delta && (
+          <span className="adm-num flex items-center gap-0.5"
+                style={{ fontSize: 11, fontWeight: 600, color: deltaPositive ? 'var(--adm-success)' : 'var(--adm-danger)' }}>
+            <i data-lucide={deltaPositive ? 'trending-up' : 'trending-down'} style={{ width: 12, height: 12 }} />
+            {delta}
+          </span>
+        )}
+        {sub && <span style={{ fontSize: 11, color: 'var(--adm-fg-3)' }}>{sub}</span>}
+      </div>
+    </div>
+  );
+}
+
+function MiniSparkline({ data, color }) {
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const w = 220, h = 48;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - min) / (max - min || 1)) * h;
+    return [x, y];
+  });
+  const d = pts.map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(' ');
+  const area = `${d} L${w},${h} L0,${h} Z`;
+  return (
+    <svg width={w} height={h} style={{ display: 'block' }}>
+      <defs>
+        <linearGradient id={`grad-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.2" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#grad-${color.replace('#', '')})`} />
+      <path d={d} fill="none" stroke={color} strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function AdminDashboard() {
+  const activity = [12, 18, 15, 22, 28, 34, 30, 38, 42, 47, 44, 52, 58, 54];
+  const completion = [62, 64, 63, 65, 68, 70, 72, 71, 74, 76, 75, 78, 80, 82];
+
+  const deadlines = [
+    { course: 'Безопасность на рабочем месте', users: 312, completed: 187, deadline: '12 марта', urgency: 'high' },
+    { course: 'Кибергигиена 2026',                users: 280, completed: 220, deadline: '20 марта', urgency: 'med' },
+    { course: 'Антикоррупционная политика',      users: 312, completed: 295, deadline: '25 марта', urgency: 'low' },
+    { course: 'GDPR & защита данных',             users: 145, completed: 88,  deadline: '02 апреля', urgency: 'med' },
+  ];
+
+  const recent = [
+    { who: 'Aziz Karimov',     act: 'завершил курс',       what: 'Power BI: продвинутый',      when: '12 мин назад' },
+    { who: 'Madina Saidova',   act: 'опубликовала курс',    what: 'Лидерство в команде',        when: '1 ч назад' },
+    { who: 'Bekhzod Khasanov', act: 'провалил тест',        what: 'Кибергигиена · попытка 2',   when: '2 ч назад', danger: true },
+    { who: 'Nilufar Rahimova', act: 'добавлена в группу',   what: 'Senior Analytics',           when: '3 ч назад' },
+    { who: 'Rustam Khalilov',  act: 'обновил материал',      what: 'Безопасность · Модуль 4',    when: '5 ч назад' },
+  ];
+
+  return (
+    <div className="space-y-5">
+      {/* KPIs */}
+      <div className="grid grid-cols-4 gap-4">
+        <KPICard label="Активных сотрудников" value="312" delta="+8" deltaPositive sub="за 30 дней" icon="users" />
+        <KPICard label="Курсов запущено"       value="47"  delta="+3" deltaPositive sub="в этом квартале" icon="book-open" />
+        <KPICard label="Средняя завершаемость" value="78%" delta="+4%" deltaPositive sub="к прошлому мес." icon="check-circle-2" />
+        <KPICard label="Просрочек дедлайна"    value="12"  delta="-3"  deltaPositive sub="к прошлой неделе" icon="alarm-clock" />
+      </div>
+
+      {/* Charts row */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="adm-card p-5 col-span-2">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <span className="adm-eyebrow">Активность за 14 дней</span>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--adm-fg-1)', marginTop: 2 }}>Завершённые уроки в день</div>
+            </div>
+            <div className="flex items-center gap-2">
+              {['7д', '14д', '30д', '90д'].map((p, i) => (
+                <button key={p} className="px-2.5 py-1 rounded-md"
+                        style={{ fontSize: 11, fontWeight: 600, background: i === 1 ? 'var(--adm-bg-muted)' : 'transparent', color: i === 1 ? 'var(--adm-fg-1)' : 'var(--adm-fg-3)' }}>
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+          <ChartBars data={activity} />
+        </div>
+
+        <div className="adm-card p-5">
+          <div className="mb-3">
+            <span className="adm-eyebrow">Тренд завершаемости</span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="adm-num" style={{ fontSize: 22, fontWeight: 700, color: 'var(--adm-fg-1)' }}>82%</span>
+              <span className="adm-num flex items-center gap-0.5" style={{ fontSize: 11, fontWeight: 600, color: 'var(--adm-success)' }}>
+                <i data-lucide="trending-up" style={{ width: 11, height: 11 }} /> +6%
+              </span>
+            </div>
+          </div>
+          <MiniSparkline data={completion} color="#1E3A8A" />
+          <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: '1px solid var(--adm-border-1)' }}>
+            <span style={{ fontSize: 11, color: 'var(--adm-fg-3)' }}>Цель квартала</span>
+            <span className="adm-num" style={{ fontSize: 12, fontWeight: 600, color: 'var(--adm-fg-1)' }}>85%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Deadlines + activity */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="adm-card col-span-2">
+          <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--adm-border-1)' }}>
+            <div>
+              <span className="adm-eyebrow">Обязательные курсы</span>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--adm-fg-1)', marginTop: 2 }}>Дедлайны и охват</div>
+            </div>
+            <button className="adm-btn adm-btn--ghost"><i data-lucide="external-link" style={{ width: 13, height: 13 }} /> Все курсы</button>
+          </div>
+          <table className="adm-table">
+            <thead>
+              <tr>
+                <th>Курс</th>
+                <th style={{ width: 140 }}>Прогресс</th>
+                <th style={{ width: 100 }}>Дедлайн</th>
+                <th style={{ width: 80 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {deadlines.map((d, i) => {
+                const pct = Math.round(d.completed / d.users * 100);
+                const u = d.urgency;
+                return (
+                  <tr key={i}>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{d.course}</div>
+                      <div style={{ fontSize: 11, color: 'var(--adm-fg-3)', marginTop: 2 }} className="adm-num">
+                        {d.completed} / {d.users} сотрудников
+                      </div>
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 rounded-full" style={{ background: 'var(--adm-bg-muted)' }}>
+                          <div className="h-full rounded-full"
+                               style={{
+                                 width: `${pct}%`,
+                                 background: u === 'high' ? 'var(--adm-danger)' : u === 'med' ? 'var(--adm-accent)' : 'var(--adm-success)',
+                               }} />
+                        </div>
+                        <span className="adm-num" style={{ fontSize: 11, fontWeight: 600, color: 'var(--adm-fg-2)', minWidth: 28 }}>{pct}%</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={'adm-pill adm-pill--dot ' + (u === 'high' ? 'adm-pill--danger' : u === 'med' ? 'adm-pill--warn' : 'adm-pill--success')}>
+                        {d.deadline}
+                      </span>
+                    </td>
+                    <td className="text-right">
+                      <button className="adm-btn adm-btn--ghost" style={{ padding: '4px 10px', fontSize: 12 }}>Открыть</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="adm-card">
+          <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--adm-border-1)' }}>
+            <span className="adm-eyebrow">Активность</span>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--adm-fg-1)', marginTop: 2 }}>Последние события</div>
+          </div>
+          <ul className="px-5 py-2">
+            {recent.map((r, i) => (
+              <li key={i} className="flex items-start gap-3 py-3" style={{ borderBottom: i < recent.length - 1 ? '1px solid var(--adm-border-1)' : 'none' }}>
+                <div className="adm-avatar" style={{ width: 26, height: 26, fontSize: 10 }}>
+                  {r.who.split(' ').map(s => s[0]).join('')}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div style={{ fontSize: 12.5, color: 'var(--adm-fg-1)', lineHeight: 1.4 }}>
+                    <b>{r.who}</b>{' '}
+                    <span style={{ color: r.danger ? 'var(--adm-danger)' : 'var(--adm-fg-2)' }}>{r.act}</span>{' '}
+                    <span style={{ color: 'var(--adm-fg-2)' }}>«{r.what}»</span>
+                  </div>
+                  <div style={{ fontSize: 10.5, color: 'var(--adm-fg-3)', marginTop: 2 }}>{r.when}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChartBars({ data }) {
+  const max = Math.max(...data);
+  return (
+    <div className="flex items-end gap-1.5" style={{ height: 140 }}>
+      {data.map((v, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
+          <div className="w-full rounded-sm transition"
+               style={{
+                 height: `${(v / max) * 100}%`,
+                 background: i === data.length - 1 ? 'var(--adm-primary)' : 'var(--adm-primary-100)',
+                 minHeight: 4,
+               }} />
+          <span style={{ fontSize: 9, color: 'var(--adm-fg-3)' }}>{i + 1}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+
+/* ==================== Analytics.jsx ==================== */
+// Analytics screen — completion heatmap, dept breakdown, funnel
+
+function AdminAnalytics() {
+  const depts = [
+    { name: 'Операции',     people: 86, completion: 84, hours: 412, trend: 'up' },
+    { name: 'IT',           people: 54, completion: 76, hours: 298, trend: 'up' },
+    { name: 'Финансы',       people: 38, completion: 92, hours: 240, trend: 'flat' },
+    { name: 'HR',            people: 22, completion: 95, hours: 180, trend: 'up' },
+    { name: 'Маркетинг',     people: 28, completion: 68, hours: 142, trend: 'down' },
+    { name: 'Безопасность',  people: 14, completion: 88, hours: 96,  trend: 'flat' },
+  ];
+  const heatmap = Array.from({ length: 7 * 12 }, (_, i) => Math.random());
+
+  const funnel = [
+    { stage: 'Назначено',   count: 312, pct: 100 },
+    { stage: 'Начали',      count: 281, pct: 90 },
+    { stage: 'Половина',    count: 234, pct: 75 },
+    { stage: 'Финальный тест', count: 198, pct: 63 },
+    { stage: 'Сертификат',  count: 187, pct: 60 },
+  ];
+
+  return (
+    <div className="space-y-5">
+      {/* Filter row */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <FilterButton label="Период" value="Q1 2026" />
+        <FilterButton label="Отдел" value="Все отделы" />
+        <FilterButton label="Локация" value="Tashkent + 3" />
+        <FilterButton label="Курс" value="Все курсы" />
+        <div className="flex-1" />
+        <button className="adm-btn adm-btn--ghost"><i data-lucide="download" style={{ width: 13, height: 13 }} /> Экспорт PDF</button>
+        <button className="adm-btn adm-btn--ghost"><i data-lucide="share-2" style={{ width: 13, height: 13 }} /> Поделиться</button>
+      </div>
+
+      {/* KPI tiles */}
+      <div className="grid grid-cols-4 gap-4">
+        <KPI label="Часов обучения"    value="1 412" delta="+18%" up />
+        <KPI label="Новых сертификатов" value="142"   delta="+22%" up />
+        <KPI label="NPS обучения"        value="64"    delta="+5"   up />
+        <KPI label="Стоимость / сотрудника" value="$24"  delta="-12%" up sub="экономия" />
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        {/* Department breakdown */}
+        <div className="adm-card col-span-2">
+          <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--adm-border-1)' }}>
+            <div>
+              <span className="adm-eyebrow">По отделам</span>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--adm-fg-1)', marginTop: 2 }}>Завершаемость и нагрузка</div>
+            </div>
+            <button className="adm-btn adm-btn--ghost"><i data-lucide="arrow-up-down" style={{ width: 13, height: 13 }} /> Сортировка</button>
+          </div>
+          <table className="adm-table">
+            <thead>
+              <tr>
+                <th>Отдел</th>
+                <th style={{ width: 70 }} className="text-right">Люди</th>
+                <th style={{ width: 220 }}>Завершаемость</th>
+                <th style={{ width: 100 }} className="text-right">Часы</th>
+                <th style={{ width: 60 }}>Тренд</th>
+              </tr>
+            </thead>
+            <tbody>
+              {depts.map((d, i) => (
+                <tr key={i}>
+                  <td style={{ fontWeight: 600 }}>{d.name}</td>
+                  <td className="text-right adm-num">{d.people}</td>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full" style={{ background: 'var(--adm-bg-muted)' }}>
+                        <div className="h-full rounded-full"
+                             style={{
+                               width: `${d.completion}%`,
+                               background: d.completion >= 85 ? 'var(--adm-success)' : d.completion < 70 ? 'var(--adm-danger)' : 'var(--adm-primary)',
+                             }} />
+                      </div>
+                      <span className="adm-num" style={{ fontSize: 11, fontWeight: 600, color: 'var(--adm-fg-2)', minWidth: 32 }}>{d.completion}%</span>
+                    </div>
+                  </td>
+                  <td className="text-right adm-num">{d.hours}</td>
+                  <td>
+                    {d.trend === 'up'   && <i data-lucide="trending-up"   style={{ width: 14, height: 14, color: 'var(--adm-success)' }} />}
+                    {d.trend === 'down' && <i data-lucide="trending-down" style={{ width: 14, height: 14, color: 'var(--adm-danger)' }} />}
+                    {d.trend === 'flat' && <i data-lucide="minus"          style={{ width: 14, height: 14, color: 'var(--adm-fg-3)' }} />}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Funnel */}
+        <div className="adm-card p-5">
+          <span className="adm-eyebrow">Воронка прохождения</span>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--adm-fg-1)', marginTop: 2 }}>«Безопасность на рабочем месте»</div>
+          <ul className="mt-5 space-y-2.5">
+            {funnel.map((f, i) => (
+              <li key={i}>
+                <div className="flex items-center justify-between mb-1">
+                  <span style={{ fontSize: 12, color: 'var(--adm-fg-2)' }}>{f.stage}</span>
+                  <span className="adm-num" style={{ fontSize: 12, fontWeight: 600, color: 'var(--adm-fg-1)' }}>
+                    {f.count} <span style={{ color: 'var(--adm-fg-3)', fontWeight: 500 }}>· {f.pct}%</span>
+                  </span>
+                </div>
+                <div className="h-2 rounded-sm" style={{ background: 'var(--adm-bg-muted)' }}>
+                  <div className="h-full rounded-sm" style={{ width: `${f.pct}%`, background: 'var(--adm-primary)' }} />
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-4 pt-4 flex items-center justify-between" style={{ borderTop: '1px solid var(--adm-border-1)' }}>
+            <span style={{ fontSize: 11, color: 'var(--adm-fg-3)' }}>Самый большой отток</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--adm-danger)' }}>Половина → Финальный тест (−15%)</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Heatmap */}
+      <div className="adm-card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <span className="adm-eyebrow">Активность по часам и дням</span>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--adm-fg-1)', marginTop: 2 }}>Когда сотрудники учатся</div>
+          </div>
+          <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--adm-fg-3)' }}>
+            <span>меньше</span>
+            {[0.1, 0.3, 0.5, 0.7, 0.9].map(v => (
+              <div key={v} style={{ width: 12, height: 12, background: `rgba(30, 58, 138, ${v})`, borderRadius: 2 }} />
+            ))}
+            <span>больше</span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <div className="flex flex-col justify-around" style={{ paddingTop: 14, fontSize: 10, color: 'var(--adm-fg-3)' }}>
+            {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(d => <div key={d} style={{ height: 18 }}>{d}</div>)}
+          </div>
+          <div className="flex-1">
+            <div className="flex justify-between mb-1" style={{ fontSize: 9, color: 'var(--adm-fg-3)' }}>
+              {['8:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'].map(t => <span key={t}>{t}</span>)}
+            </div>
+            <div className="grid gap-[3px]" style={{ gridTemplateColumns: 'repeat(12, 1fr)', gridTemplateRows: 'repeat(7, 18px)' }}>
+              {heatmap.map((v, i) => (
+                <div key={i}
+                     style={{
+                       background: `rgba(30, 58, 138, ${0.05 + v * 0.85})`,
+                       borderRadius: 3,
+                     }} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KPI({ label, value, delta, up, sub }) {
+  return (
+    <div className="adm-card p-5">
+      <span className="adm-eyebrow">{label}</span>
+      <div className="adm-num" style={{ fontSize: 26, fontWeight: 700, color: 'var(--adm-fg-1)', letterSpacing: '-0.02em', marginTop: 6 }}>{value}</div>
+      <div className="flex items-center gap-2 mt-1.5">
+        {delta && (
+          <span className="adm-num flex items-center gap-0.5" style={{ fontSize: 11, fontWeight: 600, color: up ? 'var(--adm-success)' : 'var(--adm-danger)' }}>
+            <i data-lucide={up ? 'trending-up' : 'trending-down'} style={{ width: 11, height: 11 }} /> {delta}
+          </span>
+        )}
+        {sub && <span style={{ fontSize: 11, color: 'var(--adm-fg-3)' }}>{sub}</span>}
+      </div>
+    </div>
+  );
+}
+
+function FilterButton({ label, value }) {
+  return (
+    <button className="adm-btn adm-btn--ghost" style={{ fontWeight: 500 }}>
+      <span style={{ color: 'var(--adm-fg-3)' }}>{label}:</span>
+      <span style={{ color: 'var(--adm-fg-1)', fontWeight: 600 }}>{value}</span>
+      <i data-lucide="chevron-down" style={{ width: 12, height: 12, color: 'var(--adm-fg-3)' }} />
+    </button>
+  );
+}
+
+
+
+/* ==================== Users.jsx ==================== */
+// Users management screen — dense employee table
+
+function AdminUsers() {
+  const users = [
+    { id: 1, name: 'Aziz Karimov',      email: 'a.karimov@farovon.tj',  dept: 'Операции',     role: 'Junior Analyst',     courses: { done: 4, total: 7 }, points: 1250, status: 'active',     last: '5 мин назад' },
+    { id: 2, name: 'Madina Saidova',    email: 'm.saidova@farovon.tj', dept: 'HR',           role: 'HR Lead',             courses: { done: 12, total: 12 }, points: 4820, status: 'admin',      last: '20 мин назад' },
+    { id: 3, name: 'Bekhzod Khasanov',  email: 'b.khasanov@farovon.tj', dept: 'IT',           role: 'Senior Engineer',     courses: { done: 6, total: 9 },  points: 2140, status: 'overdue',    last: '1 ч назад' },
+    { id: 4, name: 'Nilufar Rahimova',  email: 'n.rahimova@farovon.tj', dept: 'Финансы',      role: 'Accountant',           courses: { done: 8, total: 8 },  points: 3260, status: 'active',     last: '2 ч назад' },
+    { id: 5, name: 'Rustam Khalilov',   email: 'r.khalilov@farovon.tj', dept: 'Безопасность', role: 'Head of Security',    courses: { done: 15, total: 15 }, points: 5680, status: 'admin',     last: 'вчера' },
+    { id: 6, name: 'Sardor Rashidov',   email: 's.rashidov@farovon.tj', dept: 'Операции',     role: 'Operations Manager',  courses: { done: 10, total: 11 }, points: 3120, status: 'active',    last: 'вчера' },
+    { id: 7, name: 'Olimjon Bakhriev',  email: 'o.bakhriev@farovon.tj', dept: 'Маркетинг',    role: 'Marketing Manager',    courses: { done: 5, total: 8 },  points: 1840, status: 'on-leave',   last: '3 дня назад' },
+    { id: 8, name: 'Zarina Yuldasheva', email: 'z.yuldasheva@farovon.tj', dept: 'HR',         role: 'Recruiter',            courses: { done: 7, total: 7 },  points: 2480, status: 'active',     last: '4 ч назад' },
+    { id: 9, name: 'Farrukh Ismoilov',  email: 'f.ismoilov@farovon.tj', dept: 'IT',           role: 'DevOps',                courses: { done: 3, total: 9 },  points: 920,  status: 'overdue',    last: '6 ч назад' },
+    { id:10, name: 'Dilshod Murodov',   email: 'd.murodov@farovon.tj', dept: 'Финансы',       role: 'Finance Analyst',      courses: { done: 6, total: 8 },  points: 2050, status: 'active',     last: '30 мин назад' },
+  ];
+
+  const statusMap = {
+    active:   { label: 'Активен',     cls: 'adm-pill adm-pill--success adm-pill--dot' },
+    admin:    { label: 'Админ',        cls: 'adm-pill adm-pill--info adm-pill--dot' },
+    overdue:  { label: 'Просрочка',    cls: 'adm-pill adm-pill--danger adm-pill--dot' },
+    'on-leave': { label: 'В отпуске',    cls: 'adm-pill adm-pill--neutral adm-pill--dot' },
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Filter bar */}
+      <div className="adm-card p-4 flex items-center gap-3 flex-wrap">
+        <div className="relative" style={{ flex: '1 1 280px', minWidth: 240 }}>
+          <i data-lucide="search" style={{ width: 14, height: 14, color: 'var(--adm-fg-3)', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+          <input className="adm-input" style={{ paddingLeft: 32 }} placeholder="Имя, email, отдел…" />
+        </div>
+        <FilterPill label="Отдел" value="Все отделы" />
+        <FilterPill label="Роль" value="Все роли" />
+        <FilterPill label="Статус" value="Активные" />
+        <FilterPill label="Группа" value="—" />
+        <div className="flex-1" />
+        <button className="adm-btn adm-btn--ghost"><i data-lucide="download" style={{ width: 13, height: 13 }} /> Экспорт</button>
+        <button className="adm-btn adm-btn--ghost"><i data-lucide="upload" style={{ width: 13, height: 13 }} /> Импорт CSV</button>
+        <button className="adm-btn adm-btn--primary"><i data-lucide="plus" style={{ width: 13, height: 13 }} /> Добавить</button>
+      </div>
+
+      {/* Bulk action bar (selected) */}
+      <div className="adm-card flex items-center justify-between px-4 py-2.5"
+           style={{ background: 'var(--adm-primary-50)', borderColor: 'var(--adm-primary-100)' }}>
+        <div className="flex items-center gap-3" style={{ fontSize: 12.5, color: 'var(--adm-primary)' }}>
+          <i data-lucide="check-square" style={{ width: 14, height: 14 }} />
+          <span><b className="adm-num">3</b> сотрудника выбрано</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="adm-btn adm-btn--ghost" style={{ fontSize: 12 }}>Назначить курс</button>
+          <button className="adm-btn adm-btn--ghost" style={{ fontSize: 12 }}>В группу…</button>
+          <button className="adm-btn adm-btn--ghost" style={{ fontSize: 12 }}>Отправить уведомление</button>
+          <span style={{ width: 1, height: 18, background: 'var(--adm-border-2)' }} />
+          <button className="adm-btn adm-btn--danger-ghost" style={{ fontSize: 12 }}>Деактивировать</button>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="adm-card overflow-hidden">
+        <table className="adm-table">
+          <thead>
+            <tr>
+              <th style={{ width: 36 }}><input type="checkbox" /></th>
+              <th>Сотрудник</th>
+              <th style={{ width: 130 }}>Отдел</th>
+              <th style={{ width: 180 }}>Должность</th>
+              <th style={{ width: 160 }}>Прогресс обучения</th>
+              <th style={{ width: 90 }} className="text-right">Баллы</th>
+              <th style={{ width: 110 }}>Статус</th>
+              <th style={{ width: 110 }}>Активность</th>
+              <th style={{ width: 36 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((u, i) => {
+              const pct = Math.round(u.courses.done / u.courses.total * 100);
+              const checked = i < 3;
+              const statusInfo = statusMap[u.status];
+              return (
+                <tr key={u.id} style={{ background: checked ? 'var(--adm-primary-50)' : 'transparent' }}>
+                  <td><input type="checkbox" defaultChecked={checked} /></td>
+                  <td>
+                    <div className="flex items-center gap-2.5">
+                      <div className="adm-avatar">{u.name.split(' ').map(s => s[0]).join('')}</div>
+                      <div className="min-w-0">
+                        <div style={{ fontWeight: 600 }} className="truncate">{u.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--adm-fg-3)' }} className="truncate">{u.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>{u.dept}</td>
+                  <td>{u.role}</td>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full" style={{ background: 'var(--adm-bg-muted)' }}>
+                        <div className="h-full rounded-full"
+                             style={{
+                               width: `${pct}%`,
+                               background: pct === 100 ? 'var(--adm-success)' : pct < 50 ? 'var(--adm-danger)' : 'var(--adm-primary)',
+                             }} />
+                      </div>
+                      <span className="adm-num" style={{ fontSize: 11, fontWeight: 600, color: 'var(--adm-fg-2)', minWidth: 36 }}>
+                        {u.courses.done}/{u.courses.total}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="text-right adm-num" style={{ fontWeight: 600 }}>{u.points.toLocaleString()}</td>
+                  <td><span className={statusInfo.cls}>{statusInfo.label}</span></td>
+                  <td style={{ fontSize: 11, color: 'var(--adm-fg-3)' }}>{u.last}</td>
+                  <td className="text-right">
+                    <button style={{ padding: 4, color: 'var(--adm-fg-3)' }}>
+                      <i data-lucide="more-horizontal" style={{ width: 15, height: 15 }} />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <div className="px-4 py-3 flex items-center justify-between" style={{ borderTop: '1px solid var(--adm-border-1)' }}>
+          <div style={{ fontSize: 12, color: 'var(--adm-fg-3)' }} className="adm-num">
+            Показано <b style={{ color: 'var(--adm-fg-1)' }}>1–10</b> из <b style={{ color: 'var(--adm-fg-1)' }}>312</b>
+          </div>
+          <div className="flex items-center gap-1">
+            {['‹', '1', '2', '3', '…', '32', '›'].map((p, i) => (
+              <button key={i} className="adm-num"
+                      style={{
+                        minWidth: 28, height: 28, padding: '0 8px',
+                        fontSize: 12, fontWeight: 600,
+                        background: p === '1' ? 'var(--adm-primary)' : 'transparent',
+                        color: p === '1' ? '#fff' : 'var(--adm-fg-2)',
+                        borderRadius: 6,
+                        border: p === '1' ? 'none' : '1px solid var(--adm-border-2)',
+                      }}>{p}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FilterPill({ label, value }) {
+  return (
+    <button className="adm-btn adm-btn--ghost" style={{ fontWeight: 500 }}>
+      <span style={{ color: 'var(--adm-fg-3)' }}>{label}:</span>
+      <span style={{ color: 'var(--adm-fg-1)' }}>{value}</span>
+      <i data-lucide="chevron-down" style={{ width: 12, height: 12, color: 'var(--adm-fg-3)' }} />
+    </button>
+  );
+}
+
+
+
+/* ==================== CourseEditor.jsx ==================== */
+// Course Editor — Equeo-style: drag-and-drop module/lesson tree
+
+function CourseEditor() {
+  const modules = [
+    { num: 1, title: 'Введение в безопасность', lessons: [
+      { type: 'video', title: 'Зачем нужна культура безопасности', dur: '6 мин', pub: true },
+      { type: 'reading', title: 'Политика компании Farovon',         dur: '4 мин', pub: true },
+      { type: 'quiz',   title: 'Проверка понимания',                 dur: '5 вопр.', pub: true },
+    ], collapsed: false },
+    { num: 2, title: 'Физическая безопасность', lessons: [
+      { type: 'video', title: 'Эвакуация и пути выхода', dur: '8 мин', pub: true },
+      { type: 'video', title: 'Работа с электроникой',    dur: '5 мин', pub: false },
+    ], collapsed: true },
+    { num: 3, title: 'Информационная безопасность', lessons: [], collapsed: true },
+    { num: 4, title: 'Реагирование на инциденты',     lessons: [], collapsed: true, draft: true },
+  ];
+
+  const typeIcon = { video: 'play-circle', reading: 'book-open', quiz: 'help-circle', task: 'clipboard-list' };
+  const typeLabel = { video: 'Видео', reading: 'Чтение', quiz: 'Тест', task: 'Задание' };
+  const typeColor = { video: 'var(--adm-primary)', reading: 'var(--adm-fg-2)', quiz: 'var(--adm-accent)', task: 'var(--adm-success)' };
+
+  const tabs = ['Содержание', 'О курсе', 'Аудитория', 'Расписание', 'Сертификат', 'Настройки'];
+
+  return (
+    <div className="space-y-4">
+      {/* Sub header */}
+      <div className="adm-card flex items-center justify-between p-4">
+        <div className="flex items-center gap-4">
+          <div className="rounded-lg flex items-center justify-center" style={{ width: 44, height: 44, background: 'var(--adm-bg-muted)', color: 'var(--adm-primary)' }}>
+            <i data-lucide="shield" style={{ width: 22, height: 22 }} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <input defaultValue="Безопасность на рабочем месте"
+                     style={{ fontSize: 16, fontWeight: 700, color: 'var(--adm-fg-1)', background: 'transparent', border: 'none', outline: 'none', minWidth: 320, letterSpacing: '-0.01em' }} />
+              <span className="adm-pill adm-pill--warn">Черновик</span>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--adm-fg-3)', marginTop: 2 }}>
+              Compliance · версия 2.1 · обновлено сегодня в 14:32 · автор Madina Saidova
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="adm-btn adm-btn--ghost"><i data-lucide="eye" style={{ width: 13, height: 13 }} /> Превью</button>
+          <button className="adm-btn adm-btn--ghost"><i data-lucide="users" style={{ width: 13, height: 13 }} /> Назначить</button>
+          <button className="adm-btn adm-btn--primary"><i data-lucide="rocket" style={{ width: 13, height: 13 }} /> Опубликовать</button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 px-1" style={{ borderBottom: '1px solid var(--adm-border-1)' }}>
+        {tabs.map((t, i) => (
+          <button key={t} className="px-3 py-2.5 transition"
+                  style={{
+                    fontSize: 13, fontWeight: 600,
+                    color: i === 0 ? 'var(--adm-primary)' : 'var(--adm-fg-2)',
+                    borderBottom: i === 0 ? '2px solid var(--adm-primary)' : '2px solid transparent',
+                    marginBottom: -1,
+                  }}>{t}</button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-[1fr_320px] gap-4">
+        {/* Module tree */}
+        <div className="space-y-3">
+          {modules.map((m, mi) => (
+            <div key={mi} className="adm-card overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3" style={{ background: '#FAFBFC', borderBottom: m.collapsed ? 'none' : '1px solid var(--adm-border-1)' }}>
+                <i data-lucide="grip-vertical" style={{ width: 14, height: 14, color: 'var(--adm-fg-3)', cursor: 'grab' }} />
+                <i data-lucide={m.collapsed ? 'chevron-right' : 'chevron-down'} style={{ width: 14, height: 14, color: 'var(--adm-fg-3)' }} />
+                <span className="adm-num" style={{ fontSize: 11, fontWeight: 600, color: 'var(--adm-fg-3)', minWidth: 18 }}>{String(m.num).padStart(2, '0')}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--adm-fg-1)', flex: 1 }}>{m.title}</span>
+                {m.draft && <span className="adm-pill adm-pill--warn">Черновик</span>}
+                <span style={{ fontSize: 11, color: 'var(--adm-fg-3)' }} className="adm-num">{m.lessons.length} уроков</span>
+                <button className="adm-btn adm-btn--ghost" style={{ padding: 5 }}><i data-lucide="more-horizontal" style={{ width: 14, height: 14 }} /></button>
+              </div>
+
+              {!m.collapsed && (
+                <div className="p-2">
+                  <ul>
+                    {m.lessons.map((l, li) => (
+                      <li key={li} className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-[var(--adm-bg-muted)] transition">
+                        <i data-lucide="grip-vertical" style={{ width: 12, height: 12, color: 'var(--adm-fg-3)', cursor: 'grab' }} />
+                        <span className="rounded-md flex items-center justify-center"
+                              style={{ width: 26, height: 26, background: 'var(--adm-bg-muted)', color: typeColor[l.type] }}>
+                          <i data-lucide={typeIcon[l.type]} style={{ width: 13, height: 13 }} />
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--adm-fg-1)' }} className="truncate">{l.title}</div>
+                          <div className="flex items-center gap-2" style={{ fontSize: 10.5, color: 'var(--adm-fg-3)', marginTop: 1 }}>
+                            <span>{typeLabel[l.type]}</span>
+                            <span>·</span>
+                            <span className="adm-num">{l.dur}</span>
+                          </div>
+                        </div>
+                        {!l.pub && <span className="adm-pill adm-pill--warn">Не опубл.</span>}
+                        <button style={{ padding: 4, color: 'var(--adm-fg-3)' }}><i data-lucide="pencil" style={{ width: 13, height: 13 }} /></button>
+                        <button style={{ padding: 4, color: 'var(--adm-fg-3)' }}><i data-lucide="more-horizontal" style={{ width: 13, height: 13 }} /></button>
+                      </li>
+                    ))}
+                  </ul>
+                  <button className="w-full flex items-center justify-center gap-1.5 mt-1 py-2 rounded-md transition"
+                          style={{ fontSize: 12, fontWeight: 600, color: 'var(--adm-primary)', background: 'transparent', border: '1px dashed var(--adm-border-2)' }}>
+                    <i data-lucide="plus" style={{ width: 13, height: 13 }} /> Добавить урок
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+
+          <button className="w-full flex items-center justify-center gap-1.5 py-3 rounded-lg transition"
+                  style={{ fontSize: 13, fontWeight: 600, color: 'var(--adm-primary)', background: '#fff', border: '1px dashed var(--adm-border-2)' }}>
+            <i data-lucide="plus" style={{ width: 14, height: 14 }} /> Добавить модуль
+          </button>
+        </div>
+
+        {/* Right panel: meta */}
+        <div className="space-y-3">
+          <div className="adm-card p-4">
+            <span className="adm-eyebrow">Обложка</span>
+            <div className="mt-2 aspect-[4/3] rounded-md flex items-center justify-center"
+                 style={{ background: 'var(--adm-bg-muted)', border: '1px dashed var(--adm-border-2)' }}>
+              <div className="text-center" style={{ color: 'var(--adm-fg-3)' }}>
+                <i data-lucide="image" style={{ width: 28, height: 28 }} />
+                <div style={{ fontSize: 11, marginTop: 6 }}>Перетащите изображение</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="adm-card p-4 space-y-3">
+            <span className="adm-eyebrow">Параметры</span>
+            <Field label="Категория" value="Compliance" />
+            <Field label="Уровень"   value="Базовый" />
+            <Field label="Длительность" value="~3 ч" />
+            <Field label="Дедлайн"    value="12 марта 2026" emphasis />
+            <Field label="Награда"    value="+250 баллов" />
+            <Field label="Сертификат" value="Да · 12 мес." />
+          </div>
+
+          <div className="adm-card p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="adm-eyebrow">Аудитория</span>
+              <button style={{ fontSize: 11, fontWeight: 600, color: 'var(--adm-primary)' }}>Изменить</button>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--adm-fg-2)', lineHeight: 1.6 }}>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <i data-lucide="users" style={{ width: 12, height: 12 }} />
+                <span><b className="adm-num">312</b> сотрудников</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--adm-fg-3)' }}>
+                Все отделы · все локации · кроме «На испытательном» (24)
+              </div>
+            </div>
+          </div>
+
+          <div className="adm-card p-4">
+            <span className="adm-eyebrow">Чек-лист публикации</span>
+            <ul className="mt-3 space-y-1.5">
+              {[
+                ['Заполнено описание',     true],
+                ['Загружена обложка',       false],
+                ['Все уроки опубликованы',   false],
+                ['Финальный тест добавлен',  true],
+                ['Аудитория настроена',      true],
+              ].map(([t, ok], i) => (
+                <li key={i} className="flex items-center gap-2" style={{ fontSize: 12 }}>
+                  <i data-lucide={ok ? 'check-circle-2' : 'circle'} style={{ width: 14, height: 14, color: ok ? 'var(--adm-success)' : 'var(--adm-fg-3)' }} />
+                  <span style={{ color: ok ? 'var(--adm-fg-2)' : 'var(--adm-fg-1)', textDecoration: ok ? 'line-through' : 'none' }}>{t}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, value, emphasis }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span style={{ fontSize: 11, color: 'var(--adm-fg-3)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>{label}</span>
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: emphasis ? 'var(--adm-accent)' : 'var(--adm-fg-1)' }} className="adm-num">{value}</span>
+    </div>
+  );
+}
+
+
+
+/* ==================== AdminContent.jsx ==================== */
+// Admin — Content section: Paths, Tests, Library
+
+function AdmToolbar({ placeholder, filters = [], primary, extra }) {
+  return (
+    <div className="adm-card p-4 flex items-center gap-3 flex-wrap">
+      <div className="relative" style={{ flex: '1 1 260px', minWidth: 220 }}>
+        <i data-lucide="search" style={{ width: 14, height: 14, color: 'var(--adm-fg-3)', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+        <input className="adm-input" style={{ paddingLeft: 32 }} placeholder={placeholder} />
+      </div>
+      {filters.map((f, i) => (
+        <button key={i} className="adm-btn adm-btn--ghost" style={{ fontWeight: 500 }}>
+          <span style={{ color: 'var(--adm-fg-3)' }}>{f.label}:</span>
+          <span style={{ color: 'var(--adm-fg-1)' }}>{f.value}</span>
+          <i data-lucide="chevron-down" style={{ width: 12, height: 12, color: 'var(--adm-fg-3)' }} />
+        </button>
+      ))}
+      <div className="flex-1" />
+      {extra}
+      {primary && <button className="adm-btn adm-btn--primary"><i data-lucide="plus" style={{ width: 13, height: 13 }} /> {primary}</button>}
+    </div>
+  );
+}
+
+function AdmStat({ icon, label, value, delta, tone = 'var(--adm-primary)' }) {
+  return (
+    <div className="adm-card p-4">
+      <div className="flex items-center gap-2 mb-2.5">
+        <span className="flex items-center justify-center rounded-md" style={{ width: 28, height: 28, background: 'var(--adm-bg-muted)', color: tone }}>
+          <i data-lucide={icon} style={{ width: 15, height: 15 }} />
+        </span>
+        <span className="adm-eyebrow">{label}</span>
+      </div>
+      <div className="flex items-baseline gap-2">
+        <span className="adm-num" style={{ fontSize: 24, fontWeight: 700 }}>{value}</span>
+        {delta && <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--adm-success)' }}>{delta}</span>}
+      </div>
+    </div>
+  );
+}
+
+function AdminPaths() {
+  const paths = [
+    { name: 'Junior → Middle Analyst', dept: 'Аналитика', steps: 5, enrolled: 42, done: 68, status: 'active' },
+    { name: 'Онбординг сотрудника (30 дней)', dept: 'Все отделы', steps: 6, enrolled: 128, done: 84, status: 'active' },
+    { name: 'Soft skills для тимлида', dept: 'Менеджмент', steps: 6, enrolled: 24, done: 41, status: 'active' },
+    { name: 'Путь инженера по безопасности', dept: 'Безопасность', steps: 8, enrolled: 12, done: 22, status: 'draft' },
+    { name: 'Продажи: базовый трек', dept: 'Продажи', steps: 4, enrolled: 56, done: 90, status: 'active' },
+    { name: 'Введение в продуктовую аналитику', dept: 'Продукт', steps: 4, enrolled: 0, done: 0, status: 'draft' },
+  ];
+  const st = {
+    active: { label: 'Опубликован', cls: 'adm-pill adm-pill--success adm-pill--dot' },
+    draft:  { label: 'Черновик',    cls: 'adm-pill adm-pill--neutral adm-pill--dot' },
+  };
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-4 gap-4">
+        <AdmStat icon="route" label="Траекторий" value="12" delta="+2" />
+        <AdmStat icon="users" label="На треках" value="262" delta="+18" tone="var(--adm-accent)" />
+        <AdmStat icon="check-circle-2" label="Средн. завершение" value="61%" tone="var(--adm-success)" />
+        <AdmStat icon="clock" label="Ср. длительность" value="24 дн" />
+      </div>
+
+      <AdmToolbar placeholder="Название траектории…" primary="Создать траекторию"
+        filters={[{ label: 'Отдел', value: 'Все' }, { label: 'Статус', value: 'Активные' }]} />
+
+      <div className="adm-card overflow-hidden">
+        <table className="adm-table">
+          <thead>
+            <tr>
+              <th>Траектория</th>
+              <th style={{ width: 150 }}>Отдел</th>
+              <th style={{ width: 90 }} className="text-center">Шагов</th>
+              <th style={{ width: 100 }} className="text-right">Записано</th>
+              <th style={{ width: 200 }}>Средний прогресс</th>
+              <th style={{ width: 130 }}>Статус</th>
+              <th style={{ width: 40 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {paths.map((p, i) => (
+              <tr key={i}>
+                <td>
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex items-center justify-center rounded-md" style={{ width: 30, height: 30, background: 'var(--adm-primary-50)', color: 'var(--adm-primary)', flexShrink: 0 }}>
+                      <i data-lucide="route" style={{ width: 15, height: 15 }} />
+                    </span>
+                    <span style={{ fontWeight: 600 }}>{p.name}</span>
+                  </div>
+                </td>
+                <td>{p.dept}</td>
+                <td className="text-center adm-num">{p.steps}</td>
+                <td className="text-right adm-num" style={{ fontWeight: 600 }}>{p.enrolled}</td>
+                <td>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 rounded-full" style={{ background: 'var(--adm-bg-muted)' }}>
+                      <div className="h-full rounded-full" style={{ width: `${p.done}%`, background: p.done >= 80 ? 'var(--adm-success)' : 'var(--adm-primary)' }} />
+                    </div>
+                    <span className="adm-num" style={{ fontSize: 11, fontWeight: 600, color: 'var(--adm-fg-2)', minWidth: 30 }}>{p.done}%</span>
+                  </div>
+                </td>
+                <td><span className={st[p.status].cls}>{st[p.status].label}</span></td>
+                <td className="text-right"><button style={{ padding: 4, color: 'var(--adm-fg-3)' }}><i data-lucide="more-horizontal" style={{ width: 15, height: 15 }} /></button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function AdminTests() {
+  const tests = [
+    { name: 'Итоговый тест: Безопасность', q: 20, pass: 80, attempts: 312, rate: 74, course: 'Безопасность на РМ', status: 'active' },
+    { name: 'Кибергигиена — проверка', q: 15, pass: 70, attempts: 208, rate: 88, course: 'Кибергигиена 2026', status: 'active' },
+    { name: 'Excel: практический', q: 25, pass: 75, attempts: 96, rate: 62, course: 'Excel для аналитиков', status: 'active' },
+    { name: 'Онбординг: welcome-квиз', q: 10, pass: 60, attempts: 128, rate: 95, course: 'Онбординг', status: 'active' },
+    { name: 'Лидерство: самооценка', q: 18, pass: 0, attempts: 0, rate: 0, course: 'Лидерство', status: 'draft' },
+  ];
+  const st = {
+    active: { label: 'Активен', cls: 'adm-pill adm-pill--success adm-pill--dot' },
+    draft:  { label: 'Черновик', cls: 'adm-pill adm-pill--neutral adm-pill--dot' },
+  };
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-4 gap-4">
+        <AdmStat icon="clipboard-check" label="Тестов" value="84" delta="+5" />
+        <AdmStat icon="pencil" label="Попыток за месяц" value="1 240" delta="+12%" tone="var(--adm-accent)" />
+        <AdmStat icon="check-circle-2" label="Средн. сдача" value="79%" tone="var(--adm-success)" />
+        <AdmStat icon="alert-triangle" label="Ниже порога" value="6" tone="var(--adm-danger)" />
+      </div>
+
+      <AdmToolbar placeholder="Название теста…" primary="Создать тест"
+        filters={[{ label: 'Курс', value: 'Все' }, { label: 'Статус', value: 'Все' }]}
+        extra={<button className="adm-btn adm-btn--ghost"><i data-lucide="git-branch" style={{ width: 13, height: 13 }} /> Банк вопросов</button>} />
+
+      <div className="adm-card overflow-hidden">
+        <table className="adm-table">
+          <thead>
+            <tr>
+              <th>Тест</th>
+              <th style={{ width: 180 }}>Курс</th>
+              <th style={{ width: 90 }} className="text-center">Вопросов</th>
+              <th style={{ width: 90 }} className="text-center">Порог</th>
+              <th style={{ width: 100 }} className="text-right">Попыток</th>
+              <th style={{ width: 160 }}>Процент сдачи</th>
+              <th style={{ width: 120 }}>Статус</th>
+              <th style={{ width: 40 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {tests.map((t, i) => (
+              <tr key={i}>
+                <td>
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex items-center justify-center rounded-md" style={{ width: 30, height: 30, background: 'var(--adm-accent-50)', color: 'var(--adm-accent)', flexShrink: 0 }}>
+                      <i data-lucide="clipboard-check" style={{ width: 15, height: 15 }} />
+                    </span>
+                    <span style={{ fontWeight: 600 }}>{t.name}</span>
+                  </div>
+                </td>
+                <td style={{ color: 'var(--adm-fg-2)' }}>{t.course}</td>
+                <td className="text-center adm-num">{t.q}</td>
+                <td className="text-center adm-num">{t.pass ? t.pass + '%' : '—'}</td>
+                <td className="text-right adm-num" style={{ fontWeight: 600 }}>{t.attempts || '—'}</td>
+                <td>
+                  {t.attempts ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full" style={{ background: 'var(--adm-bg-muted)' }}>
+                        <div className="h-full rounded-full" style={{ width: `${t.rate}%`, background: t.rate >= 75 ? 'var(--adm-success)' : t.rate < 65 ? 'var(--adm-danger)' : 'var(--adm-accent)' }} />
+                      </div>
+                      <span className="adm-num" style={{ fontSize: 11, fontWeight: 600, color: 'var(--adm-fg-2)', minWidth: 30 }}>{t.rate}%</span>
+                    </div>
+                  ) : <span style={{ color: 'var(--adm-fg-3)', fontSize: 12 }}>нет данных</span>}
+                </td>
+                <td><span className={st[t.status].cls}>{st[t.status].label}</span></td>
+                <td className="text-right"><button style={{ padding: 4, color: 'var(--adm-fg-3)' }}><i data-lucide="more-horizontal" style={{ width: 15, height: 15 }} /></button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function AdminLibrary() {
+  const files = [
+    { name: 'Регламент по охране труда.pdf', type: 'pdf', size: '2.4 МБ', by: 'Р. Халилов', date: '02 июл', dl: 214 },
+    { name: 'Онбординг-презентация.pptx', type: 'ppt', size: '8.1 МБ', by: 'М. Саидова', date: '28 июн', dl: 96 },
+    { name: 'Видео: работа с CRM.mp4', type: 'video', size: '124 МБ', by: 'С. Рашидов', date: '25 июн', dl: 48 },
+    { name: 'Шаблон отчёта.xlsx', type: 'xls', size: '340 КБ', by: 'Н. Рахимова', date: '20 июн', dl: 312 },
+    { name: 'Бренд-гайд Farovon.pdf', type: 'pdf', size: '5.6 МБ', by: 'О. Бахриев', date: '14 июн', dl: 178 },
+    { name: 'Чек-лист безопасности.docx', type: 'doc', size: '88 КБ', by: 'Р. Халилов', date: '10 июн', dl: 402 },
+  ];
+  const typeMap = {
+    pdf:   { icon: 'file-text', color: 'var(--adm-danger)', bg: 'var(--adm-danger-50)' },
+    ppt:   { icon: 'monitor-play', color: 'var(--adm-accent)', bg: 'var(--adm-accent-50)' },
+    video: { icon: 'video', color: 'var(--adm-primary)', bg: 'var(--adm-primary-50)' },
+    xls:   { icon: 'table', color: 'var(--adm-success)', bg: 'var(--adm-success-50)' },
+    doc:   { icon: 'file', color: 'var(--adm-primary)', bg: 'var(--adm-primary-50)' },
+  };
+  const folders = [
+    { name: 'Регламенты', count: 24, icon: 'folder' },
+    { name: 'Презентации', count: 38, icon: 'folder' },
+    { name: 'Видео', count: 12, icon: 'folder' },
+    { name: 'Шаблоны', count: 45, icon: 'folder' },
+  ];
+  return (
+    <div className="space-y-5">
+      <AdmToolbar placeholder="Поиск по файлам…" primary="Загрузить файл"
+        filters={[{ label: 'Тип', value: 'Все' }]}
+        extra={<button className="adm-btn adm-btn--ghost"><i data-lucide="folder-plus" style={{ width: 13, height: 13 }} /> Новая папка</button>} />
+
+      <div className="grid grid-cols-4 gap-4">
+        {folders.map((f, i) => (
+          <div key={i} className="adm-card p-4 flex items-center gap-3 cursor-pointer" style={{ transition: 'border-color .12s' }}>
+            <span className="flex items-center justify-center rounded-lg" style={{ width: 40, height: 40, background: 'var(--adm-bg-muted)', color: 'var(--adm-accent)' }}>
+              <i data-lucide={f.icon} style={{ width: 20, height: 20 }} />
+            </span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{f.name}</div>
+              <div className="adm-num" style={{ fontSize: 11, color: 'var(--adm-fg-3)' }}>{f.count} файлов</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="adm-card overflow-hidden">
+        <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--adm-border-1)' }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>Недавние файлы</span>
+          <span className="adm-eyebrow">119 файлов · 2.1 ГБ</span>
+        </div>
+        <table className="adm-table">
+          <thead>
+            <tr>
+              <th>Файл</th>
+              <th style={{ width: 110 }} className="text-right">Размер</th>
+              <th style={{ width: 150 }}>Загрузил</th>
+              <th style={{ width: 100 }}>Дата</th>
+              <th style={{ width: 110 }} className="text-right">Скачиваний</th>
+              <th style={{ width: 80 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {files.map((f, i) => {
+              const t = typeMap[f.type];
+              return (
+                <tr key={i}>
+                  <td>
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex items-center justify-center rounded-md" style={{ width: 30, height: 30, background: t.bg, color: t.color, flexShrink: 0 }}>
+                        <i data-lucide={t.icon} style={{ width: 15, height: 15 }} />
+                      </span>
+                      <span style={{ fontWeight: 500 }}>{f.name}</span>
+                    </div>
+                  </td>
+                  <td className="text-right adm-num" style={{ color: 'var(--adm-fg-2)' }}>{f.size}</td>
+                  <td style={{ color: 'var(--adm-fg-2)' }}>{f.by}</td>
+                  <td style={{ fontSize: 12, color: 'var(--adm-fg-3)' }}>{f.date}</td>
+                  <td className="text-right adm-num" style={{ fontWeight: 600 }}>{f.dl}</td>
+                  <td className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <button style={{ padding: 4, color: 'var(--adm-fg-3)' }}><i data-lucide="download" style={{ width: 15, height: 15 }} /></button>
+                      <button style={{ padding: 4, color: 'var(--adm-fg-3)' }}><i data-lucide="more-horizontal" style={{ width: 15, height: 15 }} /></button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
+
+/* ==================== AdminPeopleComms.jsx ==================== */
+// Admin — People section: Groups, Roles
+
+function AdminGroups() {
+  const groups = [
+    { name: 'Новые сотрудники', desc: 'Автозачисление при найме', members: 34, courses: 3, auto: true, color: 'var(--adm-primary)' },
+    { name: 'Отдел продаж', desc: 'Синхронизация с HR-системой', members: 78, courses: 6, auto: true, color: 'var(--adm-accent)' },
+    { name: 'Руководители', desc: 'Ручное управление', members: 22, courses: 8, auto: false, color: 'var(--adm-success)' },
+    { name: 'IT-департамент', desc: 'Синхронизация с AD', members: 56, courses: 5, auto: true, color: 'var(--adm-primary)' },
+    { name: 'Стажёры 2026', desc: 'Программа адаптации', members: 18, courses: 4, auto: false, color: 'var(--adm-accent)' },
+    { name: 'Кадровый резерв', desc: 'Ручное управление', members: 12, courses: 7, auto: false, color: 'var(--adm-success)' },
+  ];
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-4 gap-4">
+        <AdmStat icon="users-round" label="Групп" value="18" delta="+3" />
+        <AdmStat icon="user-check" label="Всего в группах" value="312" tone="var(--adm-accent)" />
+        <AdmStat icon="refresh-cw" label="Автосинхрон." value="11" tone="var(--adm-success)" />
+        <AdmStat icon="user-plus" label="Без группы" value="8" tone="var(--adm-danger)" />
+      </div>
+
+      <AdmToolbar placeholder="Название группы…" primary="Создать группу"
+        filters={[{ label: 'Тип', value: 'Все' }]} />
+
+      <div className="grid grid-cols-3 gap-4">
+        {groups.map((g, i) => (
+          <div key={i} className="adm-card p-5">
+            <div className="flex items-start justify-between mb-3">
+              <span className="flex items-center justify-center rounded-lg" style={{ width: 40, height: 40, background: 'var(--adm-bg-muted)', color: g.color }}>
+                <i data-lucide="users-round" style={{ width: 20, height: 20 }} />
+              </span>
+              <button style={{ padding: 4, color: 'var(--adm-fg-3)' }}><i data-lucide="more-horizontal" style={{ width: 16, height: 16 }} /></button>
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>{g.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--adm-fg-3)', marginTop: 2 }}>{g.desc}</div>
+            <div className="flex items-center gap-4 mt-4 pt-4" style={{ borderTop: '1px solid var(--adm-border-1)' }}>
+              <div>
+                <div className="adm-num" style={{ fontSize: 18, fontWeight: 700 }}>{g.members}</div>
+                <div className="adm-eyebrow">Участников</div>
+              </div>
+              <div>
+                <div className="adm-num" style={{ fontSize: 18, fontWeight: 700 }}>{g.courses}</div>
+                <div className="adm-eyebrow">Курсов</div>
+              </div>
+              <div className="flex-1" />
+              {g.auto
+                ? <span className="adm-pill adm-pill--info"><i data-lucide="refresh-cw" style={{ width: 11, height: 11 }} /> Авто</span>
+                : <span className="adm-pill adm-pill--neutral">Ручная</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminRoles() {
+  const perms = ['Просмотр курсов', 'Прохождение', 'Создание курсов', 'Управление людьми', 'Аналитика', 'Настройки', 'Роли и доступы', 'Журнал аудита'];
+  const roles = [
+    { name: 'Сотрудник', desc: 'Базовый доступ к обучению', users: 248, color: 'var(--adm-fg-2)', grid: [1,1,0,0,0,0,0,0] },
+    { name: 'Наставник', desc: 'Ведёт группы и курсы', users: 32, color: 'var(--adm-primary)', grid: [1,1,1,0,1,0,0,0] },
+    { name: 'HR', desc: 'Управление людьми и отчётность', users: 8, color: 'var(--adm-accent)', grid: [1,1,1,1,1,0,0,0] },
+    { name: 'Администратор', desc: 'Полный доступ', users: 4, color: 'var(--adm-danger)', grid: [1,1,1,1,1,1,1,1] },
+  ];
+  return (
+    <div className="space-y-5">
+      <AdmToolbar placeholder="Название роли…" primary="Создать роль" />
+
+      <div className="grid grid-cols-4 gap-4">
+        {roles.map((r, i) => (
+          <div key={i} className="adm-card p-4">
+            <div className="flex items-center gap-2.5 mb-1">
+              <span className="flex items-center justify-center rounded-md" style={{ width: 30, height: 30, background: 'var(--adm-bg-muted)', color: r.color }}>
+                <i data-lucide="shield" style={{ width: 16, height: 16 }} />
+              </span>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{r.name}</div>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--adm-fg-3)' }}>{r.desc}</div>
+            <div className="adm-num" style={{ fontSize: 12, color: 'var(--adm-fg-2)', marginTop: 8 }}><b>{r.users}</b> сотрудников</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="adm-card overflow-hidden">
+        <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--adm-border-1)' }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>Матрица прав доступа</span>
+        </div>
+        <table className="adm-table">
+          <thead>
+            <tr>
+              <th>Разрешение</th>
+              {roles.map((r, i) => <th key={i} className="text-center" style={{ width: 130 }}>{r.name}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {perms.map((p, pi) => (
+              <tr key={pi}>
+                <td style={{ fontWeight: 500 }}>{p}</td>
+                {roles.map((r, ri) => (
+                  <td key={ri} className="text-center">
+                    {r.grid[pi]
+                      ? <span style={{ display: 'inline-flex', color: 'var(--adm-success)' }}><i data-lucide="check" style={{ width: 16, height: 16 }} /></span>
+                      : <span style={{ color: 'var(--adm-border-2)' }}>—</span>}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Communications ───────────────────────────────────────────
+
+function AdminBroadcasts() {
+  const items = [
+    { title: 'Напоминание: дедлайн по безопасности', channel: 'Email + Push', audience: 'Просрочка (24)', sent: '2 июл, 10:00', open: 68, status: 'sent' },
+    { title: 'Новый курс: Power BI', channel: 'Push', audience: 'Аналитика (42)', sent: '28 июн, 14:30', open: 82, status: 'sent' },
+    { title: 'Приглашение на вебинар', channel: 'Email', audience: 'Все (312)', sent: 'Запланировано 14 июл', open: 0, status: 'scheduled' },
+    { title: 'Ежемесячный дайджест обучения', channel: 'Email', audience: 'Все (312)', sent: 'Черновик', open: 0, status: 'draft' },
+    { title: 'Опрос удовлетворённости', channel: 'Push + In-app', audience: 'Активные (280)', sent: '20 июн, 09:00', open: 54, status: 'sent' },
+  ];
+  const st = {
+    sent:      { label: 'Отправлено',   cls: 'adm-pill adm-pill--success adm-pill--dot' },
+    scheduled: { label: 'Запланировано', cls: 'adm-pill adm-pill--info adm-pill--dot' },
+    draft:     { label: 'Черновик',      cls: 'adm-pill adm-pill--neutral adm-pill--dot' },
+  };
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-4 gap-4">
+        <AdmStat icon="send" label="Отправлено за месяц" value="18" />
+        <AdmStat icon="mail-open" label="Средн. открытий" value="66%" tone="var(--adm-success)" />
+        <AdmStat icon="calendar-clock" label="Запланировано" value="3" tone="var(--adm-accent)" />
+        <AdmStat icon="mouse-pointer-click" label="Средн. кликов" value="24%" />
+      </div>
+
+      <AdmToolbar placeholder="Тема рассылки…" primary="Новая рассылка"
+        filters={[{ label: 'Канал', value: 'Все' }, { label: 'Статус', value: 'Все' }]} />
+
+      <div className="adm-card overflow-hidden">
+        <table className="adm-table">
+          <thead>
+            <tr>
+              <th>Рассылка</th>
+              <th style={{ width: 140 }}>Канал</th>
+              <th style={{ width: 160 }}>Аудитория</th>
+              <th style={{ width: 170 }}>Отправка</th>
+              <th style={{ width: 140 }}>Открытий</th>
+              <th style={{ width: 130 }}>Статус</th>
+              <th style={{ width: 40 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((b, i) => (
+              <tr key={i}>
+                <td style={{ fontWeight: 600 }}>{b.title}</td>
+                <td style={{ color: 'var(--adm-fg-2)' }}>{b.channel}</td>
+                <td style={{ color: 'var(--adm-fg-2)' }}>{b.audience}</td>
+                <td style={{ fontSize: 12, color: 'var(--adm-fg-3)' }}>{b.sent}</td>
+                <td>
+                  {b.status === 'sent' ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full" style={{ background: 'var(--adm-bg-muted)' }}>
+                        <div className="h-full rounded-full" style={{ width: `${b.open}%`, background: 'var(--adm-success)' }} />
+                      </div>
+                      <span className="adm-num" style={{ fontSize: 11, fontWeight: 600, color: 'var(--adm-fg-2)', minWidth: 28 }}>{b.open}%</span>
+                    </div>
+                  ) : <span style={{ color: 'var(--adm-fg-3)', fontSize: 12 }}>—</span>}
+                </td>
+                <td><span className={st[b.status].cls}>{st[b.status].label}</span></td>
+                <td className="text-right"><button style={{ padding: 4, color: 'var(--adm-fg-3)' }}><i data-lucide="more-horizontal" style={{ width: 15, height: 15 }} /></button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function AdminForum() {
+  const threads = [
+    { title: 'Советы по экзамену Power BI?', author: 'Мадина С.', replies: 12, cat: 'Помощь', reports: 0, status: 'open', when: '2 ч' },
+    { title: 'Как удерживать мотивацию в длинных модулях?', author: 'Бекзод К.', replies: 7, cat: 'Дискуссия', reports: 0, status: 'open', when: '5 ч' },
+    { title: 'Прогресс не сохраняется на iOS', author: 'Нигора Р.', replies: 3, cat: 'Баг', reports: 1, status: 'flagged', when: '1 д' },
+    { title: 'Реклама сторонних курсов', author: 'Аноним', replies: 0, cat: 'Спам', reports: 4, status: 'flagged', when: '1 д' },
+    { title: 'Добро пожаловать в сообщество!', author: 'CEO', replies: 28, cat: 'Закреплено', reports: 0, status: 'pinned', when: '2 нед' },
+  ];
+  const catCls = {
+    'Помощь': 'adm-pill--info', 'Дискуссия': 'adm-pill--neutral', 'Баг': 'adm-pill--warn',
+    'Спам': 'adm-pill--danger', 'Закреплено': 'adm-pill--success',
+  };
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-4 gap-4">
+        <AdmStat icon="messages-square" label="Тем" value="248" delta="+14" />
+        <AdmStat icon="message-circle" label="Ответов за неделю" value="86" tone="var(--adm-accent)" />
+        <AdmStat icon="flag" label="На модерации" value="3" tone="var(--adm-danger)" />
+        <AdmStat icon="users" label="Активных авторов" value="94" tone="var(--adm-success)" />
+      </div>
+
+      <div className="adm-card flex items-center justify-between px-4 py-2.5" style={{ background: 'var(--adm-danger-50)', borderColor: 'var(--adm-danger)' }}>
+        <div className="flex items-center gap-2.5" style={{ fontSize: 12.5, color: 'var(--adm-danger)' }}>
+          <i data-lucide="flag" style={{ width: 14, height: 14 }} />
+          <span><b>3 темы</b> ожидают модерации — есть жалобы от пользователей</span>
+        </div>
+        <button className="adm-btn adm-btn--danger-ghost" style={{ fontSize: 12 }}>Открыть очередь</button>
+      </div>
+
+      <AdmToolbar placeholder="Поиск по темам…"
+        filters={[{ label: 'Категория', value: 'Все' }, { label: 'Статус', value: 'Все' }]}
+        extra={<button className="adm-btn adm-btn--ghost"><i data-lucide="settings-2" style={{ width: 13, height: 13 }} /> Категории</button>} />
+
+      <div className="adm-card overflow-hidden">
+        <table className="adm-table">
+          <thead>
+            <tr>
+              <th>Тема</th>
+              <th style={{ width: 140 }}>Автор</th>
+              <th style={{ width: 130 }}>Категория</th>
+              <th style={{ width: 90 }} className="text-center">Ответов</th>
+              <th style={{ width: 90 }} className="text-center">Жалоб</th>
+              <th style={{ width: 90 }}>Активность</th>
+              <th style={{ width: 40 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {threads.map((t, i) => (
+              <tr key={i} style={{ background: t.status === 'flagged' ? 'var(--adm-danger-50)' : 'transparent' }}>
+                <td>
+                  <div className="flex items-center gap-2">
+                    {t.status === 'pinned' && <i data-lucide="pin" style={{ width: 13, height: 13, color: 'var(--adm-success)' }} />}
+                    <span style={{ fontWeight: 600 }}>{t.title}</span>
+                  </div>
+                </td>
+                <td style={{ color: 'var(--adm-fg-2)' }}>{t.author}</td>
+                <td><span className={'adm-pill ' + catCls[t.cat]}>{t.cat}</span></td>
+                <td className="text-center adm-num">{t.replies}</td>
+                <td className="text-center adm-num" style={{ fontWeight: 700, color: t.reports ? 'var(--adm-danger)' : 'var(--adm-fg-3)' }}>{t.reports || '—'}</td>
+                <td style={{ fontSize: 12, color: 'var(--adm-fg-3)' }}>{t.when} назад</td>
+                <td className="text-right"><button style={{ padding: 4, color: 'var(--adm-fg-3)' }}><i data-lucide="more-horizontal" style={{ width: 15, height: 15 }} /></button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function AdminEvents() {
+  const events = [
+    { title: 'Культура обратной связи', kind: 'Вебинар', date: '14 июл, 14:00', reg: 42, cap: 100, status: 'open' },
+    { title: 'Тимбилдинг: игры', kind: 'Офлайн', date: '22 июл, 17:00', reg: 38, cap: 40, status: 'almost' },
+    { title: 'Мастер-класс: Power BI', kind: 'Вебинар', date: '27 июл, 16:00', reg: 64, cap: 150, status: 'open' },
+    { title: 'Q&A с CEO', kind: 'Офлайн', date: '02 авг, 12:00', reg: 12, cap: 60, status: 'open' },
+    { title: 'Онбординг-день (июнь)', kind: 'Офлайн', date: '15 июн, 10:00', reg: 34, cap: 34, status: 'past' },
+  ];
+  const st = {
+    open:   { label: 'Открыта запись', cls: 'adm-pill adm-pill--success adm-pill--dot' },
+    almost: { label: 'Мест мало',       cls: 'adm-pill adm-pill--warn adm-pill--dot' },
+    past:   { label: 'Завершено',        cls: 'adm-pill adm-pill--neutral adm-pill--dot' },
+  };
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-4 gap-4">
+        <AdmStat icon="calendar" label="Событий" value="24" delta="+4" />
+        <AdmStat icon="user-check" label="Регистраций" value="486" tone="var(--adm-accent)" />
+        <AdmStat icon="calendar-clock" label="Предстоящих" value="8" tone="var(--adm-primary)" />
+        <AdmStat icon="percent" label="Средн. явка" value="78%" tone="var(--adm-success)" />
+      </div>
+
+      <AdmToolbar placeholder="Название события…" primary="Создать событие"
+        filters={[{ label: 'Тип', value: 'Все' }, { label: 'Статус', value: 'Все' }]} />
+
+      <div className="adm-card overflow-hidden">
+        <table className="adm-table">
+          <thead>
+            <tr>
+              <th>Событие</th>
+              <th style={{ width: 120 }}>Тип</th>
+              <th style={{ width: 170 }}>Дата и время</th>
+              <th style={{ width: 200 }}>Заполненность</th>
+              <th style={{ width: 140 }}>Статус</th>
+              <th style={{ width: 40 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {events.map((e, i) => {
+              const pct = Math.round(e.reg / e.cap * 100);
+              return (
+                <tr key={i}>
+                  <td>
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex items-center justify-center rounded-md" style={{ width: 30, height: 30, background: 'var(--adm-primary-50)', color: 'var(--adm-primary)', flexShrink: 0 }}>
+                        <i data-lucide={e.kind === 'Вебинар' ? 'video' : 'map-pin'} style={{ width: 15, height: 15 }} />
+                      </span>
+                      <span style={{ fontWeight: 600 }}>{e.title}</span>
+                    </div>
+                  </td>
+                  <td style={{ color: 'var(--adm-fg-2)' }}>{e.kind}</td>
+                  <td className="adm-num" style={{ fontSize: 12.5, color: 'var(--adm-fg-2)' }}>{e.date}</td>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full" style={{ background: 'var(--adm-bg-muted)' }}>
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: pct >= 95 ? 'var(--adm-accent)' : 'var(--adm-primary)' }} />
+                      </div>
+                      <span className="adm-num" style={{ fontSize: 11, fontWeight: 600, color: 'var(--adm-fg-2)', minWidth: 52 }}>{e.reg}/{e.cap}</span>
+                    </div>
+                  </td>
+                  <td><span className={st[e.status].cls}>{st[e.status].label}</span></td>
+                  <td className="text-right"><button style={{ padding: 4, color: 'var(--adm-fg-3)' }}><i data-lucide="more-horizontal" style={{ width: 15, height: 15 }} /></button></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
+
+/* ==================== AdminSystem.jsx ==================== */
+// Admin — System section: Settings, Integrations, Audit
+
+function AdminSettings() {
+  const nav = ['Общие', 'Брендинг', 'Уведомления', 'Геймификация', 'Безопасность', 'Локализация'];
+  const Row = ({ title, desc, control }) => (
+    <div className="flex items-center justify-between py-4" style={{ borderBottom: '1px solid var(--adm-border-1)' }}>
+      <div style={{ maxWidth: 460 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600 }}>{title}</div>
+        <div style={{ fontSize: 12, color: 'var(--adm-fg-3)', marginTop: 2 }}>{desc}</div>
+      </div>
+      {control}
+    </div>
+  );
+  const Toggle = ({ on }) => (
+    <span style={{ width: 38, height: 22, borderRadius: 999, background: on ? 'var(--adm-primary)' : 'var(--adm-border-2)', position: 'relative', flexShrink: 0, cursor: 'pointer' }}>
+      <span style={{ position: 'absolute', top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
+    </span>
+  );
+  return (
+    <div className="grid grid-cols-[200px_1fr] gap-6">
+      <nav className="space-y-0.5">
+        {nav.map((n, i) => (
+          <button key={i} className="w-full text-left px-3 py-2 rounded-lg"
+                  style={{ fontSize: 13, fontWeight: i === 0 ? 600 : 500, background: i === 0 ? 'var(--adm-primary-50)' : 'transparent', color: i === 0 ? 'var(--adm-primary)' : 'var(--adm-fg-2)' }}>
+            {n}
+          </button>
+        ))}
+      </nav>
+
+      <div className="space-y-5">
+        <div className="adm-card p-6">
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Общие настройки</div>
+          <div className="adm-eyebrow" style={{ marginBottom: 8 }}>Основные параметры платформы</div>
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="adm-eyebrow" style={{ display: 'block', marginBottom: 6 }}>Название организации</label>
+              <input className="adm-input" defaultValue="Farovon" />
+            </div>
+            <div>
+              <label className="adm-eyebrow" style={{ display: 'block', marginBottom: 6 }}>Домен</label>
+              <input className="adm-input" defaultValue="learn.farovon.tj" />
+            </div>
+            <div>
+              <label className="adm-eyebrow" style={{ display: 'block', marginBottom: 6 }}>Часовой пояс</label>
+              <input className="adm-input" defaultValue="(GMT+5) Ташкент" />
+            </div>
+            <div>
+              <label className="adm-eyebrow" style={{ display: 'block', marginBottom: 6 }}>Язык по умолчанию</label>
+              <input className="adm-input" defaultValue="Русский" />
+            </div>
+          </div>
+        </div>
+
+        <div className="adm-card p-6">
+          <div style={{ fontSize: 15, fontWeight: 700 }}>Политики обучения</div>
+          <div style={{ marginTop: 4 }}>
+            <Row title="Обязательный онбординг" desc="Автоназначение welcome-курса новым сотрудникам" control={<Toggle on={true} />} />
+            <Row title="Дедлайны по умолчанию" desc="30 дней на завершение обязательного курса" control={<Toggle on={true} />} />
+            <Row title="Автонапоминания" desc="Уведомлять за 3 дня до дедлайна" control={<Toggle on={true} />} />
+            <Row title="Сертификаты с QR" desc="Генерировать QR-валидацию для сертификатов" control={<Toggle on={false} />} />
+            <div className="flex items-center justify-between pt-4">
+              <span style={{ fontSize: 12, color: 'var(--adm-fg-3)' }}>Изменения применяются сразу</span>
+              <div className="flex items-center gap-2">
+                <button className="adm-btn adm-btn--ghost">Отмена</button>
+                <button className="adm-btn adm-btn--primary">Сохранить</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminIntegrations() {
+  const integrations = [
+    { name: 'Active Directory', desc: 'Синхронизация пользователей и групп', icon: 'users', status: 'connected', by: 'IT-отдел' },
+    { name: 'MS Teams', desc: 'Уведомления и вебинары', icon: 'video', status: 'connected', by: 'M. Саидова' },
+    { name: '1C:Зарплата', desc: 'Импорт оргструктуры', icon: 'building-2', status: 'connected', by: 'HR' },
+    { name: 'Telegram Bot', desc: 'Push-уведомления в мессенджер', icon: 'send', status: 'connected', by: 'IT-отдел' },
+    { name: 'Slack', desc: 'Оповещения о курсах', icon: 'hash', status: 'available', by: null },
+    { name: 'Google Calendar', desc: 'Синхронизация событий', icon: 'calendar', status: 'available', by: null },
+    { name: 'Zoom', desc: 'Вебинары и записи', icon: 'video', status: 'error', by: 'IT-отдел' },
+    { name: 'SCORM / xAPI', desc: 'Импорт внешних курсов', icon: 'package', status: 'available', by: null },
+  ];
+  const st = {
+    connected: { label: 'Подключено', cls: 'adm-pill adm-pill--success adm-pill--dot' },
+    available: { label: 'Доступно',   cls: 'adm-pill adm-pill--neutral' },
+    error:     { label: 'Ошибка',      cls: 'adm-pill adm-pill--danger adm-pill--dot' },
+  };
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-3 gap-4">
+        <AdmStat icon="plug" label="Подключено" value="4" tone="var(--adm-success)" />
+        <AdmStat icon="alert-triangle" label="Требуют внимания" value="1" tone="var(--adm-danger)" />
+        <AdmStat icon="package" label="Доступно" value="12" tone="var(--adm-fg-2)" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        {integrations.map((it, i) => (
+          <div key={i} className="adm-card p-5 flex items-center gap-4">
+            <span className="flex items-center justify-center rounded-lg" style={{ width: 44, height: 44, background: 'var(--adm-bg-muted)', color: it.status === 'error' ? 'var(--adm-danger)' : 'var(--adm-primary)', flexShrink: 0 }}>
+              <i data-lucide={it.icon} style={{ width: 22, height: 22 }} />
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span style={{ fontSize: 14, fontWeight: 700 }}>{it.name}</span>
+                <span className={st[it.status].cls}>{st[it.status].label}</span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--adm-fg-3)', marginTop: 2 }}>{it.desc}</div>
+              {it.by && <div style={{ fontSize: 11, color: 'var(--adm-fg-3)', marginTop: 4 }}>Настроил: {it.by}</div>}
+            </div>
+            <button className={'adm-btn ' + (it.status === 'available' ? 'adm-btn--primary' : 'adm-btn--ghost')} style={{ flexShrink: 0 }}>
+              {it.status === 'available' ? 'Подключить' : it.status === 'error' ? 'Исправить' : 'Настроить'}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminAudit() {
+  const logs = [
+    { time: '14:32:08', actor: 'М. Саидова', action: 'Назначила курс', target: '«Безопасность» → Группа «Новые»', ip: '10.0.4.12', type: 'assign' },
+    { time: '14:18:44', actor: 'Р. Халилов', action: 'Изменил роль', target: 'Ф. Исмоилов → Наставник', ip: '10.0.4.31', type: 'role' },
+    { time: '13:52:10', actor: 'Система', action: 'Синхронизация AD', target: '312 пользователей обновлено', ip: '—', type: 'sync' },
+    { time: '13:40:22', actor: 'М. Саидова', action: 'Опубликовала курс', target: '«Кибергигиена 2026»', ip: '10.0.4.12', type: 'publish' },
+    { time: '12:15:03', actor: 'А. Каримов', action: 'Вход в систему', target: 'Успешно', ip: '10.0.7.88', type: 'auth' },
+    { time: '11:58:47', actor: 'Неизвестно', action: 'Неудачный вход', target: 'admin@farovon.tj — 3 попытки', ip: '203.0.113.9', type: 'security' },
+    { time: '11:30:12', actor: 'Р. Халилов', action: 'Изменил настройки', target: 'Политики обучения', ip: '10.0.4.31', type: 'settings' },
+    { time: '10:44:55', actor: 'Система', action: 'Отправлена рассылка', target: 'Напоминание о дедлайне (24 чел.)', ip: '—', type: 'broadcast' },
+  ];
+  const typeMap = {
+    assign:   { color: 'var(--adm-primary)', bg: 'var(--adm-primary-50)', icon: 'user-plus' },
+    role:     { color: 'var(--adm-accent)', bg: 'var(--adm-accent-50)', icon: 'shield' },
+    sync:     { color: 'var(--adm-fg-2)', bg: 'var(--adm-bg-muted)', icon: 'refresh-cw' },
+    publish:  { color: 'var(--adm-success)', bg: 'var(--adm-success-50)', icon: 'upload' },
+    auth:     { color: 'var(--adm-success)', bg: 'var(--adm-success-50)', icon: 'log-in' },
+    security: { color: 'var(--adm-danger)', bg: 'var(--adm-danger-50)', icon: 'shield-alert' },
+    settings: { color: 'var(--adm-fg-2)', bg: 'var(--adm-bg-muted)', icon: 'settings-2' },
+    broadcast:{ color: 'var(--adm-primary)', bg: 'var(--adm-primary-50)', icon: 'send' },
+  };
+  return (
+    <div className="space-y-5">
+      <AdmToolbar placeholder="Поиск по действиям, пользователям, IP…"
+        filters={[{ label: 'Тип', value: 'Все' }, { label: 'Пользователь', value: 'Все' }, { label: 'Период', value: 'Сегодня' }]}
+        extra={<button className="adm-btn adm-btn--ghost"><i data-lucide="download" style={{ width: 13, height: 13 }} /> Экспорт лога</button>} />
+
+      <div className="adm-card overflow-hidden">
+        <div className="px-4 py-2.5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--adm-border-1)', background: '#FAFBFC' }}>
+          <span className="adm-eyebrow">6 июля 2026 · показано 8 из 1 284 событий</span>
+          <span className="adm-pill adm-pill--danger adm-pill--dot">1 событие безопасности</span>
+        </div>
+        <table className="adm-table">
+          <thead>
+            <tr>
+              <th style={{ width: 100 }}>Время</th>
+              <th style={{ width: 160 }}>Пользователь</th>
+              <th style={{ width: 180 }}>Действие</th>
+              <th>Объект</th>
+              <th style={{ width: 130 }}>IP-адрес</th>
+            </tr>
+          </thead>
+          <tbody>
+            {logs.map((l, i) => {
+              const t = typeMap[l.type];
+              return (
+                <tr key={i} style={{ background: l.type === 'security' ? 'var(--adm-danger-50)' : 'transparent' }}>
+                  <td className="adm-mono" style={{ fontSize: 12, color: 'var(--adm-fg-2)' }}>{l.time}</td>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      {l.actor === 'Система' || l.actor === 'Неизвестно'
+                        ? <span className="flex items-center justify-center rounded-full" style={{ width: 24, height: 24, background: 'var(--adm-bg-muted)', color: 'var(--adm-fg-3)' }}><i data-lucide={l.actor === 'Система' ? 'cpu' : 'user-x'} style={{ width: 13, height: 13 }} /></span>
+                        : <span className="adm-avatar" style={{ width: 24, height: 24, fontSize: 10 }}>{l.actor.replace(/[.\s]/g, '').slice(0, 2)}</span>}
+                      <span style={{ fontSize: 12.5, fontWeight: 500 }}>{l.actor}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span className="inline-flex items-center gap-1.5" style={{ fontSize: 12.5, fontWeight: 600, color: t.color }}>
+                      <i data-lucide={t.icon} style={{ width: 13, height: 13 }} /> {l.action}
+                    </span>
+                  </td>
+                  <td style={{ fontSize: 12.5, color: 'var(--adm-fg-2)' }}>{l.target}</td>
+                  <td className="adm-mono" style={{ fontSize: 12, color: 'var(--adm-fg-3)' }}>{l.ip}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
+
+
+/* ==================== App shell ==================== */
+
+function App() {
+  const [active, setActive] = React.useState('dashboard');
+  React.useEffect(() => { window.lucide?.createIcons(); });
+
+  const screens = {
+    dashboard: { title: 'Дашборд',          breadcrumb: ['Обзор', 'Дашборд'],          render: () => <AdminDashboard /> },
+    analytics: { title: 'Аналитика',        breadcrumb: ['Обзор', 'Аналитика'],        render: () => <AdminAnalytics /> },
+    courses:   { title: 'Безопасность на рабочем месте', breadcrumb: ['Контент', 'Курсы', 'Редактирование'], render: () => <CourseEditor />,
+                 actions: <></> },
+    paths:     { title: 'Траектории',       breadcrumb: ['Контент', 'Траектории'],      render: () => <AdminPaths /> },
+    tests:     { title: 'Тесты',            breadcrumb: ['Контент', 'Тесты'],           render: () => <AdminTests /> },
+    library:   { title: 'Библиотека',       breadcrumb: ['Контент', 'Библиотека'],      render: () => <AdminLibrary /> },
+    users:     { title: 'Сотрудники',       breadcrumb: ['Люди', 'Сотрудники'],         render: () => <AdminUsers /> },
+    groups:    { title: 'Группы',           breadcrumb: ['Люди', 'Группы'],             render: () => <AdminGroups /> },
+    roles:     { title: 'Роли и доступы',   breadcrumb: ['Люди', 'Роли и доступы'],     render: () => <AdminRoles /> },
+    broadcasts:{ title: 'Рассылки',         breadcrumb: ['Коммуникации', 'Рассылки'],   render: () => <AdminBroadcasts /> },
+    forum:     { title: 'Форум',            breadcrumb: ['Коммуникации', 'Форум'],      render: () => <AdminForum /> },
+    events:    { title: 'События',          breadcrumb: ['Коммуникации', 'События'],    render: () => <AdminEvents /> },
+    settings:  { title: 'Настройки',        breadcrumb: ['Система', 'Настройки'],        render: () => <AdminSettings /> },
+    integrations: { title: 'Интеграции',    breadcrumb: ['Система', 'Интеграции'],      render: () => <AdminIntegrations /> },
+    audit:     { title: 'Журнал аудита',    breadcrumb: ['Система', 'Журнал'],          render: () => <AdminAudit /> },
+  };
+  const screen = screens[active] || {
+    title: active.charAt(0).toUpperCase() + active.slice(1),
+    breadcrumb: [active],
+    render: () => (
+      <div className="p-12 text-center">
+        <i data-lucide="construction" style={{ width: 48, height: 48, color: 'var(--adm-fg-3)' }} />
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 16 }}>Раздел в разработке</h2>
+        <p style={{ fontSize: 13, color: 'var(--adm-fg-2)', marginTop: 6 }}>Демо-кит покрывает: Дашборд, Аналитику, Сотрудников и Редактор курса.</p>
+      </div>
+    ),
+  };
+
+  return (
+    <div className="flex h-screen overflow-hidden" data-screen-label={`Admin — ${active}`}>
+      <AdminSidebar active={active} onNav={setActive} />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <AdminTopBar title={screen.title} breadcrumb={screen.breadcrumb} actions={screen.actions} />
+        <main className="flex-1 overflow-y-auto p-6">{screen.render()}</main>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
+</script>
+</body>
+</html>

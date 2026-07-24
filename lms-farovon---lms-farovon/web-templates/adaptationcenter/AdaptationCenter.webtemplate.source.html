@@ -1,6 +1,6 @@
 {% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
 <div class="container py-5 text-center">
-  <i class="bi bi-shield-lock" style="font-size:52px;color:#94A3B8;"></i>
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
   <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
   <p style="font-size:13px;color:#64748B;">Страница доступна только администраторам, HR, наставникам и руководителям.</p>
   <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
@@ -8,29 +8,29 @@
 {% else %}
 
 <style>
-  .fv-ac { padding: 28px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
+  .fv-ac { padding: 12px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
   .fv-ac-breadcrumb { margin-bottom: 18px; }
   .fv-ac-breadcrumb ol { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .fv-ac-breadcrumb li { font-size: 12px; color: #94A3B8; display: flex; align-items: center; gap: 6px; }
+  .fv-ac-breadcrumb li { font-size: 12px; color: #64748B; display: flex; align-items: center; gap: 6px; }
   .fv-ac-breadcrumb li::after { content: '/'; color: #CBD5E1; }
   .fv-ac-breadcrumb li:last-child::after { display: none; }
   .fv-ac-breadcrumb a { color: #64748B; text-decoration: none; }
-  .fv-ac-breadcrumb a:hover { color: #0D9488; }
+  .fv-ac-breadcrumb a:hover { color: #15803D; }
   .fv-ac-breadcrumb li:last-child { color: #0B1220; font-weight: 600; }
 
   .fv-ac-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
-  .fv-ac-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #0D9488; display: block; margin-bottom: 5px; }
+  .fv-ac-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #15803D; display: block; margin-bottom: 5px; }
   .fv-ac-title { font-size: 26px; font-weight: 800; color: #0B1220; margin: 0 0 5px; }
   .fv-ac-sub { font-size: 13px; color: #64748B; margin: 0; }
-  .fv-ac-newbtn { background: #0D9488; color: #fff; border: none; padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
-  .fv-ac-newbtn:hover { background: #0B7A6E; color: #fff; }
+  .fv-ac-newbtn { background: #1E3A8A; color: #fff; border: none; padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .fv-ac-newbtn:hover { background: #15306E; color: #fff; }
 
   .fv-ac-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
   @media (max-width: 900px) { .fv-ac-stats { grid-template-columns: repeat(2, 1fr); } }
   .fv-ac-stat { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px 20px; display: flex; gap: 14px; align-items: center; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
   .fv-ac-stat-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
   .fv-ac-stat-val { font-size: 22px; font-weight: 800; color: #0B1220; line-height: 1; }
-  .fv-ac-stat-lbl { font-size: 11px; color: #94A3B8; margin-top: 4px; }
+  .fv-ac-stat-lbl { font-size: 11px; color: #64748B; margin-top: 4px; }
 
   .fv-ac-section-title { font-size: 16px; font-weight: 700; color: #0B1220; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
 
@@ -54,11 +54,11 @@
   .fv-ac-mentor-rank.gold { background: #FEF3C7; color: #92400E; }
   .fv-ac-mentor-rank.silver { background: #E5E7EB; color: #374151; }
   .fv-ac-mentor-rank.bronze { background: #FED7AA; color: #9A3412; }
-  .fv-ac-mentor-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #6366F1, #8B5CF6); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .fv-ac-mentor-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #6366F1, #1E3A8A); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
   .fv-ac-mentor-info { flex: 1; min-width: 0; }
   .fv-ac-mentor-name { font-size: 13px; font-weight: 600; color: #0B1220; margin: 0 0 2px; }
-  .fv-ac-mentor-stat { font-size: 11px; color: #94A3B8; }
-  .fv-ac-mentor-score { font-size: 14px; font-weight: 700; color: #0D9488; }
+  .fv-ac-mentor-stat { font-size: 11px; color: #64748B; }
+  .fv-ac-mentor-score { font-size: 14px; font-weight: 700; color: #15803D; }
 </style>
 
 <div class="fv-ac container-fluid px-3 px-md-4">
@@ -81,7 +81,7 @@
 
   <div class="fv-ac-stats">
     <div class="fv-ac-stat">
-      <div class="fv-ac-stat-icon" style="background:#F0FDFA;color:#0D9488;"><i class="bi bi-collection"></i></div>
+      <div class="fv-ac-stat-icon" style="background:#ECF6EF;color:#15803D;"><i class="bi bi-collection"></i></div>
       <div><div class="fv-ac-stat-val">6</div><div class="fv-ac-stat-lbl">Активных программ</div></div>
     </div>
     <div class="fv-ac-stat">
@@ -99,13 +99,13 @@
   </div>
 
   {% comment %}── Programs ──{% endcomment %}
-  <h2 class="fv-ac-section-title"><i class="bi bi-diagram-3" style="color:#0D9488;"></i> Программы адаптации</h2>
+  <h2 class="fv-ac-section-title"><i class="bi bi-diagram-3" style="color:#15803D;"></i> Программы адаптации</h2>
 
   <div class="fv-ac-grid">
     {% assign p_names = 'Базовая адаптация,Менеджер по продажам,IT-стажировка,Производство,Финансы,HR-департамент' | split: ',' %}
     {% assign p_tags  = 'Все отделы,Продажи,IT,Производство,Финансы,HR' | split: ',' %}
-    {% assign p_colors_bg = '#F0FDFA,#EFF6FF,#F5F3FF,#FFF7ED,#F0FDF4,#FDF2F8' | split: ',' %}
-    {% assign p_colors_fg = '#0D9488,#2563EB,#7C3AED,#EA580C,#22C55E,#DB2777' | split: ',' %}
+    {% assign p_colors_bg = '#ECF6EF,#EFF6FF,#EEF2F9,#FFF7ED,#F0FDF4,#F0F2F5' | split: ',' %}
+    {% assign p_colors_fg = '#15803D,#2563EB,#1E3A8A,#EA580C,#22C55E,#334155' | split: ',' %}
     {% for n in p_names %}
       {% assign i = forloop.index0 %}
       {% assign tag = p_tags[i] %}

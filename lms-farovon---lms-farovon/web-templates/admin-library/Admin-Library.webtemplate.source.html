@@ -1,0 +1,175 @@
+{% comment %}
+  Admin Library — Библиотека H5P (/admin/library)
+  Дизайн: admin_console/AdminConsole.html (AdminLibrary.jsx). Примитивы .adm-* — customtheme.css.
+  Данные: РЕАЛЬНЫЕ new_h5pcontent (+uploadedby link). Это каталог интерактивного контента.
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+{% fetchxml lib_tot %}
+<fetch aggregate="true">
+  <entity name="new_h5pcontent">
+    <attribute name="new_h5pcontentid" aggregate="count" alias="tot" />
+    <attribute name="new_durationseconds" aggregate="sum" alias="dsum" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign lib_total = 0 %}{% assign lib_dur = 0 %}
+{% for r in lib_tot.results.entities %}{% assign lib_total = r.tot | plus: 0 %}{% assign lib_dur = r.dsum | plus: 0 %}{% endfor %}
+{% assign lib_min = lib_dur | divided_by: 60 %}
+
+{% fetchxml lib_act %}
+<fetch aggregate="true">
+  <entity name="new_h5pcontent">
+    <attribute name="new_h5pcontentid" aggregate="count" alias="act" />
+    <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign lib_active = 0 %}
+{% for r in lib_act.results.entities %}{% assign lib_active = r.act | plus: 0 %}{% endfor %}
+
+{% fetchxml lib_list %}
+<fetch top="100">
+  <entity name="new_h5pcontent">
+    <attribute name="new_h5pcontentid" />
+    <attribute name="new_name" />
+    <attribute name="new_librarytype" />
+    <attribute name="new_durationseconds" />
+    <attribute name="new_isactive" />
+    <attribute name="createdon" />
+    <link-entity name="contact" from="contactid" to="new_uploadedby" alias="ub" link-type="outer">
+      <attribute name="fullname" />
+    </link-entity>
+    <order attribute="createdon" descending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+<style>
+  .adml { padding: 24px 0 56px; }
+  .adml-head { margin-bottom: 20px; }
+  .adml-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .adml-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .adml-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 700px) { .adml-kpis { grid-template-columns: 1fr; } }
+  .adml-search { position: relative; flex: 1 1 260px; min-width: 220px; }
+  .adml-search i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--adm-fg-3); font-size: 14px; pointer-events: none; }
+  .adml-search .adm-input { padding-left: 32px; }
+  .adml-tbl-wrap { overflow-x: auto; }
+  .adml-ico { width: 30px; height: 30px; border-radius: var(--adm-radius-sm); display: inline-flex; align-items: center; justify-content: center; background: var(--adm-primary-50); color: var(--adm-primary); flex-shrink: 0; }
+  .adml-name { font-weight: 500; color: var(--adm-fg-1); }
+</style>
+
+<div class="container adm-scope adml">
+
+  <div class="adml-head">
+    <span class="adm-eyebrow">Контент</span>
+    <h1>Библиотека H5P</h1>
+    <p>Каталог интерактивного контента платформы.</p>
+  </div>
+
+  {% comment %}── KPI (реальные) ──{% endcomment %}
+  <div class="adml-kpis">
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Материалов</span><i class="bi bi-collection-play" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ lib_total }}</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">всего в каталоге</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Активных</span><i class="bi bi-check-circle" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ lib_active }}</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">опубликовано</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Общая длительность</span><i class="bi bi-clock" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ lib_min }}<span style="font-size:16px;font-weight:600;color:var(--adm-fg-3);"> мин</span></div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">суммарно контента</span></div>
+    </div>
+  </div>
+
+  {% comment %}── Toolbar ──{% endcomment %}
+  <div class="adm-card adm-toolbar" style="margin-bottom:16px;">
+    <div class="adml-search">
+      <i class="bi bi-search"></i>
+      <input type="text" class="adm-input" id="admlSearch" placeholder="Поиск по материалам…" autocomplete="off">
+    </div>
+    <div style="flex:1;"></div>
+    <a href="/admin/h5p-upload" class="adm-btn adm-btn--primary"><i class="bi bi-cloud-upload"></i> Загрузить H5P</a>
+  </div>
+
+  {% comment %}── Таблица материалов ──{% endcomment %}
+  <div class="adm-card" style="overflow:hidden;">
+    {% assign lc = 0 %}
+    {% for c in lib_list.results.entities %}{% assign lc = lc | plus: 1 %}{% endfor %}
+    {% if lc == 0 %}
+    <div style="padding:48px 24px;text-align:center;color:var(--adm-fg-3);">
+      <i class="bi bi-collection" style="display:block;font-size:40px;color:#CBD5E1;margin-bottom:12px;"></i>
+      В библиотеке пока нет материалов.
+    </div>
+    {% else %}
+    <div class="adml-tbl-wrap">
+      <table class="adm-table" id="admlTable">
+        <thead>
+          <tr>
+            <th>Материал</th>
+            <th style="width:160px;">Тип</th>
+            <th class="adm-r" style="width:110px;">Длительность</th>
+            <th style="width:170px;">Загрузил</th>
+            <th style="width:110px;">Статус</th>
+            <th style="width:110px;">Создан</th>
+          </tr>
+        </thead>
+        <tbody id="admlBody">
+          {% for c in lib_list.results.entities %}
+            {% assign nm = c.new_name | default: 'Без названия' %}
+            {% assign lt = c.new_librarytype | default: '' | remove: 'H5P.' | split: ' ' | first %}
+            {% assign dur = c.new_durationseconds | plus: 0 %}
+            {% assign mins = dur | divided_by: 60 %}
+            {% assign secs = dur | modulo: 60 %}
+            {% assign ub = c['ub.fullname'] | default: '—' %}
+            {% assign act = c.new_isactive %}
+          <tr data-search="{{ nm | downcase }} {{ lt | downcase }} {{ ub | downcase }}">
+            <td>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="adml-ico"><i class="bi bi-play-btn"></i></span>
+                <span class="adml-name">{{ nm }}</span>
+              </div>
+            </td>
+            <td>{% if lt != '' %}<span class="adm-pill adm-pill--neutral">{{ lt }}</span>{% else %}<span style="color:var(--adm-fg-3);">—</span>{% endif %}</td>
+            <td class="adm-r adm-num">{% if dur > 0 %}{{ mins }}:{% if secs < 10 %}0{% endif %}{{ secs }}{% else %}—{% endif %}</td>
+            <td style="color:var(--adm-fg-2);">{{ ub }}</td>
+            <td>{% if act %}<span class="adm-pill adm-pill--success adm-pill--dot">Активен</span>{% else %}<span class="adm-pill adm-pill--neutral adm-pill--dot">Скрыт</span>{% endif %}</td>
+            <td style="font-size:12px;color:var(--adm-fg-3);">{{ c.createdon | date: 'dd.MM.yyyy' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  (function () {
+    var s = document.getElementById('admlSearch');
+    if (!s) return;
+    s.addEventListener('input', function () {
+      var q = (s.value || '').toLowerCase();
+      document.querySelectorAll('#admlBody tr[data-search]').forEach(function (r) {
+        var m = !q || (r.getAttribute('data-search') || '').indexOf(q) !== -1;
+        r.style.display = m ? '' : 'none';
+      });
+    });
+  })();
+</script>
+
+{% endunless %}

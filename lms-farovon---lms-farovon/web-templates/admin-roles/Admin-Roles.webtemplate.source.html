@@ -1,0 +1,92 @@
+{% comment %}
+  Admin Roles — Роли и доступы (/admin/roles). Дизайн: AdminRoles.jsx. Примитивы .adm-* — customtheme.css.
+  ДЕМО-матрица прав. Реальные web-роли живут в Power Pages (webrole).
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+<style>
+  .admr { padding: 24px 0 56px; }
+  .admr-head { margin-bottom: 20px; }
+  .admr-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .admr-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .admr-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  @media (max-width: 900px) { .admr-cards { grid-template-columns: repeat(2, 1fr); } }
+  .admr-card { padding: 16px; }
+  .admr-ico { width: 30px; height: 30px; border-radius: var(--adm-radius-sm); display: inline-flex; align-items: center; justify-content: center; background: var(--adm-bg-muted); }
+  .admr-tbl-wrap { overflow-x: auto; }
+  .admr-tbl th.rcol, .admr-tbl td.rcol { text-align: center; }
+</style>
+
+<div class="container adm-scope admr">
+
+  <div class="admr-head">
+    <div style="display:flex;align-items:center;gap:8px;"><span class="adm-eyebrow">Люди</span><span class="adm-demo-chip">демо</span></div>
+    <h1>Роли и доступы</h1>
+    <p>Роли пользователей и матрица разрешений.</p>
+  </div>
+
+  <div class="adm-card adm-toolbar" style="margin-bottom:16px;">
+    <div style="position:relative;flex:1 1 260px;min-width:220px;">
+      <i class="bi bi-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--adm-fg-3);font-size:14px;"></i>
+      <input type="text" class="adm-input" style="padding-left:32px;" placeholder="Название роли…" disabled>
+    </div>
+    <div style="flex:1;"></div>
+    <button type="button" class="adm-btn adm-btn--primary" disabled><i class="bi bi-plus-lg"></i> Создать роль</button>
+  </div>
+
+  {% assign roles = 'Сотрудник|Базовый доступ к обучению|248|var(--adm-fg-2);Наставник|Ведёт группы и курсы|32|var(--adm-primary);HR|Управление людьми и отчётность|8|var(--adm-accent);Администратор|Полный доступ|4|var(--adm-danger)' | split: ';' %}
+  <div class="admr-cards">
+    {% for r in roles %}
+      {% assign f = r | split: '|' %}
+    <div class="adm-card admr-card">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="admr-ico" style="color:{{ f[3] }};"><i class="bi bi-shield-check"></i></span>
+        <div style="font-size:14px;font-weight:700;color:var(--adm-fg-1);">{{ f[0] }}</div>
+      </div>
+      <div style="font-size:12px;color:var(--adm-fg-3);margin-top:8px;">{{ f[1] }}</div>
+      <div class="adm-num" style="font-size:12px;color:var(--adm-fg-2);margin-top:8px;"><b>{{ f[2] }}</b> сотрудников</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="adm-card" style="overflow:hidden;">
+    <div class="adm-cardhead"><div class="adm-cardhead-title" style="margin-top:0;">Матрица прав доступа</div></div>
+    <div class="admr-tbl-wrap">
+      <table class="adm-table admr-tbl">
+        <thead>
+          <tr>
+            <th>Разрешение</th>
+            <th class="rcol" style="width:120px;">Сотрудник</th>
+            <th class="rcol" style="width:120px;">Наставник</th>
+            <th class="rcol" style="width:120px;">HR</th>
+            <th class="rcol" style="width:120px;">Админ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% comment %} строка: разрешение|сотр|наст|hr|админ (1=есть) {% endcomment %}
+          {% assign perms = 'Просмотр курсов|1|1|1|1;Прохождение|1|1|1|1;Создание курсов|0|1|1|1;Управление людьми|0|0|1|1;Аналитика|0|1|1|1;Настройки|0|0|0|1;Роли и доступы|0|0|0|1;Журнал аудита|0|0|0|1' | split: ';' %}
+          {% for p in perms %}
+            {% assign f = p | split: '|' %}
+          <tr>
+            <td style="font-weight:500;">{{ f[0] }}</td>
+            {% for i in (1..4) %}
+              <td class="rcol">{% if f[i] == '1' %}<i class="bi bi-check-lg" style="color:var(--adm-success);font-size:16px;"></i>{% else %}<span style="color:var(--adm-border-2);">—</span>{% endif %}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+{% endunless %}

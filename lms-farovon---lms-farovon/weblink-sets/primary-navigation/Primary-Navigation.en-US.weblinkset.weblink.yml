@@ -11,7 +11,7 @@
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 3
+  adx_displayorder: 32
   adx_displaypagechildlinks: false
   adx_name: Управление задачами
   adx_openinnewwindow: false
@@ -22,7 +22,7 @@
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 4
+  adx_displayorder: 33
   adx_displaypagechildlinks: false
   adx_name: Мероприятия
   adx_openinnewwindow: false
@@ -33,7 +33,7 @@
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 5
+  adx_displayorder: 34
   adx_displaypagechildlinks: false
   adx_name: Пользователи
   adx_openinnewwindow: false
@@ -44,7 +44,7 @@
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 6
+  adx_displayorder: 35
   adx_displaypagechildlinks: false
   adx_name: Отчёты
   adx_openinnewwindow: false
@@ -55,7 +55,7 @@
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 7
+  adx_displayorder: 36
   adx_displaypagechildlinks: false
   adx_name: H5P Загрузка
   adx_openinnewwindow: false
@@ -67,7 +67,7 @@
   adx_websitelanguageid: f130e0ff-a538-f111-88b5-7ced8d76b3cc
 - adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 8
+  adx_displayorder: 4
   adx_displaypagechildlinks: false
   adx_name: H5P Прогресс
   adx_openinnewwindow: false
@@ -78,18 +78,18 @@
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 9
+  adx_displayorder: 2
   adx_displaypagechildlinks: false
-  adx_name: H5P Уроки
+  adx_name: Курсы
   adx_openinnewwindow: false
-  adx_pageid: cc10e5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_pageid: b1b2c3d4-2222-3333-4444-000000000023
   adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_robotsfollowlink: true
   adx_weblinkid: aa07e5ed-a538-f111-88b5-7ced8d76b3cc
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 11
+  adx_displayorder: 7
   adx_displaypagechildlinks: false
   adx_name: Магазин наград
   adx_openinnewwindow: false
@@ -100,9 +100,9 @@
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 10
+  adx_displayorder: 6
   adx_displaypagechildlinks: false
-  adx_name: Лидерборд
+  adx_name: Рейтинг
   adx_openinnewwindow: false
   adx_pageid: e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b
   adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
@@ -111,7 +111,7 @@
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 12
+  adx_displayorder: 8
   adx_displaypagechildlinks: false
   adx_name: Мой профиль
   adx_openinnewwindow: false
@@ -122,7 +122,7 @@
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 13
+  adx_displayorder: 3
   adx_displaypagechildlinks: false
   adx_name: Траектории
   adx_openinnewwindow: false
@@ -133,9 +133,9 @@
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 14
+  adx_displayorder: 5
   adx_displaypagechildlinks: false
-  adx_name: Форум
+  adx_name: Сообщество
   adx_openinnewwindow: false
   adx_pageid: a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d
   adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
@@ -144,7 +144,7 @@
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 2
+  adx_displayorder: 31
   adx_displaypagechildlinks: false
   adx_name: Центр адаптации
   adx_openinnewwindow: false

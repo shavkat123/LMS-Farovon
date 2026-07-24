@@ -1,0 +1,163 @@
+{% comment %}
+  Admin Courses — Курсы (/admin/courses). Дизайн: adm-* система (список вместо CourseEditor,
+  т.к. msdynce_course — плоская таблица курсов/событий с регистрацией, без модулей).
+  РЕАЛЬНЫЕ данные: msdynce_course (активные), поля как в course-catalog.
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+{% fetchxml crs %}
+<fetch top="100">
+  <entity name="msdynce_course">
+    <attribute name="msdynce_courseid" />
+    <attribute name="msdynce_coursename" />
+    <attribute name="msdynce_instructor" />
+    <attribute name="msdynce_coursetype" />
+    <attribute name="msdynce_registeredparticipants" />
+    <attribute name="msdynce_registerationmaxcapacity" />
+    <attribute name="msdynce_coursestartdateandtime" />
+    <attribute name="msdynce_registerationdeadline" />
+    <filter><condition attribute="statuscode" operator="eq" value="1" /></filter>
+    <order attribute="msdynce_coursestartdateandtime" descending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── KPI из списка ──{% endcomment %}
+{% assign c_count = 0 %}
+{% assign c_part = 0 %}
+{% assign c_cap = 0 %}
+{% for c in crs.results.entities %}
+  {% assign c_count = c_count | plus: 1 %}
+  {% assign c_part = c_part | plus: c.msdynce_registeredparticipants %}
+  {% assign c_cap = c_cap | plus: c.msdynce_registerationmaxcapacity %}
+{% endfor %}
+{% assign c_fill = 0 %}
+{% if c_cap > 0 %}{% assign c_fill = c_part | times: 100 | divided_by: c_cap %}{% endif %}
+
+<style>
+  .admco { padding: 24px 0 56px; }
+  .admco-head { margin-bottom: 20px; }
+  .admco-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .admco-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .admco-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 700px) { .admco-kpis { grid-template-columns: 1fr; } }
+  .admco-search { position: relative; flex: 1 1 260px; min-width: 220px; }
+  .admco-search i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--adm-fg-3); font-size: 14px; pointer-events: none; }
+  .admco-search .adm-input { padding-left: 32px; }
+  .admco-tbl-wrap { overflow-x: auto; }
+  .admco-ico { width: 30px; height: 30px; border-radius: var(--adm-radius-sm); display: inline-flex; align-items: center; justify-content: center; background: var(--adm-primary-50); color: var(--adm-primary); flex-shrink: 0; }
+  .admco-new { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 8px; background: var(--adm-primary); color: #fff !important; font-size: 13px; font-weight: 600; text-decoration: none !important; white-space: nowrap; transition: background .14s; }
+  .admco-new:hover { background: var(--adm-primary-hover, #15306E); color: #fff !important; }
+  .admco-act { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--adm-border); color: var(--adm-fg-2) !important; text-decoration: none !important; transition: border-color .14s, color .14s, background .14s; }
+  .admco-act:hover { border-color: var(--adm-primary); color: var(--adm-primary) !important; background: var(--adm-primary-50); }
+  .admco-act--del:hover { border-color: #DC2626; color: #DC2626 !important; background: #FEF2F2; }
+</style>
+
+<div class="container adm-scope admco">
+
+  <div class="admco-head">
+    <span class="adm-eyebrow">Контент</span>
+    <h1>Курсы</h1>
+    <p>Курсы и обучающие мероприятия с регистрацией.</p>
+  </div>
+
+  <div class="admco-kpis">
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Активных курсов</span><i class="bi bi-journal-text"></i></div><div class="adm-stat-val">{{ c_count }}</div><div class="adm-stat-foot"><span class="adm-stat-sub">опубликовано</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Регистраций</span><i class="bi bi-person-check"></i></div><div class="adm-stat-val">{{ c_part }}</div><div class="adm-stat-foot"><span class="adm-stat-sub">участников всего</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Средняя заполненность</span><i class="bi bi-people"></i></div><div class="adm-stat-val">{{ c_fill }}%</div><div class="adm-stat-foot"><span class="adm-stat-sub">мест занято</span></div></div>
+  </div>
+
+  <div class="adm-card adm-toolbar" style="margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="admco-search">
+      <i class="bi bi-search"></i>
+      <input type="text" class="adm-input" id="admcoSearch" placeholder="Название курса, инструктор…" autocomplete="off">
+    </div>
+    <a href="/admin/create-course" class="admco-new"><i class="bi bi-plus-lg"></i> Создать курс</a>
+  </div>
+
+  <div class="adm-card" style="overflow:hidden;">
+    {% if c_count == 0 %}
+    <div style="padding:48px 24px;text-align:center;color:var(--adm-fg-3);">
+      <i class="bi bi-journal" style="display:block;font-size:40px;color:#CBD5E1;margin-bottom:12px;"></i>
+      Активных курсов пока нет.
+    </div>
+    {% else %}
+    <div class="admco-tbl-wrap">
+      <table class="adm-table" id="admcoTable">
+        <thead>
+          <tr>
+            <th>Курс</th>
+            <th style="width:130px;">Тип</th>
+            <th style="width:160px;">Инструктор</th>
+            <th style="width:120px;">Старт</th>
+            <th style="width:180px;">Заполненность</th>
+            <th style="width:120px;">Дедлайн рег.</th>
+            <th style="width:96px;text-align:right;">Действия</th>
+          </tr>
+        </thead>
+        <tbody id="admcoBody">
+          {% for c in crs.results.entities %}
+            {% assign cid = c.msdynce_courseid %}
+            {% assign nm = c.msdynce_coursename | default: 'Без названия' %}
+            {% assign instr = c.msdynce_instructor | default: '—' %}
+            {% assign reg = c.msdynce_registeredparticipants | plus: 0 %}
+            {% assign cap = c.msdynce_registerationmaxcapacity | plus: 0 %}
+            {% assign pct = 0 %}{% if cap > 0 %}{% assign pct = reg | times: 100 | divided_by: cap %}{% endif %}
+            {% if pct >= 95 %}{% assign bc = 'var(--adm-accent)' %}{% else %}{% assign bc = 'var(--adm-primary)' %}{% endif %}
+            {% capture tlabel %}{% if c.msdynce_coursetype %}{% for ty in c.msdynce_coursetype %}{{ ty.label }}{% unless forloop.last %}, {% endunless %}{% endfor %}{% endif %}{% endcapture %}
+          <tr data-search="{{ nm | downcase }} {{ instr | downcase }}">
+            <td>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="admco-ico"><i class="bi bi-mortarboard"></i></span>
+                <span style="font-weight:600;">{{ nm }}</span>
+              </div>
+            </td>
+            <td>{% assign tl = tlabel | strip %}{% if tl != '' %}<span class="adm-pill adm-pill--neutral">{{ tl }}</span>{% else %}<span style="color:var(--adm-fg-3);">—</span>{% endif %}</td>
+            <td style="color:var(--adm-fg-2);">{{ instr }}</td>
+            <td style="font-size:12px;color:var(--adm-fg-2);">{{ c.msdynce_coursestartdateandtime | date: 'dd.MM.yyyy' }}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div class="adm-bar" style="flex:1;"><div style="width:{{ pct }}%;background:{{ bc }};"></div></div>
+                <span class="adm-num" style="font-size:11px;font-weight:600;color:var(--adm-fg-2);min-width:52px;">{{ reg }}/{{ cap }}</span>
+              </div>
+            </td>
+            <td style="font-size:12px;color:var(--adm-fg-3);">{{ c.msdynce_registerationdeadline | date: 'dd.MM.yyyy' }}</td>
+            <td>
+              <div style="display:flex;gap:6px;justify-content:flex-end;">
+                <a href="/admin/edit-course?id={{ cid }}" class="admco-act" title="Редактировать"><i class="bi bi-pencil"></i></a>
+                <a href="/admin/delete-course?id={{ cid }}" class="admco-act admco-act--del" title="Удалить"><i class="bi bi-trash"></i></a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  (function () {
+    var s = document.getElementById('admcoSearch');
+    if (!s) return;
+    s.addEventListener('input', function () {
+      var q = (s.value || '').toLowerCase();
+      document.querySelectorAll('#admcoBody tr[data-search]').forEach(function (r) {
+        var m = !q || (r.getAttribute('data-search') || '').indexOf(q) !== -1;
+        r.style.display = m ? '' : 'none';
+      });
+    });
+  })();
+</script>
+
+{% endunless %}

@@ -1,6 +1,6 @@
 {% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Administrators' %}
 <div class="container py-5 text-center">
-  <i class="bi bi-shield-lock" style="font-size:52px;color:#94A3B8;"></i>
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
   <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
   <p style="font-size:13px;color:#64748B;">Эта страница доступна только администраторам.</p>
   <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
@@ -8,9 +8,9 @@
 {% else %}
 
 <style>
-  .fv-upload-page { padding: 28px 0 48px; }
+  .fv-upload-page { padding: 12px 0 48px; }
   .fv-upload-header { margin-bottom: 24px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-  .fv-upload-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #94A3B8; display: block; margin-bottom: 4px; }
+  .fv-upload-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #64748B; display: block; margin-bottom: 4px; }
   .fv-upload-title { font-size: 22px; font-weight: 700; color: #0B1220; margin: 0 0 4px; }
   .fv-upload-sub { font-size: 13px; color: #64748B; margin: 0; }
   .fv-upload-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(11,18,32,0.04); margin-bottom: 16px; }

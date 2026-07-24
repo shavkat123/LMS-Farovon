@@ -1,0 +1,102 @@
+{% comment %}
+  Admin Broadcasts — Рассылки (/admin/broadcasts). Дизайн: AdminBroadcasts.jsx. Примитивы .adm-* — customtheme.css.
+  ДЕМО-данные: движка рассылок нет. Подключится позже.
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+<style>
+  .admb { padding: 24px 0 56px; }
+  .admb-head { margin-bottom: 20px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .admb-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .admb-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .admb-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 900px) { .admb-kpis { grid-template-columns: repeat(2, 1fr); } }
+  .admb-tbl-wrap { overflow-x: auto; }
+</style>
+
+<div class="container adm-scope admb">
+
+  <div class="admb-head">
+    <div>
+      <div style="display:flex;align-items:center;gap:8px;"><span class="adm-eyebrow">Коммуникации</span><span class="adm-demo-chip">демо</span></div>
+      <h1>Рассылки</h1>
+      <p>Email- и push-уведомления сотрудникам.</p>
+    </div>
+    <button type="button" class="adm-btn adm-btn--primary" disabled title="Появится после подключения движка рассылок"><i class="bi bi-plus-lg"></i> Новая рассылка</button>
+  </div>
+
+  <div class="admb-kpis">
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Отправлено за месяц</span><i class="bi bi-send"></i></div><div class="adm-stat-val">18</div><div class="adm-stat-foot"><span class="adm-stat-sub">рассылок</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Средн. открытий</span><i class="bi bi-envelope-open"></i></div><div class="adm-stat-val">66%</div><div class="adm-stat-foot"><span class="adm-stat-sub">open rate</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Запланировано</span><i class="bi bi-calendar-event"></i></div><div class="adm-stat-val">3</div><div class="adm-stat-foot"><span class="adm-stat-sub">в очереди</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Средн. кликов</span><i class="bi bi-cursor"></i></div><div class="adm-stat-val">24%</div><div class="adm-stat-foot"><span class="adm-stat-sub">CTR</span></div></div>
+  </div>
+
+  <div class="adm-card adm-toolbar" style="margin-bottom:16px;">
+    <div style="position:relative;flex:1 1 260px;min-width:220px;">
+      <i class="bi bi-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--adm-fg-3);font-size:14px;"></i>
+      <input type="text" class="adm-input" style="padding-left:32px;" placeholder="Тема рассылки…" disabled>
+    </div>
+    <button type="button" class="adm-chip" disabled><span class="l">Канал:</span> Все <i class="bi bi-chevron-down" style="font-size:11px;color:var(--adm-fg-3);"></i></button>
+    <button type="button" class="adm-chip" disabled><span class="l">Статус:</span> Все <i class="bi bi-chevron-down" style="font-size:11px;color:var(--adm-fg-3);"></i></button>
+  </div>
+
+  <div class="adm-card" style="overflow:hidden;">
+    <div class="admb-tbl-wrap">
+      <table class="adm-table">
+        <thead>
+          <tr>
+            <th>Рассылка</th>
+            <th style="width:140px;">Канал</th>
+            <th style="width:160px;">Аудитория</th>
+            <th style="width:170px;">Отправка</th>
+            <th style="width:150px;">Открытий</th>
+            <th style="width:130px;">Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% assign items = 'Напоминание: дедлайн по безопасности|Email + Push|Просрочка (24)|2 июл, 10:00|68|sent;Новый курс: Power BI|Push|Аналитика (42)|28 июн, 14:30|82|sent;Приглашение на вебинар|Email|Все (312)|Запланировано 14 июл|0|scheduled;Ежемесячный дайджест обучения|Email|Все (312)|Черновик|0|draft;Опрос удовлетворённости|Push + In-app|Активные (280)|20 июн, 09:00|54|sent' | split: ';' %}
+          {% for b in items %}
+            {% assign f = b | split: '|' %}
+            {% assign op = f[4] | plus: 0 %}
+          <tr>
+            <td style="font-weight:600;">{{ f[0] }}</td>
+            <td style="color:var(--adm-fg-2);">{{ f[1] }}</td>
+            <td style="color:var(--adm-fg-2);">{{ f[2] }}</td>
+            <td style="font-size:12px;color:var(--adm-fg-3);">{{ f[3] }}</td>
+            <td>
+              {% if f[5] == 'sent' %}
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div class="adm-bar" style="flex:1;"><div style="width:{{ op }}%;background:var(--adm-success);"></div></div>
+                <span class="adm-num" style="font-size:11px;font-weight:600;color:var(--adm-fg-2);min-width:28px;">{{ op }}%</span>
+              </div>
+              {% else %}<span style="color:var(--adm-fg-3);font-size:12px;">—</span>{% endif %}
+            </td>
+            <td>
+              {% if f[5] == 'sent' %}<span class="adm-pill adm-pill--success adm-pill--dot">Отправлено</span>
+              {% elsif f[5] == 'scheduled' %}<span class="adm-pill adm-pill--info adm-pill--dot">Запланировано</span>
+              {% else %}<span class="adm-pill adm-pill--neutral adm-pill--dot">Черновик</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="background:var(--adm-accent-50);border:1px solid #F4E5C9;border-radius:10px;padding:10px 16px;margin-top:16px;font-size:12px;color:var(--adm-accent);display:flex;align-items:center;gap:10px;">
+    <i class="bi bi-info-circle-fill" style="flex-shrink:0;"></i>
+    <span>Демо-данные. Раздел подключится после интеграции движка рассылок.</span>
+  </div>
+
+</div>
+
+{% endunless %}

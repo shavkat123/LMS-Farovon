@@ -7,6 +7,7 @@
     <attribute name="new_librarytype" />
     <attribute name="new_durationseconds" />
     <attribute name="new_thumbnailurl" />
+    <attribute name="new_relatedcourse" />
     <filter>
       <condition attribute="new_isactive" operator="eq" value="1" />
     </filter>
@@ -18,6 +19,22 @@
 {% assign is_admin = false %}
 {% if user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Administrators' %}
   {% assign is_admin = true %}
+{% endif %}
+
+{% comment %}── Список курсов для привязки (только админ) ──{% endcomment %}
+{% if is_admin %}
+{% fetchxml crs_all %}
+<fetch>
+  <entity name="msdynce_course">
+    <attribute name="msdynce_courseid" />
+    <attribute name="msdynce_coursename" />
+    <filter>
+      <condition attribute="statuscode" operator="eq" value="1" />
+    </filter>
+    <order attribute="msdynce_coursename" />
+  </entity>
+</fetch>
+{% endfetchxml %}
 {% endif %}
 
 {% assign started_count = 0 %}
@@ -52,10 +69,10 @@
 {% endfor %}
 
 <style>
-  .fv-catalog { padding: 28px 0 48px; }
+  .fv-catalog { padding: 12px 0 48px; }
   .fv-catalog-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
   .fv-catalog-title { font-size: 22px; font-weight: 700; color: #0B1220; margin: 0; }
-  .fv-catalog-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #94A3B8; display: block; margin-bottom: 2px; }
+  .fv-catalog-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #64748B; display: block; margin-bottom: 2px; }
 
   .fv-stats-row { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
   .fv-stat-chip { background: #fff; border: 1px solid #E5E7EB; border-radius: 8px; padding: 10px 16px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; color: #475569; }
@@ -63,9 +80,9 @@
 
   .fv-filter-bar { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px 16px; margin-bottom: 24px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(11,18,32,0.04); }
   .fv-search-wrap { flex: 1; min-width: 180px; display: flex; align-items: center; gap: 8px; background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: 7px; padding: 7px 12px; }
-  .fv-search-wrap i { color: #94A3B8; font-size: 14px; }
+  .fv-search-wrap i { color: #64748B; font-size: 14px; }
   .fv-search-input { border: none; background: transparent; outline: none; font-size: 13px; color: #0B1220; width: 100%; }
-  .fv-search-input::placeholder { color: #94A3B8; }
+  .fv-search-input::placeholder { color: #64748B; }
   .fv-filter-sep { width: 1px; height: 22px; background: #E5E7EB; }
   .fv-filter-pill { padding: 6px 14px; border-radius: 20px; border: 1px solid #E5E7EB; background: #fff; font-size: 12px; font-weight: 500; color: #475569; cursor: pointer; transition: all 0.14s; white-space: nowrap; }
   .fv-filter-pill.active { background: #1E3A8A; border-color: #1E3A8A; color: #fff; }
@@ -74,13 +91,49 @@
   .fv-cat-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 1px 3px rgba(11,18,32,0.05); transition: box-shadow 0.18s, transform 0.18s; height: 100%; }
   .fv-cat-card:hover { box-shadow: 0 6px 20px rgba(11,18,32,0.10); transform: translateY(-2px); }
   .fv-cat-card.is-completed { border-color: #BBF7D0; }
-  .fv-cat-thumb { height: 160px; background: linear-gradient(135deg,#EEF2F9,#D8DFEF); display: flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 40px; position: relative; overflow: hidden; cursor: pointer; flex-shrink: 0; }
+  .fv-cat-thumb { height: 160px; background: linear-gradient(135deg,#EEF2F9,#D8DFEF); display: flex; align-items: center; justify-content: center; color: #64748B; font-size: 40px; position: relative; overflow: hidden; cursor: pointer; flex-shrink: 0; }
   .fv-cat-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* ── Типографическая обложка (дизайн-кит v2-cover) — когда нет превью ── */
+  .fv-cat-thumb.fv-cat-cover { flex-direction: column; align-items: flex-start; justify-content: space-between; padding: 14px; font-size: inherit; }
+  .fv-cat-cover::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(0deg, transparent 23px, rgba(11,18,32,0.04) 24px),
+      linear-gradient(90deg, transparent 23px, rgba(11,18,32,0.04) 24px);
+    background-size: 24px 24px;
+    opacity: 0.6;
+  }
+  .fv-cat-cover.fv-cover--navy  { background: linear-gradient(135deg, #1E3A8A 0%, #15306E 100%); }
+  .fv-cat-cover.fv-cover--warm  { background: linear-gradient(135deg, #FAF3E8 0%, #F4E5C9 100%); }
+  .fv-cat-cover.fv-cover--slate { background: linear-gradient(135deg, #475569 0%, #334155 100%); }
+  .fv-cat-cover.fv-cover--paper { background: linear-gradient(135deg, #F6F7F9 0%, #E5E7EB 100%); }
+  .fv-cat-cover .fv-cover-label { position: relative; font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+  .fv-cat-cover .fv-cover-title { position: relative; font-weight: 700; line-height: 1.1; font-size: 20px; letter-spacing: -0.01em; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .fv-cat-cover.has-status .fv-cover-label { margin-top: 24px; }
+  .fv-cat-cover.has-admin .fv-cover-title { margin-bottom: 26px; }
+
+  /* Кастомный confirm-диалог (вместо confirm()) */
+  .fv-confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(11,18,32,.45); z-index: 10000; align-items: center; justify-content: center; padding: 20px; }
+  .fv-confirm-overlay.open { display: flex; }
+  .fv-confirm { background: #fff; border-radius: 16px; padding: 24px; width: 100%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+  .fv-confirm p { font-size: 14px; color: #0B1220; margin: 0 0 18px; line-height: 1.5; }
+  .fv-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; }
+  .fv-confirm-cancel { background: #fff; border: 1px solid #E5E7EB; color: #0B1220; border-radius: 10px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .fv-confirm-cancel:hover { background: #F0F2F5; }
+  .fv-confirm-ok { background: #B91C1C; border: none; color: #fff; border-radius: 10px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .fv-confirm-ok:hover { background: #991B1B; }
+
+  /* Тост-уведомление (вместо alert()) */
+  .fv-toast { position: fixed; right: 20px; bottom: 20px; z-index: 10001; max-width: 360px; background: #0B1220; color: #fff; border-radius: 12px; padding: 12px 16px; font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(11,18,32,.25); opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity .25s ease-out, transform .25s ease-out; }
+  .fv-toast.show { opacity: 1; transform: translateY(0); }
+  .fv-toast.error { background: #B91C1C; }
   .fv-cat-body { padding: 14px 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
-  .fv-cat-type { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #94A3B8; }
+  .fv-cat-type { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #64748B; }
   .fv-cat-title { font-size: 14px; font-weight: 700; color: #0B1220; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.45; }
   .fv-cat-desc { font-size: 12px; color: #64748B; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; flex: 1; margin-top: 2px; }
-  .fv-cat-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #94A3B8; margin-top: 4px; }
+  .fv-cat-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #64748B; margin-top: 4px; }
   .fv-cat-foot { padding: 10px 16px 14px; }
   .fv-cat-btn { display: block; width: 100%; padding: 9px; border-radius: 7px; text-align: center; font-size: 13px; font-weight: 600; text-decoration: none !important; transition: background 0.14s; }
   .fv-cat-btn-start { background: #1E3A8A; color: #fff !important; }
@@ -97,12 +150,12 @@
   .fv-admin-delete-btn { position: absolute; bottom: 6px; left: 6px; background: rgba(185,28,28,0.8); border: none; color: #fff; padding: 4px 8px; border-radius: 5px; font-size: 11px; font-weight: 500; cursor: pointer; z-index: 2; display: flex; align-items: center; gap: 4px; line-height: 1; }
   .fv-admin-delete-btn:hover { background: rgba(185,28,28,1); }
 
-  .fv-empty-state { text-align: center; padding: 60px 20px; color: #94A3B8; }
+  .fv-empty-state { text-align: center; padding: 60px 20px; color: #64748B; }
   .fv-empty-state i { font-size: 52px; display: block; margin-bottom: 14px; }
   .fv-empty-state h3 { font-size: 16px; font-weight: 600; color: #475569; margin-bottom: 6px; }
   .fv-empty-state p { font-size: 13px; }
 
-  .fv-catalog-count { font-size: 12px; color: #94A3B8; font-weight: 500; }
+  .fv-catalog-count { font-size: 12px; color: #64748B; font-weight: 500; }
 </style>
 
 <div class="container fv-catalog">
@@ -114,7 +167,7 @@
       <h1 class="fv-catalog-title">Каталог уроков</h1>
     </div>
     {% if is_admin %}
-    <a href="/h5p-upload" class="btn btn-primary btn-sm" style="font-size:13px;font-weight:600;border-radius:8px;padding:8px 16px;">
+    <a href="/admin/h5p-upload" class="btn btn-primary btn-sm" style="font-size:13px;font-weight:600;border-radius:8px;padding:8px 16px;">
       <i class="bi bi-plus-lg"></i> Загрузить урок
     </a>
     {% endif %}
@@ -193,12 +246,22 @@
     <div class="col fv-catalog-item" data-status="{{ lesson_status }}" data-title="{{ item.new_name | downcase }}">
       <div class="fv-cat-card{% if lesson_status == 'completed' %} is-completed{% endif %}">
 
-        <!-- THUMBNAIL -->
-        <div class="fv-cat-thumb" onclick="location.href='/h5p-player?id={{ cid }}'">
-          {% if item.new_thumbnailurl and item.new_thumbnailurl != '' %}
+        <!-- THUMBNAIL / COVER -->
+        {% assign has_thumb = false %}
+        {% if item.new_thumbnailurl and item.new_thumbnailurl != '' %}{% assign has_thumb = true %}{% endif %}
+        {% assign cov_mod = forloop.index0 | modulo: 4 %}
+        {% case cov_mod %}
+          {% when 0 %}{% assign cov = 'paper' %}{% assign cov_dark = false %}
+          {% when 1 %}{% assign cov = 'navy' %}{% assign cov_dark = true %}
+          {% when 2 %}{% assign cov = 'warm' %}{% assign cov_dark = false %}
+          {% else %}{% assign cov = 'slate' %}{% assign cov_dark = true %}
+        {% endcase %}
+        <div class="fv-cat-thumb{% unless has_thumb %} fv-cat-cover fv-cover--{{ cov }}{% unless lesson_status == 'not_started' %} has-status{% endunless %}{% if is_admin %} has-admin{% endif %}{% endunless %}" data-href="/h5p-player?id={{ cid }}" role="link" tabindex="0" aria-label="Открыть урок {{ item.new_name | escape }}">
+          {% if has_thumb %}
             <img src="{{ item.new_thumbnailurl }}" alt="{{ item.new_name | escape }}" onerror="this.style.display='none'" />
           {% else %}
-            <i class="bi bi-play-circle-fill"></i>
+            <span class="fv-cover-label" style="color:{% if cov_dark %}rgba(255,255,255,0.7){% else %}#94A3B8{% endif %};">{{ item.new_librarytype | default: 'H5P' }}</span>
+            <span class="fv-cover-title" style="color:{% if cov_dark %}#FFFFFF{% else %}#0B1220{% endif %};">{{ item.new_name }}</span>
           {% endif %}
 
           {% if lesson_status == 'completed' %}
@@ -218,15 +281,12 @@
           <button class="fv-admin-edit-btn edit-thumb-btn"
                   data-id="{{ cid }}"
                   data-thumb="{{ item.new_thumbnailurl }}"
-                  onclick="event.stopPropagation()"
-                  type="button">
-            <i class="bi bi-pencil"></i> Превью
+                  data-course="{% if item.new_relatedcourse != blank %}{{ item.new_relatedcourse.id }}{% endif %}"                  type="button">
+            <i class="bi bi-pencil"></i> Урок
           </button>
           <button class="fv-admin-delete-btn delete-h5p"
                   data-id="{{ cid }}"
-                  data-name="{{ item.new_name | escape }}"
-                  onclick="event.stopPropagation()"
-                  type="button"
+                  data-name="{{ item.new_name | escape }}"                  type="button"
                   title="Удалить урок">
             <i class="bi bi-trash3"></i>
           </button>
@@ -285,12 +345,12 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" style="border-radius:12px;border:1px solid #E5E7EB;">
       <div class="modal-header" style="border-bottom:1px solid #F1F5F9;padding:16px 20px;">
-        <h5 class="modal-title" style="font-size:15px;font-weight:700;color:#0B1220;">Превью урока</h5>
+        <h5 class="modal-title" style="font-size:15px;font-weight:700;color:#0B1220;">Настройки урока</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body" style="padding:20px;">
         <div id="thumb-preview-wrap" class="mb-3 rounded overflow-hidden"
-             style="height:180px;background:linear-gradient(135deg,#EEF2F9,#D8DFEF);display:flex;align-items:center;justify-content:center;color:#94A3B8;font-size:48px;">
+             style="height:180px;background:linear-gradient(135deg,#EEF2F9,#D8DFEF);display:flex;align-items:center;justify-content:center;color:#64748B;font-size:48px;">
           <img id="thumb-preview-img" src="" alt="" style="width:100%;height:180px;object-fit:cover;display:none;">
           <i id="thumb-preview-icon" class="bi bi-play-circle-fill"></i>
         </div>
@@ -314,6 +374,17 @@
             <small class="text-muted">Загрузка…</small>
           </div>
         </div>
+
+        <div style="margin-top:18px;padding-top:16px;border-top:1px solid #F1F5F9;">
+          <label class="form-label small text-muted" for="course-select"><i class="bi bi-mortarboard"></i> Курс, к которому относится урок</label>
+          <select id="course-select" class="form-select">
+            <option value="">— не привязан к курсу —</option>
+            {% if is_admin %}{% for c in crs_all.results.entities %}
+            <option value="{{ c.msdynce_courseid }}">{{ c.msdynce_coursename | escape }}</option>
+            {% endfor %}{% endif %}
+          </select>
+          <small class="text-muted">Урок появится в блоке «Программа курса» на странице выбранного курса.</small>
+        </div>
       </div>
       <div class="modal-footer" style="border-top:1px solid #F1F5F9;padding:12px 20px;">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
@@ -325,8 +396,68 @@
 </div>
 {% endif %}
 
+<div class="fv-toast" id="fvToast" role="status" aria-live="polite"></div>
+<div class="fv-confirm-overlay" id="fvConfirm">
+  <div class="fv-confirm" role="dialog" aria-modal="true" aria-labelledby="fvConfirmText">
+    <p id="fvConfirmText"></p>
+    <div class="fv-confirm-actions">
+      <button type="button" class="fv-confirm-cancel" id="fvConfirmCancel">Отмена</button>
+      <button type="button" class="fv-confirm-ok" id="fvConfirmOk">Удалить</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
+  // ── Toast + confirm (вместо alert/confirm) ─────────────────────────────────
+  var toastT = null;
+  function showToast(msg, type) {
+    var t = document.getElementById('fvToast');
+    if (!t) return;
+    t.textContent = msg;
+    t.className = 'fv-toast show' + (type ? ' ' + type : '');
+    clearTimeout(toastT);
+    toastT = setTimeout(function () { t.classList.remove('show'); }, 4500);
+  }
+  function fvConfirm(msg) {
+    return new Promise(function (resolve) {
+      var ov = document.getElementById('fvConfirm');
+      document.getElementById('fvConfirmText').textContent = msg;
+      ov.classList.add('open');
+      var okBtn = document.getElementById('fvConfirmOk');
+      var noBtn = document.getElementById('fvConfirmCancel');
+      function done(v) {
+        ov.classList.remove('open');
+        okBtn.removeEventListener('click', ok);
+        noBtn.removeEventListener('click', no);
+        ov.removeEventListener('click', out);
+        document.removeEventListener('keydown', esc);
+        resolve(v);
+      }
+      function ok() { done(true); }
+      function no() { done(false); }
+      function out(e) { if (e.target === ov) done(false); }
+      function esc(e) { if (e.key === 'Escape') done(false); }
+      okBtn.addEventListener('click', ok);
+      noBtn.addEventListener('click', no);
+      ov.addEventListener('click', out);
+      document.addEventListener('keydown', esc);
+      noBtn.focus();
+    });
+  }
+
+  // ── Навигация по карточке (data-href вместо inline onclick — CSP) ──────────
+  document.addEventListener('click', function (e) {
+    var thumb = e.target.closest('.fv-cat-thumb[data-href]');
+    if (!thumb || e.target.closest('button')) return;
+    location.href = thumb.getAttribute('data-href');
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || !e.target.closest) return;
+    var thumb = e.target.closest('.fv-cat-thumb[data-href]');
+    if (thumb) location.href = thumb.getAttribute('data-href');
+  });
+
   // ── Search & filter ────────────────────────────────────────────────────────
   var searchInput  = document.getElementById('fv-search');
   var filterPills  = document.querySelectorAll('[data-filter]');
@@ -397,7 +528,7 @@
     }
   }
 
-  var currentId = null, activeTab = 'url', uploadedUrl = null;
+  var currentId = null, activeTab = 'url', uploadedUrl = null, currentCourseOrig = '';
 
   // ── Вкладки ────────────────────────────────────────────────────────────────
   document.querySelectorAll('#thumbTabs [data-tab]').forEach(function (btn) {
@@ -419,7 +550,7 @@
     uploadedUrl = null;
     var file = this.files && this.files[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { alert('Файл слишком большой (макс. 2 МБ)'); this.value = ''; return; }
+    if (file.size > 2 * 1024 * 1024) { showToast('Файл слишком большой (макс. 2 МБ)', 'error'); this.value = ''; return; }
     setPreview(URL.createObjectURL(file));
   });
 
@@ -427,6 +558,8 @@
   document.querySelectorAll('.edit-thumb-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
       currentId = this.dataset.id; uploadedUrl = null;
+      currentCourseOrig = this.dataset.course || '';
+      var csel = document.getElementById('course-select'); if (csel) { csel.value = currentCourseOrig; }
       var cur   = this.dataset.thumb || '';
       document.getElementById('thumb-url-input').value    = cur;
       document.getElementById('thumb-file-input').value   = '';
@@ -492,6 +625,48 @@
     });
   }
 
+  // ── Привязка урока к курсу (lookup new_relatedcourse через @odata.bind) ──────
+  function bindCourseAttempt(id, courseId, prop) {
+    var body = {}; body[prop + '@odata.bind'] = '/msdynce_courses(' + courseId + ')';
+    return getToken().then(function (t) {
+      return fetch('/_api/new_h5pcontents(' + id + ')', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'OData-MaxVersion': '4.0', 'OData-Version': '4.0', '__RequestVerificationToken': t },
+        body: JSON.stringify(body), credentials: 'include'
+      });
+    });
+  }
+  function unbindCourseAttempt(id, prop) {
+    var body = {}; body[prop + '@odata.bind'] = null;
+    return getToken().then(function (t) {
+      return fetch('/_api/new_h5pcontents(' + id + ')', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'OData-MaxVersion': '4.0', 'OData-Version': '4.0', '__RequestVerificationToken': t },
+        body: JSON.stringify(body), credentials: 'include'
+      });
+    });
+  }
+  function saveCourse(id, courseId, orig) {
+    courseId = courseId || ''; orig = orig || '';
+    if (courseId === orig) return Promise.resolve();            // не изменилось
+    if (!courseId) {                                            // отвязка (best effort)
+      resetToken();
+      return unbindCourseAttempt(id, 'new_relatedcourse').then(function (r) {
+        if (r.ok || r.status === 204) return;
+        resetToken(); return unbindCourseAttempt(id, 'new_RelatedCourse').then(function () {});
+      }).catch(function () {});
+    }
+    resetToken();                                              // привязка/смена, с фолбэком регистра нав-свойства
+    return bindCourseAttempt(id, courseId, 'new_relatedcourse').then(function (r) {
+      if (r.ok || r.status === 204) return;
+      resetToken();
+      return bindCourseAttempt(id, courseId, 'new_RelatedCourse').then(function (r2) {
+        if (r2.ok || r2.status === 204) return;
+        return r2.text().then(function (t) { throw new Error('Курс: HTTP ' + r2.status + ': ' + t.slice(0, 160)); });
+      });
+    });
+  }
+
   // ── Кнопка «Сохранить» ─────────────────────────────────────────────────────
   document.getElementById('thumb-save-btn').addEventListener('click', function () {
     if (!currentId) return;
@@ -500,47 +675,53 @@
     var promise;
     if (activeTab === 'file') {
       var file = document.getElementById('thumb-file-input').files && document.getElementById('thumb-file-input').files[0];
-      if (!file) { saveBtn.disabled = false; return; }
-      promise = uploadThumbFile(currentId, file);
+      promise = file ? uploadThumbFile(currentId, file) : Promise.resolve();
     } else {
       promise = saveThumbUrl(currentId, document.getElementById('thumb-url-input').value.trim());
     }
     promise.then(function () {
+      return saveCourse(currentId, document.getElementById('course-select').value, currentCourseOrig);
+    }).then(function () {
       bootstrap.Modal.getInstance(document.getElementById('thumbModal')).hide();
       location.reload();
-    }).catch(function (e) { saveBtn.disabled = false; alert('Ошибка сохранения: ' + e.message); });
+    }).catch(function (e) { saveBtn.disabled = false; showToast('Ошибка сохранения: ' + e.message, 'error'); });
   });
 
   // ── Кнопка «Удалить превью» ────────────────────────────────────────────────
   document.getElementById('thumb-clear-btn').addEventListener('click', function () {
-    if (!currentId || !confirm('Удалить превью?')) return;
-    this.disabled = true;
+    if (!currentId) return;
     var btn = this;
-    resetToken();
-    saveThumbUrl(currentId, '').then(function () {
-      bootstrap.Modal.getInstance(document.getElementById('thumbModal')).hide();
-      location.reload();
-    }).catch(function (e) { btn.disabled = false; alert('Ошибка: ' + e.message); });
+    fvConfirm('Удалить превью?').then(function (ok) {
+      if (!ok) return;
+      btn.disabled = true;
+      resetToken();
+      saveThumbUrl(currentId, '').then(function () {
+        bootstrap.Modal.getInstance(document.getElementById('thumbModal')).hide();
+        location.reload();
+      }).catch(function (e) { btn.disabled = false; showToast('Ошибка: ' + e.message, 'error'); });
+    });
   });
 
   // ── Удаление урока ─────────────────────────────────────────────────────────
   document.querySelectorAll('.delete-h5p').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var id = this.dataset.id, name = this.dataset.name || 'урок';
-      if (!confirm('Удалить урок «' + name + '»?\nЭто действие нельзя отменить.')) return;
-      this.disabled = true;
       var self = this;
-      resetToken();
-      getToken().then(function (token) {
-        return fetch('/_api/new_h5pcontents(' + id + ')', {
-          method: 'DELETE',
-          headers: { 'OData-MaxVersion': '4.0', 'OData-Version': '4.0', '__RequestVerificationToken': token },
-          credentials: 'include'
-        });
-      }).then(function (res) {
-        if (res.ok || res.status === 204) { location.reload(); }
-        else { self.disabled = false; res.text().then(function (t) { alert('Ошибка (HTTP ' + res.status + '):\n' + t.slice(0, 300)); }); }
-      }).catch(function (e) { self.disabled = false; alert('Сетевая ошибка: ' + e.message); });
+      fvConfirm('Удалить урок «' + name + '»? Это действие нельзя отменить.').then(function (ok) {
+        if (!ok) return;
+        self.disabled = true;
+        resetToken();
+        getToken().then(function (token) {
+          return fetch('/_api/new_h5pcontents(' + id + ')', {
+            method: 'DELETE',
+            headers: { 'OData-MaxVersion': '4.0', 'OData-Version': '4.0', '__RequestVerificationToken': token },
+            credentials: 'include'
+          });
+        }).then(function (res) {
+          if (res.ok || res.status === 204) { location.reload(); }
+          else { self.disabled = false; res.text().then(function (t) { showToast('Ошибка удаления (HTTP ' + res.status + '): ' + t.slice(0, 200), 'error'); }); }
+        }).catch(function (e) { self.disabled = false; showToast('Сетевая ошибка: ' + e.message, 'error'); });
+      });
     });
   });
   {% endif %}

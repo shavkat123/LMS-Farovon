@@ -1,207 +1,299 @@
-{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
-<div class="container py-5 text-center">
-  <i class="bi bi-shield-lock" style="font-size:52px;color:#94A3B8;"></i>
-  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
-  <p style="font-size:13px;color:#64748B;">Страница доступна только администраторам, HR, наставникам и руководителям.</p>
-  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+{% comment %}
+  Events — Мероприятия (handoff v2 design, user-facing)
+  Демо-данные: featured live-событие + фильтр-табы + список с записью и баллами.
+  Подключится к таблице new_event после её создания.
+{% endcomment %}
+
+{% unless user %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-calendar-event" style="font-size:52px;color:#64748B;display:block;margin-bottom:16px;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin-bottom:6px;">Войдите в систему</h2>
+  <p style="font-size:13px;color:#64748B;margin-bottom:20px;">Для просмотра мероприятий необходимо авторизоваться.</p>
+  <a href="/SignIn" class="btn btn-primary" style="border-radius:8px;">Войти</a>
 </div>
 {% else %}
 
 <style>
-  .fv-ev { padding: 28px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
-  .fv-ev-breadcrumb { margin-bottom: 18px; }
-  .fv-ev-breadcrumb ol { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .fv-ev-breadcrumb li { font-size: 12px; color: #94A3B8; display: flex; align-items: center; gap: 6px; }
-  .fv-ev-breadcrumb li::after { content: '/'; color: #CBD5E1; }
-  .fv-ev-breadcrumb li:last-child::after { display: none; }
-  .fv-ev-breadcrumb a { color: #64748B; text-decoration: none; }
-  .fv-ev-breadcrumb a:hover { color: #0D9488; }
-  .fv-ev-breadcrumb li:last-child { color: #0B1220; font-weight: 600; }
+  .fv-ev { padding: 12px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
 
-  .fv-ev-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
-  .fv-ev-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #0D9488; display: block; margin-bottom: 5px; }
-  .fv-ev-title { font-size: 26px; font-weight: 800; color: #0B1220; margin: 0 0 5px; }
-  .fv-ev-sub { font-size: 13px; color: #64748B; margin: 0; }
-  .fv-ev-newbtn { background: #0D9488; color: #fff; border: none; padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
-  .fv-ev-newbtn:hover { background: #0B7A6E; color: #fff; }
+  /* Header */
+  .fv-ev-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .fv-ev-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #1E3A8A; display: block; margin-bottom: 4px; }
+  .fv-ev-title { font-size: 28px; font-weight: 700; letter-spacing: -0.015em; color: #0B1220; margin: 0 0 4px; }
+  .fv-ev-sub { font-size: 14px; color: #475569; margin: 0; }
+  .fv-ev-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .fv-ev-btn-sec { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 12px; font-size: 13px; font-weight: 500; background: #fff; border: 1px solid #E5E7EB; color: #475569 !important; text-decoration: none; cursor: pointer; }
+  .fv-ev-btn-sec:hover { border-color: #D1D5DB; color: #0B1220 !important; }
+  .fv-ev-btn-pri { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 12px; font-size: 13px; font-weight: 600; background: #1E3A8A; border: 1px solid #1E3A8A; color: #fff; cursor: pointer; }
+  .fv-ev-btn-pri:hover { background: #15306E; color: #fff; }
 
-  .fv-ev-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
-  @media (max-width: 1000px) { .fv-ev-layout { grid-template-columns: 1fr; } }
+  .fv-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; box-shadow: 0 1px 2px rgba(11,18,32,.04), 0 1px 3px rgba(11,18,32,.04); }
 
-  .fv-ev-cal { background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; padding: 22px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
-  .fv-ev-cal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-  .fv-ev-cal-month { font-size: 18px; font-weight: 700; color: #0B1220; }
-  .fv-ev-cal-nav { display: flex; gap: 4px; }
-  .fv-ev-cal-nav button { background: #F8FAFC; border: 1px solid #E5E7EB; width: 32px; height: 32px; border-radius: 8px; color: #374151; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
-  .fv-ev-cal-nav button:hover { background: #F0FDFA; color: #0D9488; border-color: #0D9488; }
+  /* Featured */
+  .fv-feat { overflow: hidden; margin-bottom: 24px; }
+  .fv-feat-grid { display: grid; grid-template-columns: 1.5fr 1fr; }
+  @media (max-width: 860px) { .fv-feat-grid { grid-template-columns: 1fr; } }
+  .fv-feat-body { padding: 28px; }
+  .fv-chip-live { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; background: #FBEAEA; color: #B91C1C; }
+  .fv-dot { display: inline-block; width: 6px; height: 6px; border-radius: 999px; background: #B91C1C; animation: fv-pulse 1.8s ease-in-out infinite; }
+  @keyframes fv-pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  .fv-feat-kind { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #94A3B8; }
+  .fv-feat-title { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; color: #0B1220; margin: 0; }
+  .fv-feat-meta { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; margin-top: 20px; }
+  .fv-feat-meta span { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #475569; }
+  .fv-feat-meta i { color: #94A3B8; font-size: 15px; }
+  .fv-feat-speaker { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
+  .fv-feat-av { width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; background: #EEF2F9; color: #1E3A8A; }
+  .fv-feat-sp-name { font-size: 13px; font-weight: 600; color: #0B1220; }
+  .fv-feat-sp-role { font-size: 12px; color: #94A3B8; }
+  .fv-feat-cta { display: flex; align-items: center; gap: 16px; margin-top: 24px; flex-wrap: wrap; }
+  .fv-feat-join { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 600; background: #1E3A8A; border: none; color: #fff; cursor: pointer; }
+  .fv-feat-join:hover { background: #15306E; color: #fff; }
+  .fv-feat-pts { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: #475569; }
+  .fv-feat-pts i { color: #B45309; font-size: 14px; }
 
-  .fv-ev-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
-  .fv-ev-cal-dow { font-size: 10px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: .04em; text-align: center; padding: 6px 0; }
-  .fv-ev-cal-day { aspect-ratio: 1; border: 1px solid #F1F5F9; border-radius: 8px; padding: 6px; font-size: 12px; color: #0B1220; position: relative; display: flex; flex-direction: column; gap: 2px; }
-  .fv-ev-cal-day.out { color: #CBD5E1; background: #FAFBFC; }
-  .fv-ev-cal-day.today { border-color: #0D9488; background: #F0FDFA; font-weight: 700; }
-  .fv-ev-cal-num { font-size: 12px; font-weight: 600; }
-  .fv-ev-cal-dot { width: 6px; height: 6px; border-radius: 50%; align-self: flex-start; }
+  .fv-feat-cover { position: relative; background: linear-gradient(135deg, #1E3A8A 0%, #15306E 100%); min-height: 220px; }
+  .fv-feat-cover-in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: 24px; }
+  .fv-seat-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,.12); color: #fff; }
+  .fv-seat-lbl { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.6); }
+  .fv-seat-num { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; margin-top: 2px; }
+  .fv-seat-bar { height: 6px; width: 180px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,.2); margin-top: 12px; }
+  .fv-seat-bar > div { height: 100%; border-radius: 999px; background: #fff; }
 
-  .fv-ev-side { display: flex; flex-direction: column; gap: 16px; }
-  .fv-ev-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; padding: 18px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
-  .fv-ev-card-title { font-size: 14px; font-weight: 700; color: #0B1220; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+  /* Tabs */
+  .fv-ev-tabs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .fv-ev-tab { padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; background: #fff; color: #475569; border: 1px solid #E5E7EB; transition: background .14s, color .14s, border-color .14s; }
+  .fv-ev-tab.active { background: #0B1220; color: #fff; border-color: #0B1220; }
+  .fv-ev-tab:hover:not(.active) { border-color: #D1D5DB; color: #0B1220; }
 
-  .fv-ev-item { display: flex; gap: 12px; padding: 12px 0; border-top: 1px solid #F1F5F9; }
-  .fv-ev-item:first-of-type { border-top: none; padding-top: 0; }
-  .fv-ev-item-date { width: 48px; flex-shrink: 0; text-align: center; background: #F8FAFC; border-radius: 8px; padding: 6px 0; }
-  .fv-ev-item-day { font-size: 18px; font-weight: 800; color: #0B1220; line-height: 1; }
-  .fv-ev-item-mon { font-size: 9px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
-  .fv-ev-item-info { flex: 1; min-width: 0; }
-  .fv-ev-item-type { font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; display: inline-block; margin-bottom: 4px; }
-  .fv-ev-item-name { font-size: 13px; font-weight: 600; color: #0B1220; margin: 0 0 4px; line-height: 1.3; }
-  .fv-ev-item-meta { font-size: 11px; color: #94A3B8; display: flex; gap: 12px; flex-wrap: wrap; }
+  /* List */
+  .fv-ev-row { display: flex; align-items: center; gap: 20px; padding: 20px; border-bottom: 1px solid #E5E7EB; transition: background .14s; }
+  .fv-ev-row:last-child { border-bottom: none; }
+  .fv-ev-row:hover { background: #F0F2F5; }
+  .fv-ev-date { text-align: center; border-radius: 12px; padding: 10px 12px; min-width: 60px; background: #F0F2F5; flex-shrink: 0; }
+  .fv-ev-date .wd { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #94A3B8; }
+  .fv-ev-date .d { font-size: 22px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; color: #0B1220; }
+  .fv-ev-date .m { font-size: 10px; font-weight: 600; text-transform: uppercase; color: #94A3B8; }
+  .fv-ev-main { flex: 1; min-width: 0; }
+  .fv-ev-tags { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+  .fv-ev-kind { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #94A3B8; }
+  .fv-ev-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .fv-ev-name { font-size: 15px; font-weight: 600; color: #0B1220; }
+  .fv-ev-meta { display: flex; align-items: center; gap: 16px; margin-top: 6px; flex-wrap: wrap; }
+  .fv-ev-meta span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #94A3B8; }
+  .fv-ev-meta i.pts { color: #B45309; }
+  .fv-ev-reg { padding: 8px 16px; border-radius: 12px; font-size: 12px; font-weight: 600; flex-shrink: 0; cursor: pointer; background: #1E3A8A; color: #fff; border: 1px solid #1E3A8A; transition: background .14s, color .14s; }
+  .fv-ev-reg:hover { background: #15306E; }
+  .fv-ev-reg.is-reg { background: #ECF6EF; color: #15803D; border-color: #ECF6EF; }
+  .fv-ev-reg.is-reg:hover { background: #DCEEE2; }
 
-  .fv-ev-legend { display: flex; gap: 14px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #F1F5F9; flex-wrap: wrap; font-size: 11px; color: #64748B; }
-  .fv-ev-legend-item { display: flex; align-items: center; gap: 5px; }
-  .fv-ev-legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .fv-ev-empty { text-align: center; padding: 48px 24px; color: #94A3B8; font-size: 13px; }
+  .fv-ev-empty i { font-size: 40px; color: #CBD5E1; display: block; margin-bottom: 12px; }
+
+  .fv-ev-demo { background: #FAF3E8; border: 1px solid #F4E5C9; border-radius: 12px; padding: 10px 16px; margin-top: 20px; font-size: 12px; color: #B45309; display: flex; align-items: center; gap: 10px; }
+
+  @media (max-width: 576px) {
+    .fv-ev-title { font-size: 24px; }
+    .fv-ev-row { flex-wrap: wrap; }
+    .fv-ev-reg { width: 100%; }
+  }
 </style>
 
-<div class="fv-ev container-fluid px-3 px-md-4">
-
-  <nav class="fv-ev-breadcrumb" aria-label="breadcrumb">
-    <ol>
-      <li><a href="/">Главная</a></li>
-      <li aria-current="page">Мероприятия</li>
-    </ol>
-  </nav>
+<div class="container fv-ev">
 
   <div class="fv-ev-header">
     <div>
-      <span class="fv-ev-eyebrow">Администрирование</span>
-      <h1 class="fv-ev-title">Мероприятия</h1>
-      <p class="fv-ev-sub">Календарь встреч, тренингов и онбординг-сессий.</p>
+      <span class="fv-ev-eyebrow">Мероприятия</span>
+      <h1 class="fv-ev-title">Календарь событий</h1>
+      <p class="fv-ev-sub">Вебинары, встречи и офлайн-мероприятия. За участие начисляются баллы.</p>
     </div>
-    <button class="fv-ev-newbtn" type="button" disabled title="Появится после создания таблицы new_event"><i class="bi bi-plus-lg"></i> Новое мероприятие</button>
+    <div class="fv-ev-actions">
+      <a href="/calendar" class="fv-ev-btn-sec"><i class="bi bi-calendar3"></i> Вид календаря</a>
+      <button type="button" class="fv-ev-btn-pri" id="fv-ev-suggest"><i class="bi bi-plus-lg"></i> Предложить событие</button>
+    </div>
   </div>
 
-  <div class="fv-ev-layout">
-    {% comment %}── Calendar ──{% endcomment %}
-    <div class="fv-ev-cal">
-      <div class="fv-ev-cal-head">
-        <div class="fv-ev-cal-month">Май 2026</div>
-        <div class="fv-ev-cal-nav">
-          <button type="button" aria-label="Предыдущий месяц"><i class="bi bi-chevron-left"></i></button>
-          <button type="button" aria-label="Сегодня" style="width:auto;padding:0 12px;font-size:12px;">Сегодня</button>
-          <button type="button" aria-label="Следующий месяц"><i class="bi bi-chevron-right"></i></button>
+  {% comment %}── Featured live event ──{% endcomment %}
+  <div class="fv-card fv-feat">
+    <div class="fv-feat-grid">
+      <div class="fv-feat-body">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+          <span class="fv-chip-live"><span class="fv-dot"></span> Идёт сейчас</span>
+          <span class="fv-feat-kind">Вебинар</span>
         </div>
-      </div>
-      <div class="fv-ev-cal-grid">
-        <div class="fv-ev-cal-dow">Пн</div><div class="fv-ev-cal-dow">Вт</div><div class="fv-ev-cal-dow">Ср</div><div class="fv-ev-cal-dow">Чт</div><div class="fv-ev-cal-dow">Пт</div><div class="fv-ev-cal-dow">Сб</div><div class="fv-ev-cal-dow">Вс</div>
+        <h2 class="fv-feat-title">Культура обратной связи: как давать и принимать</h2>
 
-        {% comment %}May 2026 starts Friday. Showing 5 weeks (Apr 27 — May 31){% endcomment %}
-        <div class="fv-ev-cal-day out"><span class="fv-ev-cal-num">27</span></div>
-        <div class="fv-ev-cal-day out"><span class="fv-ev-cal-num">28</span></div>
-        <div class="fv-ev-cal-day out"><span class="fv-ev-cal-num">29</span></div>
-        <div class="fv-ev-cal-day out"><span class="fv-ev-cal-num">30</span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">1</span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">2</span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">3</span></div>
+        <div class="fv-feat-meta">
+          <span><i class="bi bi-calendar-event"></i> 14 марта, 14:00–15:30</span>
+          <span><i class="bi bi-camera-video"></i> Онлайн · Zoom</span>
+        </div>
 
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">4</span><span class="fv-ev-cal-dot" style="background:#2563EB;"></span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">5</span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">6</span><span class="fv-ev-cal-dot" style="background:#7C3AED;"></span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">7</span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">8</span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">9</span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">10</span></div>
-
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">11</span><span class="fv-ev-cal-dot" style="background:#0D9488;"></span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">12</span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">13</span><span class="fv-ev-cal-dot" style="background:#2563EB;"></span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">14</span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">15</span><span class="fv-ev-cal-dot" style="background:#D97706;"></span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">16</span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">17</span></div>
-
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">18</span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">19</span><span class="fv-ev-cal-dot" style="background:#7C3AED;"></span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">20</span></div>
-        <div class="fv-ev-cal-day today"><span class="fv-ev-cal-num">21</span><span class="fv-ev-cal-dot" style="background:#0D9488;"></span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">22</span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">23</span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">24</span></div>
-
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">25</span><span class="fv-ev-cal-dot" style="background:#2563EB;"></span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">26</span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">27</span><span class="fv-ev-cal-dot" style="background:#D97706;"></span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">28</span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">29</span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">30</span><span class="fv-ev-cal-dot" style="background:#7C3AED;"></span></div>
-        <div class="fv-ev-cal-day"><span class="fv-ev-cal-num">31</span></div>
-      </div>
-
-      <div class="fv-ev-legend">
-        <div class="fv-ev-legend-item"><span class="fv-ev-legend-dot" style="background:#0D9488;"></span> Встреча</div>
-        <div class="fv-ev-legend-item"><span class="fv-ev-legend-dot" style="background:#2563EB;"></span> Тренинг</div>
-        <div class="fv-ev-legend-item"><span class="fv-ev-legend-dot" style="background:#7C3AED;"></span> Презентация</div>
-        <div class="fv-ev-legend-item"><span class="fv-ev-legend-dot" style="background:#D97706;"></span> Дедлайн</div>
-      </div>
-    </div>
-
-    {% comment %}── Upcoming events ──{% endcomment %}
-    <div class="fv-ev-side">
-      <div class="fv-ev-card">
-        <h3 class="fv-ev-card-title"><i class="bi bi-calendar-week" style="color:#0D9488;"></i> Ближайшие события</h3>
-
-        <div class="fv-ev-item">
-          <div class="fv-ev-item-date"><div class="fv-ev-item-day">21</div><div class="fv-ev-item-mon">МАЙ</div></div>
-          <div class="fv-ev-item-info">
-            <span class="fv-ev-item-type" style="background:#F0FDFA;color:#0D9488;">Встреча</span>
-            <h4 class="fv-ev-item-name">Знакомство с командой продаж</h4>
-            <div class="fv-ev-item-meta"><span><i class="bi bi-clock"></i> 15:00</span><span><i class="bi bi-people"></i> 12 участников</span></div>
+        <div class="fv-feat-speaker">
+          <div class="fv-feat-av">МС</div>
+          <div>
+            <div class="fv-feat-sp-name">Мадина Саидова</div>
+            <div class="fv-feat-sp-role">HR Lead</div>
           </div>
         </div>
 
-        <div class="fv-ev-item">
-          <div class="fv-ev-item-date"><div class="fv-ev-item-day">25</div><div class="fv-ev-item-mon">МАЙ</div></div>
-          <div class="fv-ev-item-info">
-            <span class="fv-ev-item-type" style="background:#EFF6FF;color:#2563EB;">Тренинг</span>
-            <h4 class="fv-ev-item-name">Корпоративная этика и культура</h4>
-            <div class="fv-ev-item-meta"><span><i class="bi bi-clock"></i> 10:00</span><span><i class="bi bi-geo-alt"></i> Конф-зал A</span></div>
-          </div>
-        </div>
-
-        <div class="fv-ev-item">
-          <div class="fv-ev-item-date"><div class="fv-ev-item-day">27</div><div class="fv-ev-item-mon">МАЙ</div></div>
-          <div class="fv-ev-item-info">
-            <span class="fv-ev-item-type" style="background:#FEF3C7;color:#92400E;">Дедлайн</span>
-            <h4 class="fv-ev-item-name">Сдача отчётов за первый месяц</h4>
-            <div class="fv-ev-item-meta"><span><i class="bi bi-clock"></i> До 18:00</span></div>
-          </div>
-        </div>
-
-        <div class="fv-ev-item">
-          <div class="fv-ev-item-date"><div class="fv-ev-item-day">30</div><div class="fv-ev-item-mon">МАЙ</div></div>
-          <div class="fv-ev-item-info">
-            <span class="fv-ev-item-type" style="background:#F5F3FF;color:#7C3AED;">Презентация</span>
-            <h4 class="fv-ev-item-name">Итоги месяца для стажёров</h4>
-            <div class="fv-ev-item-meta"><span><i class="bi bi-clock"></i> 14:00</span><span><i class="bi bi-camera-video"></i> Онлайн</span></div>
-          </div>
+        <div class="fv-feat-cta">
+          <button type="button" class="fv-feat-join">Присоединиться <i class="bi bi-arrow-right"></i></button>
+          <span class="fv-feat-pts"><i class="bi bi-award"></i> +80 баллов</span>
         </div>
       </div>
 
-      <div class="fv-ev-card">
-        <h3 class="fv-ev-card-title"><i class="bi bi-bell" style="color:#D97706;"></i> Напоминания</h3>
-        <ul style="list-style:none;padding:0;margin:0;font-size:12px;color:#64748B;display:flex;flex-direction:column;gap:8px;">
-          <li><i class="bi bi-check-circle" style="color:#22C55E;"></i> 3 события подтверждены сотрудниками</li>
-          <li><i class="bi bi-exclamation-circle" style="color:#D97706;"></i> 1 событие ждёт подтверждения</li>
-          <li><i class="bi bi-calendar-plus" style="color:#2563EB;"></i> 2 новых приглашения</li>
-        </ul>
+      <div class="fv-feat-cover">
+        <div class="fv-feat-cover-in">
+          <span class="fv-seat-chip"><i class="bi bi-people"></i> 42/100 мест</span>
+          <div>
+            <div class="fv-seat-lbl">Свободно мест</div>
+            <div class="fv-seat-num">58</div>
+            <div class="fv-seat-bar"><div style="width:42%;"></div></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
+  {% comment %}── Filter tabs ──{% endcomment %}
+  <div class="fv-ev-tabs" role="group" aria-label="Фильтр событий">
+    <button type="button" class="fv-ev-tab active" data-kind="Все">Все</button>
+    <button type="button" class="fv-ev-tab" data-kind="Вебинары">Вебинары</button>
+    <button type="button" class="fv-ev-tab" data-kind="Встречи 1:1">Встречи 1:1</button>
+    <button type="button" class="fv-ev-tab" data-kind="Офлайн">Офлайн</button>
+    <button type="button" class="fv-ev-tab" data-kind="Записи">Записи</button>
+  </div>
+
+  {% comment %}── Event list (demo) ──{% endcomment %}
+  <div class="fv-card" style="overflow:hidden;">
+    <div id="fv-ev-list">
+
+      <div class="fv-ev-row" data-kind="Вебинары">
+        <div class="fv-ev-date"><div class="wd">Пт</div><div class="d">14</div><div class="m">мар</div></div>
+        <div class="fv-ev-main">
+          <div class="fv-ev-tags">
+            <span class="fv-ev-kind">Вебинар</span>
+            <span class="fv-ev-chip" style="background:#FBEAEA;color:#B91C1C;"><span class="fv-dot"></span> Идёт сейчас</span>
+          </div>
+          <div class="fv-ev-name">Культура обратной связи</div>
+          <div class="fv-ev-meta">
+            <span><i class="bi bi-clock"></i> 14:00</span>
+            <span><i class="bi bi-camera-video"></i> Zoom</span>
+            <span><i class="bi bi-award pts"></i> +80</span>
+          </div>
+        </div>
+        <button type="button" class="fv-ev-reg is-reg"><i class="bi bi-check-lg"></i> Вы записаны</button>
+      </div>
+
+      <div class="fv-ev-row" data-kind="Встречи 1:1">
+        <div class="fv-ev-date"><div class="wd">Вт</div><div class="d">18</div><div class="m">мар</div></div>
+        <div class="fv-ev-main">
+          <div class="fv-ev-tags">
+            <span class="fv-ev-kind">Встреча 1:1</span>
+            <span class="fv-ev-chip" style="background:#EEF2F9;color:#1E3A8A;">Скоро</span>
+          </div>
+          <div class="fv-ev-name">Ревью с ментором</div>
+          <div class="fv-ev-meta">
+            <span><i class="bi bi-clock"></i> 11:30</span>
+            <span><i class="bi bi-camera-video"></i> MS Teams</span>
+          </div>
+        </div>
+        <button type="button" class="fv-ev-reg is-reg"><i class="bi bi-check-lg"></i> Вы записаны</button>
+      </div>
+
+      <div class="fv-ev-row" data-kind="Офлайн">
+        <div class="fv-ev-date"><div class="wd">Сб</div><div class="d">22</div><div class="m">мар</div></div>
+        <div class="fv-ev-main">
+          <div class="fv-ev-tags">
+            <span class="fv-ev-kind">Офлайн</span>
+            <span class="fv-ev-chip" style="background:#ECF6EF;color:#15803D;">Открыта запись</span>
+          </div>
+          <div class="fv-ev-name">Тимбилдинг: командные игры</div>
+          <div class="fv-ev-meta">
+            <span><i class="bi bi-clock"></i> 17:00</span>
+            <span><i class="bi bi-geo-alt"></i> Офис, 5 этаж</span>
+            <span><i class="bi bi-award pts"></i> +50</span>
+          </div>
+        </div>
+        <button type="button" class="fv-ev-reg">Записаться</button>
+      </div>
+
+      <div class="fv-ev-row" data-kind="Вебинары">
+        <div class="fv-ev-date"><div class="wd">Чт</div><div class="d">27</div><div class="m">мар</div></div>
+        <div class="fv-ev-main">
+          <div class="fv-ev-tags">
+            <span class="fv-ev-kind">Вебинар</span>
+            <span class="fv-ev-chip" style="background:#ECF6EF;color:#15803D;">Открыта запись</span>
+          </div>
+          <div class="fv-ev-name">Мастер-класс: Power BI</div>
+          <div class="fv-ev-meta">
+            <span><i class="bi bi-clock"></i> 16:00</span>
+            <span><i class="bi bi-camera-video"></i> Zoom</span>
+            <span><i class="bi bi-award pts"></i> +120</span>
+          </div>
+        </div>
+        <button type="button" class="fv-ev-reg">Записаться</button>
+      </div>
+
+      <div class="fv-ev-row" data-kind="Офлайн">
+        <div class="fv-ev-date"><div class="wd">Ср</div><div class="d">02</div><div class="m">апр</div></div>
+        <div class="fv-ev-main">
+          <div class="fv-ev-tags">
+            <span class="fv-ev-kind">Офлайн</span>
+            <span class="fv-ev-chip" style="background:#ECF6EF;color:#15803D;">Открыта запись</span>
+          </div>
+          <div class="fv-ev-name">Q&amp;A с CEO</div>
+          <div class="fv-ev-meta">
+            <span><i class="bi bi-clock"></i> 12:00</span>
+            <span><i class="bi bi-geo-alt"></i> Конференц-зал</span>
+            <span><i class="bi bi-award pts"></i> +60</span>
+          </div>
+        </div>
+        <button type="button" class="fv-ev-reg">Записаться</button>
+      </div>
+
+    </div>
+    <div id="fv-ev-empty" class="fv-ev-empty" style="display:none;">
+      <i class="bi bi-calendar-x"></i>
+      Нет событий в этой категории.
+    </div>
+  </div>
+
+  <div class="fv-ev-demo">
+    <i class="bi bi-info-circle-fill" style="flex-shrink:0;"></i>
+    <span>Демо-данные. Список событий и запись подключатся к таблице new_event после её создания.</span>
+  </div>
+
 </div>
 
-<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 16px;margin:20px auto 0;max-width:1200px;font-size:12px;color:#92400E;display:flex;align-items:center;gap:10px;">
-  <i class="bi bi-info-circle-fill" style="color:#F59E0B;flex-shrink:0;"></i>
-  <span>Демо-данные. Календарь и события подключатся к таблице new_event после её создания.</span>
-</div>
+<script>
+  (function () {
+    // Filter tabs
+    var tabs  = document.querySelectorAll('.fv-ev-tab');
+    var rows  = document.querySelectorAll('.fv-ev-row');
+    var empty = document.getElementById('fv-ev-empty');
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        var kind = tab.getAttribute('data-kind');
+        tabs.forEach(function (t) { t.classList.toggle('active', t === tab); });
+        var any = false;
+        rows.forEach(function (row) {
+          var show = (kind === 'Все') || (row.getAttribute('data-kind') === kind);
+          row.style.display = show ? '' : 'none';
+          if (show) { any = true; }
+        });
+        if (empty) { empty.style.display = any ? 'none' : 'block'; }
+      });
+    });
+
+    // Register toggle (optimistic, no backend yet)
+    document.querySelectorAll('.fv-ev-reg').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var on = btn.classList.toggle('is-reg');
+        btn.innerHTML = on ? '<i class="bi bi-check-lg"></i> Вы записаны' : 'Записаться';
+      });
+    });
+  })();
+</script>
 
 {% endunless %}

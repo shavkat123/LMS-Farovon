@@ -1,0 +1,186 @@
+{% comment %}
+  Admin Forum — Модерация форума (/admin/forum)
+  Дизайн: admin_console/AdminConsole.html (AdminForum.jsx). Примитивы .adm-* — customtheme.css.
+  Данные: РЕАЛЬНЫЕ new_forumthread (+author link contact). Всё на реальных полях.
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Модерация форума доступна только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+{% comment %}── KPI aggregate ──{% endcomment %}
+{% fetchxml fm_kpi %}
+<fetch aggregate="true">
+  <entity name="new_forumthread">
+    <attribute name="new_forumthreadid" aggregate="count" alias="tcnt" />
+    <attribute name="new_replycount" aggregate="sum" alias="rsum" />
+    <attribute name="new_votes" aggregate="sum" alias="vsum" />
+    <attribute name="new_author" aggregate="countcolumn" distinct="true" alias="acnt" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign k_threads = 0 %}{% assign k_replies = 0 %}{% assign k_votes = 0 %}{% assign k_authors = 0 %}
+{% for r in fm_kpi.results.entities %}
+  {% assign k_threads = r.tcnt | plus: 0 %}
+  {% assign k_replies = r.rsum | plus: 0 %}
+  {% assign k_votes = r.vsum | plus: 0 %}
+  {% assign k_authors = r.acnt | plus: 0 %}
+{% endfor %}
+
+{% comment %}── Список тем (закреплённые сверху, затем свежие) ──{% endcomment %}
+{% fetchxml fm_list %}
+<fetch top="50">
+  <entity name="new_forumthread">
+    <attribute name="new_forumthreadid" />
+    <attribute name="new_name" />
+    <attribute name="new_tag" />
+    <attribute name="new_votes" />
+    <attribute name="new_replycount" />
+    <attribute name="new_ispinned" />
+    <attribute name="createdon" />
+    <link-entity name="contact" from="contactid" to="new_author" alias="au" link-type="outer">
+      <attribute name="fullname" />
+    </link-entity>
+    <order attribute="new_ispinned" descending="true" />
+    <order attribute="createdon" descending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+<style>
+  .admf { padding: 24px 0 56px; }
+  .admf-head { margin-bottom: 20px; }
+  .admf-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .admf-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .admf-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 900px) { .admf-kpis { grid-template-columns: repeat(2, 1fr); } }
+  .admf-search { position: relative; flex: 1 1 260px; min-width: 220px; }
+  .admf-search i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--adm-fg-3); font-size: 14px; pointer-events: none; }
+  .admf-search .adm-input { padding-left: 32px; }
+  .admf-tbl-wrap { overflow-x: auto; }
+  .admf-title { font-weight: 600; color: var(--adm-fg-1); }
+</style>
+
+<div class="container adm-scope admf">
+
+  <div class="admf-head">
+    <span class="adm-eyebrow">Коммуникации</span>
+    <h1>Модерация форума</h1>
+    <p>Темы сообщества, авторы, категории и активность.</p>
+  </div>
+
+  {% comment %}── KPI (реальные) ──{% endcomment %}
+  <div class="admf-kpis">
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Тем</span><i class="bi bi-chat-square-text" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ k_threads }}</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">всего в форуме</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Ответов</span><i class="bi bi-chat-dots" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ k_replies }}</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">суммарно</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Голосов</span><i class="bi bi-hand-thumbs-up" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ k_votes }}</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">за темы</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Активных авторов</span><i class="bi bi-people" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ k_authors }}</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">создавали темы</span></div>
+    </div>
+  </div>
+
+  {% comment %}── Toolbar ──{% endcomment %}
+  <div class="adm-card adm-toolbar" style="margin-bottom:16px;">
+    <div class="admf-search">
+      <i class="bi bi-search"></i>
+      <input type="text" class="adm-input" id="admfSearch" placeholder="Поиск по темам, автору…" autocomplete="off">
+    </div>
+    <div style="flex:1;"></div>
+    <a href="/forum" class="adm-btn adm-btn--ghost"><i class="bi bi-box-arrow-up-right"></i> Открыть форум</a>
+  </div>
+
+  {% comment %}── Таблица тем ──{% endcomment %}
+  <div class="adm-card" style="overflow:hidden;">
+    {% assign lcount = 0 %}
+    {% for t in fm_list.results.entities %}{% assign lcount = lcount | plus: 1 %}{% endfor %}
+    {% if lcount == 0 %}
+    <div style="padding:48px 24px;text-align:center;color:var(--adm-fg-3);">
+      <i class="bi bi-chat-square" style="display:block;font-size:40px;color:#CBD5E1;margin-bottom:12px;"></i>
+      Тем пока нет.
+    </div>
+    {% else %}
+    <div class="admf-tbl-wrap">
+      <table class="adm-table" id="admfTable">
+        <thead>
+          <tr>
+            <th>Тема</th>
+            <th style="width:170px;">Автор</th>
+            <th style="width:130px;">Категория</th>
+            <th class="adm-r" style="width:90px;">Ответов</th>
+            <th class="adm-r" style="width:90px;">Голосов</th>
+            <th style="width:110px;">Создано</th>
+          </tr>
+        </thead>
+        <tbody id="admfBody">
+          {% for t in fm_list.results.entities %}
+            {% assign ttl = t.new_name | default: 'Без названия' %}
+            {% assign au = t['au.fullname'] | default: 'Аноним' %}
+            {% assign tag = t.new_tag | default: '' %}
+            {% assign rc = t.new_replycount | default: 0 %}
+            {% assign vc = t.new_votes | default: 0 %}
+            {% assign pinned = t.new_ispinned %}
+            {% case tag %}
+              {% when 'Помощь' %}{% assign pill = 'adm-pill--info' %}
+              {% when 'Дискуссия' %}{% assign pill = 'adm-pill--neutral' %}
+              {% when 'Идея' %}{% assign pill = 'adm-pill--success' %}
+              {% when 'Баг' %}{% assign pill = 'adm-pill--warn' %}
+              {% when 'Новости' %}{% assign pill = 'adm-pill--info' %}
+              {% when 'Закреплено' %}{% assign pill = 'adm-pill--success' %}
+              {% else %}{% assign pill = 'adm-pill--neutral' %}
+            {% endcase %}
+          <tr data-search="{{ ttl | downcase }} {{ au | downcase }} {{ tag | downcase }}">
+            <td>
+              <div style="display:flex;align-items:center;gap:8px;">
+                {% if pinned %}<i class="bi bi-pin-angle-fill" style="color:var(--adm-success);font-size:13px;" title="Закреплено"></i>{% endif %}
+                <span class="admf-title">{{ ttl }}</span>
+              </div>
+            </td>
+            <td style="color:var(--adm-fg-2);">{{ au }}</td>
+            <td>{% if tag != '' %}<span class="adm-pill {{ pill }}">{{ tag }}</span>{% else %}<span style="color:var(--adm-fg-3);">—</span>{% endif %}</td>
+            <td class="adm-r adm-num">{{ rc }}</td>
+            <td class="adm-r adm-num">{{ vc }}</td>
+            <td style="font-size:12px;color:var(--adm-fg-3);">{{ t.createdon | date: 'dd.MM.yyyy' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  (function () {
+    var s = document.getElementById('admfSearch');
+    if (!s) return;
+    s.addEventListener('input', function () {
+      var q = (s.value || '').toLowerCase();
+      document.querySelectorAll('#admfBody tr[data-search]').forEach(function (r) {
+        var m = !q || (r.getAttribute('data-search') || '').indexOf(q) !== -1;
+        r.style.display = m ? '' : 'none';
+      });
+    });
+  })();
+</script>
+
+{% endunless %}

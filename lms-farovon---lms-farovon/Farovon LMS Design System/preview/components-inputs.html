@@ -1,0 +1,30 @@
+<!doctype html>
+<!-- @dsCard group="Components" name="Inputs" subtitle="Text · password · search — focus ring in primary" viewport="700x280" -->
+<html><head><meta charset="utf-8"><title>Components · Inputs</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 22px; background: #fff; font-family: var(--font-sans); }
+  .field { margin-bottom: 14px; max-width: 320px; }
+  label { display: block; font-size: 14px; font-weight: 500; color: #495057; margin-bottom: 4px; }
+  input, select { display: block; width: 100%; padding: 8px 12px; border: 1px solid #DEE2E6; border-radius: 6px; font-size: 14px; font-family: var(--font-sans); color: #212529; box-sizing: border-box; }
+  input:focus, select:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); }
+  .focused { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); }
+  .search { position: relative; }
+  .search input { padding-left: 36px; }
+  .search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #ADB5BD; }
+</style></head>
+<body>
+  <div class="field">
+    <label>Username</label>
+    <input type="text" value="employee1">
+  </div>
+  <div class="field">
+    <label>Password (focused)</label>
+    <input class="focused" type="password" value="••••••••">
+  </div>
+  <div class="field search">
+    <label>Search</label>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+    <input type="text" placeholder="Search…">
+  </div>
+</body></html>

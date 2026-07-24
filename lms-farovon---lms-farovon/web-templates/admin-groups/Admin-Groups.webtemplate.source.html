@@ -1,0 +1,105 @@
+{% comment %}
+  Admin Groups — Группы (/admin/groups). Дизайн: AdminGroups.jsx. Примитивы .adm-* — customtheme.css.
+  РЕАЛЬНЫЕ данные: агрегат contact по department (отделы = группы).
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+{% comment %}── Агрегат: активные контакты по отделам ──{% endcomment %}
+{% fetchxml grp %}
+<fetch aggregate="true">
+  <entity name="contact">
+    <attribute name="department" groupby="true" alias="dept" />
+    <attribute name="contactid" aggregate="count" alias="cnt" />
+    <filter><condition attribute="statecode" operator="eq" value="0" /></filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Считаем KPI: отделов, всего, без отдела ──{% endcomment %}
+{% assign g_depts = 0 %}
+{% assign g_total = 0 %}
+{% assign g_nodept = 0 %}
+{% for r in grp.results.entities %}
+  {% assign cnt = r.cnt | plus: 0 %}
+  {% assign dname = r.dept | default: '' %}
+  {% assign g_total = g_total | plus: cnt %}
+  {% if dname == '' %}
+    {% assign g_nodept = g_nodept | plus: cnt %}
+  {% else %}
+    {% assign g_depts = g_depts | plus: 1 %}
+  {% endif %}
+{% endfor %}
+
+<style>
+  .admg { padding: 24px 0 56px; }
+  .admg-head { margin-bottom: 20px; }
+  .admg-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .admg-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .admg-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+  .admg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .admg-kpis { grid-template-columns: 1fr; } .admg-grid { grid-template-columns: 1fr; } }
+  .admg-card { padding: 20px; }
+  .admg-ico { width: 40px; height: 40px; border-radius: var(--adm-radius-md); display: inline-flex; align-items: center; justify-content: center; background: var(--adm-bg-muted); font-size: 20px; }
+  .admg-name { font-size: 15px; font-weight: 700; color: var(--adm-fg-1); }
+  .admg-desc { font-size: 12px; color: var(--adm-fg-3); margin-top: 2px; }
+  .admg-foot { display: flex; align-items: center; gap: 16px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--adm-border-1); }
+  .admg-stat-n { font-size: 18px; font-weight: 700; color: var(--adm-fg-1); }
+</style>
+
+<div class="container adm-scope admg">
+
+  <div class="admg-head">
+    <span class="adm-eyebrow">Люди</span>
+    <h1>Группы</h1>
+    <p>Сотрудники сгруппированы по отделам (поле «Отдел» в карточке контакта).</p>
+  </div>
+
+  <div class="admg-kpis">
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Отделов</span><i class="bi bi-diagram-3"></i></div><div class="adm-stat-val">{{ g_depts }}</div><div class="adm-stat-foot"><span class="adm-stat-sub">с сотрудниками</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Всего сотрудников</span><i class="bi bi-person-check"></i></div><div class="adm-stat-val">{{ g_total }}</div><div class="adm-stat-foot"><span class="adm-stat-sub">активных</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Без отдела</span><i class="bi bi-person-plus"></i></div><div class="adm-stat-val">{{ g_nodept }}</div><div class="adm-stat-foot"><span class="adm-stat-sub">не распределены</span></div></div>
+  </div>
+
+  {% if g_depts == 0 %}
+  <div class="adm-card" style="padding:48px 24px;text-align:center;color:var(--adm-fg-3);">
+    <i class="bi bi-diagram-3" style="display:block;font-size:40px;color:#CBD5E1;margin-bottom:12px;"></i>
+    Отделы не заданы. Заполните поле «Отдел» в карточках сотрудников.
+  </div>
+  {% else %}
+  <div class="admg-grid">
+    {% assign clrs = 'var(--adm-primary),var(--adm-accent),var(--adm-success),var(--adm-primary),var(--adm-accent),var(--adm-success)' | split: ',' %}
+    {% assign ci = 0 %}
+    {% for r in grp.results.entities %}
+      {% assign dname = r.dept | default: '' %}
+      {% if dname == '' %}{% continue %}{% endif %}
+      {% assign cnt = r.cnt | plus: 0 %}
+      {% assign clr = clrs[ci] %}
+      {% assign ci = ci | plus: 1 %}
+      {% if ci >= 6 %}{% assign ci = 0 %}{% endif %}
+    <div class="adm-card admg-card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+        <span class="admg-ico" style="color:{{ clr }};"><i class="bi bi-people"></i></span>
+      </div>
+      <div class="admg-name" style="margin-top:12px;">{{ dname }}</div>
+      <div class="admg-desc">Отдел компании</div>
+      <div class="admg-foot">
+        <div><div class="admg-stat-n adm-num">{{ cnt }}</div><div class="adm-eyebrow">Участников</div></div>
+        <div style="flex:1;"></div>
+        <span class="adm-pill adm-pill--info"><i class="bi bi-building"></i> Отдел</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+
+{% endunless %}

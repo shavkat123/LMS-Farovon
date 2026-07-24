@@ -1,0 +1,258 @@
+{% comment %}
+  Admin Console — дашборд админки (/admin)
+  Дизайн: admin_console/AdminConsole.html (Dashboard.jsx)
+  Токены/примитивы .adm-* — глобально в customtheme.css.
+  Данные: реальные aggregate к new_h5pprogress / new_h5pcontent / new_task.
+  Графики активности и дедлайны — демо (нет истории/таблицы дедлайнов).
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Админ-консоль доступна только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+{% comment %}── KPI 1+2+3: уникальные обучающиеся, всего завершений, средний балл ──{% endcomment %}
+{% fetchxml adm_prog %}
+<fetch aggregate="true">
+  <entity name="new_h5pprogress">
+    <attribute name="new_user" aggregate="countcolumn" distinct="true" alias="ucnt" />
+    <attribute name="new_h5pprogressid" aggregate="count" alias="ccnt" />
+    <attribute name="new_scorescaled" aggregate="avg" alias="savg" />
+    <filter>
+      <condition attribute="new_completion" operator="eq" value="1" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign kpi_users = 0 %}
+{% assign kpi_done = 0 %}
+{% assign kpi_avg = 0 %}
+{% for r in adm_prog.results.entities %}
+  {% assign kpi_users = r.ucnt | plus: 0 %}
+  {% assign kpi_done = r.ccnt | plus: 0 %}
+  {% if r.savg %}{% assign kpi_avg = r.savg | times: 100 | round %}{% endif %}
+{% endfor %}
+
+{% comment %}── KPI 4: активных уроков в каталоге ──{% endcomment %}
+{% fetchxml adm_lessons %}
+<fetch aggregate="true">
+  <entity name="new_h5pcontent">
+    <attribute name="new_h5pcontentid" aggregate="count" alias="lcnt" />
+    <filter>
+      <condition attribute="new_isactive" operator="eq" value="1" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign kpi_lessons = 0 %}
+{% for r in adm_lessons.results.entities %}
+  {% assign kpi_lessons = r.lcnt | plus: 0 %}
+{% endfor %}
+
+{% comment %}── Последние завершения уроков (реальные) ──{% endcomment %}
+{% fetchxml adm_recent %}
+<fetch top="6">
+  <entity name="new_h5pprogress">
+    <attribute name="new_h5pprogressid" />
+    <attribute name="new_scorescaled" />
+    <attribute name="new_lastupdated" />
+    <link-entity name="contact" from="contactid" to="new_user" alias="ac" link-type="outer">
+      <attribute name="fullname" />
+    </link-entity>
+    <link-entity name="new_h5pcontent" from="new_h5pcontentid" to="new_h5pcontent" alias="al" link-type="outer">
+      <attribute name="new_name" />
+    </link-entity>
+    <filter>
+      <condition attribute="new_completion" operator="eq" value="1" />
+    </filter>
+    <order attribute="new_lastupdated" descending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+<style>
+  .admd { padding: 24px 0 56px; }
+  .admd-head { margin-bottom: 20px; }
+  .admd-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .admd-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+
+  .admd-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .admd-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 20px; }
+  @media (max-width: 900px) {
+    .admd-kpis { grid-template-columns: repeat(2, 1fr); }
+    .admd-row { grid-template-columns: 1fr; }
+  }
+
+  /* Bar chart (демо) */
+  .admd-bars { display: flex; align-items: flex-end; gap: 6px; height: 140px; }
+  .admd-bars .b { flex: 1; border-radius: 3px 3px 0 0; background: var(--adm-primary-100); min-height: 4px; }
+  .admd-bars .b.last { background: var(--adm-primary); }
+  .admd-barx { display: flex; gap: 6px; margin-top: 6px; }
+  .admd-barx span { flex: 1; text-align: center; font-size: 9px; color: var(--adm-fg-3); }
+
+  /* Activity list (реальные) */
+  .admd-act { padding: 8px 20px; }
+  .admd-act li { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--adm-border-1); }
+  .admd-act li:last-child { border-bottom: none; }
+  .admd-act-txt { font-size: 12.5px; color: var(--adm-fg-1); line-height: 1.4; }
+  .admd-act-when { font-size: 10.5px; color: var(--adm-fg-3); margin-top: 2px; }
+
+  .adm-card-link { font-size: 12px; font-weight: 600; color: var(--adm-primary) !important; text-decoration: none !important; }
+</style>
+
+<div class="container adm-scope admd">
+
+  <div class="admd-head">
+    <span class="adm-eyebrow">Admin Console</span>
+    <h1>Дашборд</h1>
+    <p>Полный обзор системы обучения и панель управления.</p>
+  </div>
+
+  {% comment %}── KPI row (реальные данные) ──{% endcomment %}
+  <div class="admd-kpis">
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Сотрудников в обучении</span><i class="bi bi-people" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ kpi_users }}</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">с завершёнными уроками</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Уроков в каталоге</span><i class="bi bi-collection-play" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ kpi_lessons }}</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">активных H5P-уроков</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Средний балл</span><i class="bi bi-check-circle" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ kpi_avg }}%</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">по завершённым тестам</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Завершений всего</span><i class="bi bi-trophy" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ kpi_done }}</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">за всё время</span></div>
+    </div>
+  </div>
+
+  {% comment %}── Charts row (демо) ──{% endcomment %}
+  <div class="admd-row">
+    <div class="adm-card" style="padding:20px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;"><span class="adm-eyebrow">Активность за 14 дней</span><span class="adm-demo-chip">демо</span></div>
+          <div style="font-size:14px;font-weight:600;color:var(--adm-fg-1);margin-top:2px;">Завершённые уроки в день</div>
+        </div>
+      </div>
+      {% assign bars = '38,52,44,60,48,66,58,72,64,80,70,86,78,94' | split: ',' %}
+      <div class="admd-bars">
+        {% for h in bars %}
+        <div class="b{% if forloop.last %} last{% endif %}" style="height:{{ h }}%;"></div>
+        {% endfor %}
+      </div>
+      <div class="admd-barx">
+        {% for h in bars %}<span>{{ forloop.index }}</span>{% endfor %}
+      </div>
+    </div>
+
+    <div class="adm-card" style="padding:20px;">
+      <div style="display:flex;align-items:center;gap:8px;"><span class="adm-eyebrow">Тренд завершаемости</span><span class="adm-demo-chip">демо</span></div>
+      <div style="display:flex;align-items:baseline;gap:8px;margin-top:6px;">
+        <span class="adm-num" style="font-size:22px;font-weight:700;color:var(--adm-fg-1);">82%</span>
+        <span class="adm-num" style="font-size:11px;font-weight:600;color:var(--adm-success);display:inline-flex;align-items:center;gap:2px;"><i class="bi bi-arrow-up-right"></i> +6%</span>
+      </div>
+      <svg width="100%" height="56" viewBox="0 0 220 56" preserveAspectRatio="none" style="display:block;margin-top:12px;">
+        <defs>
+          <linearGradient id="admSpark" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1E3A8A" stop-opacity="0.2" />
+            <stop offset="100%" stop-color="#1E3A8A" stop-opacity="0" />
+          </linearGradient>
+        </defs>
+        <path d="M0,40 L20,38 L40,39 L60,34 L80,30 L100,28 L120,24 L140,25 L160,18 L180,15 L200,12 L220,8 L220,56 L0,56 Z" fill="url(#admSpark)" />
+        <path d="M0,40 L20,38 L40,39 L60,34 L80,30 L100,28 L120,24 L140,25 L160,18 L180,15 L200,12 L220,8" fill="none" stroke="#1E3A8A" stroke-width="1.5" />
+      </svg>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--adm-border-1);">
+        <span style="font-size:11px;color:var(--adm-fg-3);">Цель квартала</span>
+        <span class="adm-num" style="font-size:12px;font-weight:600;color:var(--adm-fg-1);">85%</span>
+      </div>
+    </div>
+  </div>
+
+  {% comment %}── Deadlines (демо) + Recent activity (реальные) ──{% endcomment %}
+  <div class="admd-row">
+    <div class="adm-card" style="overflow:hidden;">
+      <div class="adm-cardhead">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;"><span class="adm-eyebrow">Обязательные курсы</span><span class="adm-demo-chip">демо</span></div>
+          <div class="adm-cardhead-title">Дедлайны и охват</div>
+        </div>
+        <a href="/admin/reports" class="adm-btn adm-btn--ghost" style="padding:4px 10px;font-size:12px;"><i class="bi bi-box-arrow-up-right"></i> Отчёты</a>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="adm-table">
+          <thead>
+            <tr><th>Курс</th><th style="width:150px;">Прогресс</th><th style="width:110px;">Дедлайн</th></tr>
+          </thead>
+          <tbody>
+            {% assign dl = 'Безопасность на рабочем месте|60|high|12 марта;Кибергигиена 2026|79|med|20 марта;Антикоррупционная политика|95|low|25 марта;GDPR и защита данных|61|med|02 апреля' | split: ';' %}
+            {% for d in dl %}
+              {% assign f = d | split: '|' %}
+              {% assign pct = f[1] | plus: 0 %}
+              {% assign urg = f[2] %}
+              {% if urg == 'high' %}{% assign bc = 'var(--adm-danger)' %}{% assign pill = 'adm-pill--danger' %}{% elsif urg == 'med' %}{% assign bc = 'var(--adm-accent)' %}{% assign pill = 'adm-pill--warn' %}{% else %}{% assign bc = 'var(--adm-success)' %}{% assign pill = 'adm-pill--success' %}{% endif %}
+            <tr>
+              <td style="font-weight:600;">{{ f[0] }}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div class="adm-bar" style="flex:1;"><div style="width:{{ pct }}%;background:{{ bc }};"></div></div>
+                  <span class="adm-num" style="font-size:11px;font-weight:600;color:var(--adm-fg-2);min-width:28px;">{{ pct }}%</span>
+                </div>
+              </td>
+              <td><span class="adm-pill adm-pill--dot {{ pill }}">{{ f[3] }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="adm-card" style="overflow:hidden;">
+      <div class="adm-cardhead">
+        <div>
+          <span class="adm-eyebrow">Активность</span>
+          <div class="adm-cardhead-title">Последние завершения</div>
+        </div>
+        <a href="/h5p-progress" class="adm-card-link">Весь прогресс →</a>
+      </div>
+      {% assign rec_count = 0 %}
+      {% for p in adm_recent.results.entities %}{% assign rec_count = rec_count | plus: 1 %}{% endfor %}
+      {% if rec_count == 0 %}
+      <div style="padding:36px 20px;text-align:center;color:var(--adm-fg-3);font-size:13px;">
+        <i class="bi bi-inbox" style="display:block;font-size:34px;color:#CBD5E1;margin-bottom:10px;"></i>
+        Пока нет завершённых уроков.
+      </div>
+      {% else %}
+      <ul class="admd-act">
+        {% for p in adm_recent.results.entities %}
+        {% assign afull = p['ac.fullname'] | default: 'Сотрудник' %}
+        {% assign aparts = afull | split: ' ' %}
+        {% assign ai1 = aparts[0] | slice: 0, 1 | upcase %}
+        {% assign ai2 = '' %}
+        {% if aparts.size > 1 %}{% assign ai2 = aparts[1] | slice: 0, 1 | upcase %}{% endif %}
+        {% assign lname = p['al.new_name'] | default: 'урок' %}
+        <li>
+          <span class="adm-avatar" style="width:26px;height:26px;font-size:10px;">{{ ai1 }}{{ ai2 }}</span>
+          <div style="flex:1;min-width:0;">
+            <div class="admd-act-txt"><b>{{ afull }}</b> <span style="color:var(--adm-fg-2);">завершил урок</span> <span style="color:var(--adm-fg-2);">«{{ lname }}»</span></div>
+            <div class="admd-act-when">{{ p.new_lastupdated | date: 'dd.MM.yyyy HH:mm' }}</div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endunless %}

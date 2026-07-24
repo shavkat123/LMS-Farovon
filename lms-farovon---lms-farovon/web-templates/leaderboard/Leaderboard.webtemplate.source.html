@@ -1,12 +1,14 @@
 {% comment %}
-  Leaderboard — Рейтинг
+  Leaderboard — Рейтинг (handoff v2 design)
   Монеты = completed_count * 100 + SUM(new_scorescaled) * 50
   Агрегация делается FetchXML (GROUP BY), а не Liquid-арифметикой.
+  Период/охват — визуальные переключатели (нет истории баллов в базе).
+  Колонка «Динамика» — нейтральна (нет исторических данных).
 {% endcomment %}
 
 {% unless user %}
 <div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
-  <i class="bi bi-trophy" style="font-size:52px;color:#94A3B8;display:block;margin-bottom:16px;"></i>
+  <i class="bi bi-trophy" style="font-size:52px;color:#64748B;display:block;margin-bottom:16px;"></i>
   <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin-bottom:6px;">Войдите в систему</h2>
   <p style="font-size:13px;color:#64748B;margin-bottom:20px;">Для просмотра рейтинга необходимо авторизоваться.</p>
   <a href="/SignIn" class="btn btn-primary" style="border-radius:8px;">Войти</a>
@@ -124,66 +126,112 @@
   {% endif %}
 {% endfor %}
 
-{% assign coin_url = 'https://raw.githubusercontent.com/shavkat123/farovon-lms-system/main/frontend/src/assets/coin.png' %}
+{% comment %}── Разрыв до места выше (реальный расчёт) ──{% endcomment %}
+{% assign gap_to_next = 0 %}
+{% assign next_coins  = 0 %}
+{% assign next_rank   = 0 %}
+{% assign pct_to_next = 0 %}
+{% if my_rank > 1 %}
+  {% assign above_idx = my_rank | minus: 2 %}
+  {% assign next_rank = my_rank | minus: 1 %}
+  {% assign next_coins = coins_arr[above_idx] | plus: 0 %}
+  {% assign gap_to_next = next_coins | minus: my_coins %}
+  {% if next_coins > 0 %}
+    {% assign pct_to_next = my_coins | times: 100 | divided_by: next_coins %}
+  {% endif %}
+{% endif %}
 
 <style>
-  .fv-lb { padding: 28px 0 56px; font-family: 'Inter', ui-sans-serif, sans-serif; }
-  .fv-lb-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 28px; flex-wrap: wrap; }
-  .fv-lb-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #D97706; display: block; margin-bottom: 4px; }
-  .fv-lb-title { font-size: 22px; font-weight: 800; color: #0B1220; margin: 0 0 3px; }
-  .fv-lb-sub { font-size: 13px; color: #64748B; margin: 0; }
+  .fv-lb { padding: 12px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
 
-  .fv-my-rank-pill { background: linear-gradient(135deg,#1E3A8A,#3B82F6); border-radius: 12px; padding: 14px 20px; color: #fff; display: flex; align-items: center; gap: 14px; flex-shrink: 0; min-width: 220px; }
-  .fv-my-rank-num { font-size: 28px; font-weight: 900; line-height: 1; }
-  .fv-my-rank-lbl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; opacity: .75; }
-  .fv-my-rank-coins { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+  /* Header */
+  .fv-lb-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .fv-lb-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #B45309; display: block; margin-bottom: 4px; }
+  .fv-lb-title { font-size: 28px; font-weight: 700; letter-spacing: -0.015em; color: #0B1220; margin: 0 0 4px; }
+  .fv-lb-sub { font-size: 14px; color: #475569; margin: 0; }
 
-  .fv-podium { display: flex; align-items: flex-end; justify-content: center; gap: 12px; margin-bottom: 32px; }
-  .fv-podium-item { display: flex; flex-direction: column; align-items: center; flex: 1; max-width: 200px; }
-  .fv-podium-avatar { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; font-size: 18px; margin-bottom: 10px; position: relative; flex-shrink: 0; }
-  .fv-podium-medal { position: absolute; bottom: -6px; right: -6px; font-size: 20px; line-height: 1; }
-  .fv-podium-name { font-size: 13px; font-weight: 700; color: #0B1220; text-align: center; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
-  .fv-podium-dept { font-size: 11px; color: #94A3B8; text-align: center; margin-bottom: 8px; }
-  .fv-podium-coins { display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 800; color: #D97706; }
-  .fv-podium-block { width: 100%; border-radius: 12px 12px 0 0; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900; color: rgba(255,255,255,.5); }
+  /* Segmented switchers (period / scope) — visual state only */
+  .fv-lb-periods { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .fv-lb-per { padding: 6px 12px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; background: #fff; color: #475569; border: 1px solid #E5E7EB; transition: background .14s, color .14s, border-color .14s; }
+  .fv-lb-per.active { background: #1E3A8A; color: #fff; border-color: #1E3A8A; }
+  .fv-lb-per:hover:not(.active) { border-color: #D1D5DB; color: #0B1220; }
 
-  .fv-podium-item.rank-1 .fv-podium-block { height: 88px; background: linear-gradient(180deg,#F59E0B,#D97706); }
-  .fv-podium-item.rank-2 .fv-podium-block { height: 64px; background: linear-gradient(180deg,#94A3B8,#64748B); }
-  .fv-podium-item.rank-3 .fv-podium-block { height: 48px; background: linear-gradient(180deg,#D97706,#B45309); }
-  .fv-podium-item.rank-1 .fv-podium-avatar { width: 64px; height: 64px; font-size: 22px; background: linear-gradient(135deg,#F59E0B,#D97706); box-shadow: 0 4px 16px rgba(245,158,11,.4); }
-  .fv-podium-item.rank-2 .fv-podium-avatar { width: 52px; height: 52px; background: linear-gradient(135deg,#94A3B8,#64748B); }
-  .fv-podium-item.rank-3 .fv-podium-avatar { width: 48px; height: 48px; font-size: 16px; background: linear-gradient(135deg,#D97706,#B45309); }
+  .fv-lb-scopes { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+  .fv-lb-scope { padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; background: #fff; color: #475569; border: 1px solid #E5E7EB; transition: background .14s, color .14s, border-color .14s; }
+  .fv-lb-scope.active { background: #0B1220; color: #fff; border-color: #0B1220; }
+  .fv-lb-scope:hover:not(.active) { border-color: #D1D5DB; color: #0B1220; }
 
-  .fv-lb-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(11,18,32,.04); }
-  .fv-lb-table { width: 100%; border-collapse: collapse; }
-  .fv-lb-table thead tr { background: #F8FAFC; border-bottom: 1px solid #E5E7EB; }
-  .fv-lb-table thead th { font-size: 11px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: .07em; padding: 10px 16px; text-align: left; }
-  .fv-lb-table thead th:last-child { text-align: right; }
-  .fv-lb-table tbody tr { border-bottom: 1px solid #F1F5F9; transition: background .12s; }
-  .fv-lb-table tbody tr:last-child { border-bottom: none; }
-  .fv-lb-table tbody tr:hover { background: #F8FAFC; }
-  .fv-lb-table tbody tr.fv-me { background: #EFF6FF !important; }
-  .fv-lb-table td { padding: 12px 16px; font-size: 13px; color: #0B1220; }
-  .fv-lb-table td:last-child { text-align: right; }
+  .fv-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; box-shadow: 0 1px 2px rgba(11,18,32,.04), 0 1px 3px rgba(11,18,32,.04); }
 
-  .fv-rank-num { font-size: 13px; font-weight: 700; color: #64748B; width: 32px; text-align: center; }
-  .fv-avatar-sm { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
-  .fv-lb-fullname { font-size: 13px; font-weight: 600; color: #0B1220; }
-  .fv-lb-job { font-size: 11px; color: #94A3B8; margin-top: 1px; }
-  .fv-coin-row { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 800; color: #D97706; justify-content: flex-end; }
-  .fv-coin-row img { width: 20px; height: 20px; }
-  .fv-me-badge { background: #DBEAFE; color: #1E40AF; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 20px; margin-left: 6px; letter-spacing: .04em; }
+  /* Podium */
+  .fv-podium-wrap { padding: 32px; margin-bottom: 20px; }
+  .fv-podium { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; align-items: end; max-width: 720px; margin: 0 auto; }
+  .fv-pod { display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .fv-pod-av-wrap { position: relative; }
+  .fv-pod-av { border-radius: 999px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .fv-pod-badge { position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%); width: 24px; height: 24px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .fv-pod-name { font-size: 14px; font-weight: 700; color: #0B1220; margin-top: 12px; }
+  .fv-pod-dept { font-size: 12px; color: #94A3B8; }
+  .fv-pod-coins { margin-top: 8px; display: flex; align-items: baseline; gap: 6px; }
+  .fv-pod-coins .n { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .fv-pod-coins .u { font-size: 11px; color: #94A3B8; }
+  .fv-pod-block { margin-top: 12px; border-radius: 8px 8px 0 0; width: 100%; }
+
+  /* Layout */
+  .fv-lb-grid { display: grid; grid-template-columns: 1fr 300px; gap: 20px; }
+  @media (max-width: 992px) { .fv-lb-grid { grid-template-columns: 1fr; } }
+
+  /* Table */
+  .fv-tbl-head { padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #E5E7EB; }
+  .fv-tbl-head h3 { font-size: 16px; font-weight: 700; color: #0B1220; margin: 0; }
+  .fv-tbl-head span { font-size: 12px; color: #94A3B8; }
+  .fv-tbl-cols, .fv-tbl-row { display: grid; grid-template-columns: 48px 1fr 130px 90px 84px; align-items: center; }
+  .fv-tbl-cols { padding: 10px 24px; background: #F0F2F5; border-bottom: 1px solid #E5E7EB; }
+  .fv-tbl-cols span { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #94A3B8; }
+  .fv-tbl-cols span.r, .fv-tbl-row .r { text-align: right; justify-self: end; }
+  .fv-tbl-row { padding: 14px 24px; border-bottom: 1px solid #E5E7EB; }
+  .fv-tbl-row:last-child { border-bottom: none; }
+  .fv-tbl-row.me { background: #EEF2F9; }
+  .fv-tbl-rank { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; color: #94A3B8; }
+  .fv-tbl-rank.me { color: #1E3A8A; }
+  .fv-tbl-user { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .fv-av { width: 32px; height: 32px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; background: #F0F2F5; color: #475569; }
+  .fv-av.me { background: #1E3A8A; color: #fff; }
+  .fv-tbl-name { font-size: 14px; font-weight: 500; color: #0B1220; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fv-tbl-name.me { font-weight: 700; }
+  .fv-tbl-dept { font-size: 13px; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fv-tbl-trend { font-size: 12px; font-weight: 600; color: #94A3B8; display: inline-flex; align-items: center; gap: 4px; }
+  .fv-tbl-pts { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; color: #0B1220; }
+
+  /* Side */
+  .fv-side { display: flex; flex-direction: column; gap: 20px; }
+  .fv-side-card { padding: 24px; }
+  .fv-side-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; display: block; }
+  .fv-pos-num { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; color: #0B1220; }
+  .fv-next-box { margin-top: 16px; padding: 12px; border-radius: 12px; background: #F0F2F5; }
+  .fv-next-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .fv-next-row .l { font-size: 12px; color: #475569; }
+  .fv-next-row .v { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: #0B1220; }
+  .fv-bar { height: 6px; border-radius: 999px; overflow: hidden; background: #E5E7EB; }
+  .fv-bar > div { height: 100%; border-radius: 999px; background: #1E3A8A; }
+
+  .fv-earn { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .fv-earn li { display: flex; align-items: center; gap: 10px; }
+  .fv-earn-ic { width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: #F0F2F5; color: #475569; flex-shrink: 0; }
+  .fv-earn-lbl { flex: 1; font-size: 13px; color: #475569; }
+  .fv-earn-pts { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: #B45309; }
+  .fv-earn-soon { font-size: 11px; font-weight: 600; color: #94A3B8; }
 
   .fv-lb-empty { text-align: center; padding: 56px 24px; }
   .fv-lb-empty i { font-size: 48px; color: #CBD5E1; display: block; margin-bottom: 14px; }
   .fv-lb-empty h3 { font-size: 15px; font-weight: 700; color: #64748B; margin: 0 0 6px; }
-  .fv-lb-empty p { font-size: 13px; color: #94A3B8; margin: 0; }
+  .fv-lb-empty p { font-size: 13px; color: #64748B; margin: 0; }
 
   @media (max-width: 576px) {
-    .fv-lb-header { flex-direction: column; }
-    .fv-my-rank-pill { width: 100%; }
-    .fv-podium { gap: 6px; }
-    .fv-podium-name { font-size: 11px; max-width: 90px; }
+    .fv-lb-title { font-size: 24px; }
+    .fv-podium { gap: 10px; }
+    .fv-tbl-cols, .fv-tbl-row { grid-template-columns: 34px 1fr 74px; }
+    .fv-tbl-dept, .fv-tbl-trend, .fv-tbl-cols .c-dept, .fv-tbl-cols .c-trend { display: none; }
   }
 </style>
 
@@ -191,77 +239,91 @@
 
   <div class="fv-lb-header">
     <div>
-      <span class="fv-lb-eyebrow"><i class="bi bi-trophy-fill"></i> Рейтинг</span>
-      <h1 class="fv-lb-title">Лидеры обучения</h1>
-      <p class="fv-lb-sub">Рейтинг по монетам, заработанным за прохождение уроков</p>
+      <span class="fv-lb-eyebrow">Рейтинг</span>
+      <h1 class="fv-lb-title">Таблица лидеров</h1>
+      <p class="fv-lb-sub">Баллы за курсы, тесты, участие в событиях и помощь коллегам.</p>
     </div>
-    {% if my_rank > 0 %}
-    <div class="fv-my-rank-pill">
-      <div>
-        <div class="fv-my-rank-lbl">Ваша позиция</div>
-        <div class="fv-my-rank-num">#{{ my_rank }}</div>
-      </div>
-      <div style="width:1px;height:36px;background:rgba(255,255,255,.2);"></div>
-      <div>
-        <div class="fv-my-rank-lbl">Монеты</div>
-        <div class="fv-my-rank-coins">
-          <img src="{{ coin_url }}" style="width:18px;height:18px;"> {{ my_coins }}
-        </div>
-      </div>
+    <div class="fv-lb-periods" role="group" aria-label="Период">
+      <button type="button" class="fv-lb-per" data-per="Неделя">Неделя</button>
+      <button type="button" class="fv-lb-per" data-per="Месяц">Месяц</button>
+      <button type="button" class="fv-lb-per" data-per="Квартал">Квартал</button>
+      <button type="button" class="fv-lb-per active" data-per="Всё время">Всё время</button>
     </div>
-    {% endif %}
+  </div>
+
+  <div class="fv-lb-scopes" role="group" aria-label="Охват">
+    <button type="button" class="fv-lb-scope active" data-scope="Компания">Компания</button>
+    <button type="button" class="fv-lb-scope" data-scope="Мой отдел">Мой отдел</button>
+    <button type="button" class="fv-lb-scope" data-scope="Наставники">Наставники</button>
   </div>
 
   {% if n_real == 0 %}
-  <div class="fv-lb-empty">
+  <div class="fv-card fv-lb-empty">
     <i class="bi bi-trophy"></i>
     <h3>Рейтинг пока пуст</h3>
-    <p>Проходите уроки чтобы попасть в таблицу лидеров</p>
+    <p>Проходите уроки, чтобы попасть в таблицу лидеров.</p>
   </div>
   {% else %}
 
   {% comment %}── Подиум: только если 3+ реальных участника ──{% endcomment %}
   {% if n_real >= 3 %}
-  <div class="fv-podium">
-    {% assign podium_order = '1,0,2' | split: ',' %}
-    {% assign podium_ranks = '2,1,3' | split: ',' %}
-    {% for pi in podium_order %}
-      {% assign idx    = pi | plus: 0 %}
-      {% assign pr     = podium_ranks[forloop.index0] | plus: 0 %}
-      {% assign pname  = names_arr[idx] | default: 'Участник' %}
-      {% assign pjob   = jobs_arr[idx]  | default: '' %}
-      {% assign pcoins = coins_arr[idx] | plus: 0 %}
-      {% assign initials = pname | split: ' ' %}
-      {% assign ini1 = initials[0] | slice: 0, 1 | upcase %}
-      {% assign ini2 = '' %}
-      {% if initials.size > 1 %}{% assign ini2 = initials[1] | slice: 0, 1 | upcase %}{% endif %}
-      {% assign medal_emoji = '🥇' %}
-      {% if pr == 2 %}{% assign medal_emoji = '🥈' %}{% endif %}
-      {% if pr == 3 %}{% assign medal_emoji = '🥉' %}{% endif %}
-      <div class="fv-podium-item rank-{{ pr }}">
-        <div class="fv-podium-avatar">
-          {{ ini1 }}{{ ini2 }}
-          <span class="fv-podium-medal">{{ medal_emoji }}</span>
+  <div class="fv-card fv-podium-wrap">
+    <div class="fv-podium">
+      {% assign podium_order = '1,0,2' | split: ',' %}
+      {% assign podium_ranks = '2,1,3' | split: ',' %}
+      {% for pi in podium_order %}
+        {% assign idx    = pi | plus: 0 %}
+        {% assign pr     = podium_ranks[forloop.index0] | plus: 0 %}
+        {% assign pname  = names_arr[idx] | default: 'Участник' %}
+        {% assign pjob   = jobs_arr[idx]  | default: '' %}
+        {% assign pcoins = coins_arr[idx] | plus: 0 %}
+        {% assign initials = pname | split: ' ' %}
+        {% assign ini1 = initials[0] | slice: 0, 1 | upcase %}
+        {% assign ini2 = '' %}
+        {% if initials.size > 1 %}{% assign ini2 = initials[1] | slice: 0, 1 | upcase %}{% endif %}
+        {% assign is_first = false %}{% if pr == 1 %}{% assign is_first = true %}{% endif %}
+        <div class="fv-pod" style="order:{% if pr == 1 %}2{% elsif pr == 2 %}1{% else %}3{% endif %};">
+          <div class="fv-pod-av-wrap">
+            <div class="fv-pod-av" style="
+                 width:{% if is_first %}76px{% else %}60px{% endif %};
+                 height:{% if is_first %}76px{% else %}60px{% endif %};
+                 font-size:{% if is_first %}22px{% else %}17px{% endif %};
+                 background:{% if is_first %}#1E3A8A{% else %}#F0F2F5{% endif %};
+                 color:{% if is_first %}#fff{% else %}#0B1220{% endif %};
+                 border:{% if is_first %}3px solid #B45309{% else %}2px solid #D1D5DB{% endif %};">{{ ini1 }}{{ ini2 }}</div>
+            <div class="fv-pod-badge" style="
+                 background:{% if is_first %}#B45309{% else %}#fff{% endif %};
+                 color:{% if is_first %}#fff{% else %}#475569{% endif %};
+                 border:2px solid {% if is_first %}#B45309{% else %}#D1D5DB{% endif %};">{{ pr }}</div>
+          </div>
+          <div class="fv-pod-name">{{ pname }}</div>
+          {% if pjob != '' %}<div class="fv-pod-dept">{{ pjob }}</div>{% endif %}
+          <div class="fv-pod-coins">
+            <span class="n" style="font-size:{% if is_first %}20px{% else %}17px{% endif %};color:{% if is_first %}#B45309{% else %}#0B1220{% endif %};">{{ pcoins }}</span>
+            <span class="u">баллов</span>
+          </div>
+          <div class="fv-pod-block" style="height:{% if is_first %}48px{% elsif pr == 2 %}32px{% else %}22px{% endif %};background:{% if is_first %}#1E3A8A{% else %}#E5E7EB{% endif %};"></div>
         </div>
-        <div class="fv-podium-name">{{ pname }}</div>
-        {% if pjob != '' %}<div class="fv-podium-dept">{{ pjob }}</div>{% endif %}
-        <div class="fv-podium-coins"><img src="{{ coin_url }}" style="width:16px;height:16px;"> {{ pcoins }}</div>
-        <div class="fv-podium-block">#{{ pr }}</div>
-      </div>
-    {% endfor %}
+      {% endfor %}
+    </div>
   </div>
   {% endif %}
 
-  <div class="fv-lb-card">
-    <table class="fv-lb-table">
-      <thead>
-        <tr>
-          <th style="width:48px;">#</th>
-          <th>Участник</th>
-          <th style="width:140px;text-align:right;">Монеты</th>
-        </tr>
-      </thead>
-      <tbody>
+  <div class="fv-lb-grid">
+    {% comment %}── Полная таблица ──{% endcomment %}
+    <div class="fv-card" style="overflow:hidden;">
+      <div class="fv-tbl-head">
+        <h3>Полная таблица</h3>
+        <span><span class="fv-scope-lbl">Компания</span> · <span class="fv-per-lbl">Всё время</span></span>
+      </div>
+      <div class="fv-tbl-cols">
+        <span>#</span>
+        <span>Сотрудник</span>
+        <span class="c-dept">Отдел</span>
+        <span class="c-trend">Динамика</span>
+        <span class="r">Баллы</span>
+      </div>
+      <div>
         {% for uid in ids_arr %}
           {% if uid == '' %}{% continue %}{% endif %}
           {% assign ri     = forloop.index %}
@@ -275,38 +337,106 @@
           {% assign ini1 = initials[0] | slice: 0, 1 | upcase %}
           {% assign ini2 = '' %}
           {% if initials.size > 1 %}{% assign ini2 = initials[1] | slice: 0, 1 | upcase %}{% endif %}
-          {% assign avatar_colors = '#1E3A8A,#7C3AED,#047857,#B45309,#BE185D,#0369A1' | split: ',' %}
-          {% assign color_idx = idx | modulo: 6 %}
-          {% assign avatar_color = avatar_colors[color_idx] %}
-        <tr{% if is_me %} class="fv-me"{% endif %}>
-          <td>
-            {% if ri == 1 %}🥇{% elsif ri == 2 %}🥈{% elsif ri == 3 %}🥉{% else %}<span class="fv-rank-num">{{ ri }}</span>{% endif %}
-          </td>
-          <td>
-            <div style="display:flex;align-items:center;gap:10px;">
-              <div class="fv-avatar-sm" style="background:{{ avatar_color }};">{{ ini1 }}{{ ini2 }}</div>
-              <div>
-                <div class="fv-lb-fullname">
-                  {{ pname }}
-                  {% if is_me %}<span class="fv-me-badge">Вы</span>{% endif %}
-                </div>
-                {% if pjob != '' %}<div class="fv-lb-job">{{ pjob }}</div>{% endif %}
-              </div>
-            </div>
-          </td>
-          <td>
-            <div class="fv-coin-row">
-              <img src="{{ coin_url }}" alt="coin"> {{ pcoins }}
-            </div>
-          </td>
-        </tr>
+        <div class="fv-tbl-row{% if is_me %} me{% endif %}">
+          <span class="fv-tbl-rank{% if is_me %} me{% endif %}">{{ ri }}</span>
+          <div class="fv-tbl-user">
+            <div class="fv-av{% if is_me %} me{% endif %}">{{ ini1 }}{{ ini2 }}</div>
+            <span class="fv-tbl-name{% if is_me %} me{% endif %}">{{ pname }}{% if is_me %} (вы){% endif %}</span>
+          </div>
+          <span class="fv-tbl-dept">{% if pjob != '' %}{{ pjob }}{% else %}—{% endif %}</span>
+          <span class="fv-tbl-trend" title="История баллов появится позже"><i class="bi bi-dash"></i></span>
+          <span class="fv-tbl-pts r">{{ pcoins }}</span>
+        </div>
         {% endfor %}
-      </tbody>
-    </table>
+      </div>
+    </div>
+
+    {% comment %}── Боковая панель ──{% endcomment %}
+    <div class="fv-side">
+      <div class="fv-card fv-side-card">
+        <span class="fv-side-eyebrow" style="color:#1E3A8A;">Ваша позиция</span>
+        {% if my_rank > 0 %}
+        <div style="margin-top:8px;">
+          <span class="fv-pos-num">#{{ my_rank }}</span>
+        </div>
+        {% if my_rank == 1 %}
+          <div style="margin-top:14px;font-size:13px;font-weight:600;color:#15803D;display:flex;align-items:center;gap:6px;">
+            <i class="bi bi-trophy-fill"></i> Вы лидер рейтинга
+          </div>
+        {% else %}
+          <div class="fv-next-box">
+            <div class="fv-next-row">
+              <span class="l">До места #{{ next_rank }}</span>
+              <span class="v">{{ gap_to_next }} баллов</span>
+            </div>
+            <div class="fv-bar"><div style="width:{{ pct_to_next }}%;"></div></div>
+          </div>
+        {% endif %}
+        {% else %}
+        <div style="margin-top:10px;font-size:13px;color:#475569;">
+          Вы пока не в рейтинге. Завершите первый урок, чтобы заработать баллы.
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="fv-card fv-side-card">
+        <span class="fv-side-eyebrow" style="color:#B45309;">Как заработать баллы</span>
+        <ul class="fv-earn">
+          <li>
+            <span class="fv-earn-ic"><i class="bi bi-book"></i></span>
+            <span class="fv-earn-lbl">Завершить урок H5P</span>
+            <span class="fv-earn-pts">+100</span>
+          </li>
+          <li>
+            <span class="fv-earn-ic"><i class="bi bi-clipboard-check"></i></span>
+            <span class="fv-earn-lbl">Идеальный результат теста</span>
+            <span class="fv-earn-pts">+50</span>
+          </li>
+          <li>
+            <span class="fv-earn-ic"><i class="bi bi-award"></i></span>
+            <span class="fv-earn-lbl">Пройти курс полностью</span>
+            <span class="fv-earn-pts">бонус</span>
+          </li>
+          <li>
+            <span class="fv-earn-ic"><i class="bi bi-calendar-check"></i></span>
+            <span class="fv-earn-lbl">Посетить мероприятие</span>
+            <span class="fv-earn-soon">скоро</span>
+          </li>
+          <li>
+            <span class="fv-earn-ic"><i class="bi bi-chat-dots"></i></span>
+            <span class="fv-earn-lbl">Полезный ответ на форуме</span>
+            <span class="fv-earn-soon">скоро</span>
+          </li>
+        </ul>
+      </div>
+    </div>
   </div>
 
   {% endif %}
 
 </div>
+
+<script>
+  (function () {
+    // Period switcher — visual state only (нет истории баллов в базе)
+    var perBtns = document.querySelectorAll('.fv-lb-per');
+    var perLbl  = document.querySelector('.fv-per-lbl');
+    perBtns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        perBtns.forEach(function (x) { x.classList.toggle('active', x === b); });
+        if (perLbl) perLbl.textContent = b.getAttribute('data-per');
+      });
+    });
+    // Scope switcher — visual state only
+    var scopeBtns = document.querySelectorAll('.fv-lb-scope');
+    var scopeLbl  = document.querySelector('.fv-scope-lbl');
+    scopeBtns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        scopeBtns.forEach(function (x) { x.classList.toggle('active', x === b); });
+        if (scopeLbl) scopeLbl.textContent = b.getAttribute('data-scope');
+      });
+    });
+  })();
+</script>
 
 {% endunless %}

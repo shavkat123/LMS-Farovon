@@ -62,7 +62,7 @@
   .fv-player-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: #475569; text-decoration: none !important; padding: 6px 12px; border-radius: 7px; border: 1px solid #E5E7EB; background: #fff; transition: all 0.14s; }
   .fv-player-back:hover { background: #EEF2F9; border-color: #1E3A8A; color: #1E3A8A !important; }
   .fv-player-header { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; box-shadow: 0 1px 3px rgba(11,18,32,0.04); flex-wrap: wrap; }
-  .fv-player-meta { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #94A3B8; margin-bottom: 6px; }
+  .fv-player-meta { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #64748B; margin-bottom: 6px; }
   .fv-player-title { font-size: 20px; font-weight: 700; color: #0B1220; margin: 0 0 8px; line-height: 1.3; }
   .fv-player-desc { font-size: 13px; color: #64748B; margin: 0; max-width: 600px; }
   .fv-player-badges { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
@@ -382,18 +382,41 @@
   document.head.appendChild(coreScript);
 
   // ── Load .h5p via Power Automate proxy ───────────────────────────────────
+  // Запрос к Flow с ретраем на транзиентные ошибки шлюза (502/503/504 —
+  // часто «холодный старт» Power Automate) и понятными сообщениями.
+  async function flowFetch(fileName, attempt) {
+    attempt = attempt || 1;
+    var response = await _fetch(FLOW_URL, {
+      method : 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept'      : 'application/octet-stream, application/json, text/plain, */*'
+      },
+      body   : JSON.stringify({ fileName: fileName })
+    });
+    if (!response.ok) {
+      if ((response.status === 502 || response.status === 503 || response.status === 504) && attempt < 3) {
+        console.warn('[H5P] Flow ' + response.status + ' — повтор ' + (attempt + 1) + '/3 через 2с');
+        await new Promise(function (r) { setTimeout(r, 2000); });
+        return flowFetch(fileName, attempt + 1);
+      }
+      if (response.status === 502 || response.status === 503 || response.status === 504) {
+        throw new Error('Сервис загрузки уроков временно недоступен (Flow ' + response.status +
+          '). Обычно это значит, что файл этого урока не найден в хранилище или Power Automate не ответил. ' +
+          'Проверьте, что .h5p загружен для урока, и повторите позже.');
+      }
+      if (response.status === 404) {
+        throw new Error('Файл урока не найден в хранилище (404). Загрузите .h5p через раздел «Загрузка H5P».');
+      }
+      throw new Error('Flow HTTP ' + response.status + ' ' + response.statusText);
+    }
+    return response;
+  }
+
   async function loadViaFlow(fileName) {
     try {
       console.log('[H5P] Loading via Flow:', fileName);
-      var response = await _fetch(FLOW_URL, {
-        method : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept'      : 'application/octet-stream, application/json, text/plain, */*'
-        },
-        body   : JSON.stringify({ fileName: fileName })
-      });
-      if (!response.ok) throw new Error('Flow HTTP ' + response.status + ' ' + response.statusText);
+      var response = await flowFetch(fileName, 1);
 
       var ct = (response.headers.get('Content-Type') || '').toLowerCase();
       console.log('[H5P] Flow response Content-Type:', ct);
@@ -421,7 +444,18 @@
       }
 
       console.log('[H5P] Flow returned', buf.byteLength, 'bytes — extracting ZIP');
-      var zip = await JSZip.loadAsync(buf);
+      // Понятная диагностика вместо криптичного «Corrupted zip»
+      if (!buf || buf.byteLength < 100) {
+        throw new Error('Файл урока пустой или не загружен (' + (buf ? buf.byteLength : 0) +
+          ' байт). Похоже, .h5p не сохранился в базе — переzагрузите урок через раздел «Загрузка H5P».');
+      }
+      var zip;
+      try {
+        zip = await JSZip.loadAsync(buf);
+      } catch (zipErr) {
+        throw new Error('Файл урока повреждён или это не .h5p-архив (получено ' + buf.byteLength +
+          ' байт). Переzагрузите урок. Детали: ' + zipErr.message);
+      }
       var tasks = [];
       zip.forEach(function (path, file) {
         if (file.dir) return;
@@ -450,12 +484,17 @@
       initH5P(VBASE);
     } catch (err) {
       console.error('[H5P] Flow error:', err);
-      showError('Ошибка загрузки через Flow: ' + escHtml(err.message));
+      showError(escHtml(err.message));
     }
   }
 
   function base64ToBuffer(b64) {
-    var binary = atob(b64.replace(/\s/g, ''));
+    // Защита от искажений при передаче: пробел ← '+' (URL-декод), URL-safe (-_ → +/),
+    // затем убрать только переносы строк. НЕ удалять пробелы вслепую (это стирало бы '+').
+    b64 = String(b64).replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/').replace(/[\r\n\t\f\v]/g, '');
+    // Дополнить паддингом '=' до кратности 4 (иначе atob обрежет хвост → битый zip)
+    while (b64.length % 4 !== 0) { b64 += '='; }
+    var binary = atob(b64);
     var buf = new Uint8Array(binary.length);
     for (var i = 0; i < binary.length; i++) buf[i] = binary.charCodeAt(i);
     return buf.buffer;

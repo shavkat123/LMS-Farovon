@@ -2,82 +2,152 @@
 {% if nav %}
 
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-
-  /* Farovon v2 — dark navy sidebar rail */
-  .fv-rail {
-    background: #0E1A35;
-    border-radius: 10px;
-    padding: 8px 6px;
+  /* Farovon v2 — светлый сайдбар с цветными иконками (дизайн-кит ui_kits/web_app_v2/SidebarV2) */
+  .fv-side {
+    background: #FFFFFF;
+    border: 1px solid var(--fv-border, #E5E7EB);
+    border-radius: 14px;
+    padding: 10px 8px;
     margin-top: 8px;
+    box-shadow: 0 1px 2px rgba(11,18,32,0.04), 0 1px 3px rgba(11,18,32,0.04);
     font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
   }
-  .fv-rail-section {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: rgba(138, 153, 189, 0.55);
-    padding: 10px 12px 5px;
-    display: block;
-  }
-  .fv-rail .nav-link {
+  .fv-side .nav-list { list-style: none; padding: 0; margin: 0; }
+  .fv-side .nav-item { margin-bottom: 2px; }
+  .fv-side .nav-link {
     display: flex !important;
     align-items: center;
-    gap: 10px;
-    padding: 9px 12px !important;
-    border-radius: 8px;
-    font-size: 13px;
+    gap: 12px;
+    padding: 8px 10px !important;
+    border-radius: 12px;
+    font-size: 14px;
     font-weight: 500;
-    color: #8A99BD !important;
-    background: transparent !important;
-    transition: background 0.12s, color 0.12s;
-    text-decoration: none !important;
-    position: relative;
-  }
-  .fv-rail .nav-link:hover {
-    background: rgba(255,255,255,0.05) !important;
-    color: #C7D2E8 !important;
+    color: var(--fv-fg-2, #475569) !important;
+    background: transparent;
+    transition: background 0.14s, color 0.14s;
     text-decoration: none !important;
   }
-  .fv-rail .nav-link.active {
-    background: #182849 !important;
-    color: #ffffff !important;
+  .fv-side .nav-link:hover { background: var(--fv-bg-app, #F6F7F9); text-decoration: none !important; }
+  .fv-side .nav-link.active { font-weight: 600; }
+  .fv-side-ico {
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  /* Карточка баланса — тёплый градиент из кита */
+  .fv-side-balance {
+    margin-top: 12px;
+    padding: 16px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #FFF4DC 0%, #FFE0C2 100%);
+    border: 1px solid #FFD9A8;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  }
+  .fv-side-balance-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .fv-side-balance-lbl { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #92400E; }
+  .fv-side-balance-num { font-size: 28px; font-weight: 800; color: #7C3A0E; line-height: 1; font-variant-numeric: tabular-nums; }
+  .fv-side-balance-unit { font-size: 12px; font-weight: 600; color: #92400E; margin-left: 4px; }
+  .fv-side-balance-btn {
+    display: block;
+    margin-top: 12px;
+    width: 100%;
+    text-align: center;
+    padding: 7px 0;
+    border-radius: 10px;
+    font-size: 12px;
     font-weight: 600;
-    box-shadow: inset 3px 0 0 #B45309;
+    background: #fff;
+    color: #92400E !important;
+    border: 1px solid #FFD9A8;
+    text-decoration: none !important;
+    transition: background 0.14s;
   }
-  .fv-rail .nav-link i {
-    font-size: 1rem;
-    min-width: 18px;
-  }
-  .fv-rail .nav-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-  .fv-rail .nav-item {
-    margin-bottom: 2px;
-  }
+  .fv-side-balance-btn:hover { background: #FFF9EF; }
 </style>
 
-<nav class="fv-rail" aria-label="Навигация сотрудника">
-  <span class="fv-rail-section">Меню</span>
-  {% assign icons = "person-check,newspaper,building,list-task,calendar3,person-video2,journal-bookmark,telephone-inbound,chat-dots,shop" | split: "," %}
+<nav class="fv-side" aria-label="Навигация сотрудника">
+  {% assign icons  = "person-check,newspaper,building,list-task,calendar3,person-video2,journal-bookmark,telephone-inbound,chat-dots,shop" | split: "," %}
+  {% assign tints  = "#EEF2F9,#FAF3E8,#F0F2F5,#ECF6EF,#EEF2F9,#FAF3E8,#ECF6EF,#F0F2F5,#EEF2F9,#FAF3E8" | split: "," %}
+  {% assign colors = "#1E3A8A,#B45309,#475569,#15803D,#1E3A8A,#B45309,#15803D,#475569,#1E3A8A,#D97706" | split: "," %}
   <ul class="nav flex-column nav-list">
     {% for link in nav.weblinks %}
     {% assign icon = icons[forloop.index0] %}
+    {% assign tint = tints[forloop.index0] %}
+    {% assign col  = colors[forloop.index0] %}
+    {% unless icon %}{% assign icon = "link-45deg" %}{% endunless %}
+    {% unless tint %}{% assign tint = "#F0F2F5" %}{% endunless %}
+    {% unless col %}{% assign col = "#475569" %}{% endunless %}
     {% assign is_active = false %}
     {% if page.url == link.url %}{% assign is_active = true %}{% endif %}
     <li class="nav-item">
       <a href="{{ link.url | escape }}"
          class="nav-link{% if is_active %} active{% endif %}"
+         {% if is_active %}style="background:{{ tint }};color:{{ col }} !important;"{% endif %}
          aria-label="{{ link.name | escape }}"
          {% if link.open_in_new_window %}target="_blank"{% endif %}>
-        <i class="bi bi-{{ icon }}" aria-hidden="true"></i>
+        <span class="fv-side-ico" style="background:{{ tint }};color:{{ col }};">
+          <i class="bi bi-{{ icon }}" aria-hidden="true"></i>
+        </span>
         <span>{{ link.name | escape }}</span>
       </a>
     </li>
     {% endfor %}
   </ul>
 </nav>
+
+{% if user %}
+{% comment %}── Баланс: та же формула, что в rewards-shop (100 + score*50 за завершённый урок) ──{% endcomment %}
+{% fetchxml fv_side_done %}
+<fetch>
+  <entity name="new_h5pprogress">
+    <attribute name="new_scorescaled" />
+    <filter>
+      <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
+      <condition attribute="new_completion" operator="eq" value="1" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% fetchxml fv_side_spent %}
+<fetch>
+  <entity name="new_rewardpurchase">
+    <attribute name="new_pointsspent" />
+    <filter>
+      <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign fv_earned = 0 %}
+{% for p in fv_side_done.results.entities %}
+  {% assign fv_score_pts = 0 %}
+  {% if p.new_scorescaled %}
+    {% assign fv_score_pts = p.new_scorescaled | times: 50 | round %}
+  {% endif %}
+  {% assign fv_earned = fv_earned | plus: 100 | plus: fv_score_pts %}
+{% endfor %}
+
+{% assign fv_spent = 0 %}
+{% for pur in fv_side_spent.results.entities %}
+  {% assign fv_spent = fv_spent | plus: pur.new_pointsspent %}
+{% endfor %}
+
+{% assign fv_balance = fv_earned | minus: fv_spent %}
+
+<div class="fv-side-balance">
+  <div class="fv-side-balance-top">
+    <span class="fv-side-balance-lbl">Ваш баланс</span>
+    <i class="bi bi-stars" style="color:#D97706;" aria-hidden="true"></i>
+  </div>
+  <div aria-live="polite">
+    <span class="fv-side-balance-num">{{ fv_balance }}</span><span class="fv-side-balance-unit">баллов</span>
+  </div>
+  <a class="fv-side-balance-btn" href="/rewards-shop/">В магазин →</a>
+</div>
+{% endif %}
+
 {% endif %}

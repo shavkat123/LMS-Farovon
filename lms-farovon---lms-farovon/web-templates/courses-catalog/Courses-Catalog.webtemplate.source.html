@@ -1,0 +1,207 @@
+{% comment %}
+  Courses Catalog — Курсы и обучение (дизайн web_app_v2/CoursesV2).
+  РЕАЛЬНЫЕ данные: msdynce_course (активные) + прогресс из привязанного H5P (new_relatedcourse).
+  Баллы = кол-во привязанных уроков × 100. «Обязательно» — по категории. Траектория — пока не показываем (нет поля).
+  Карточка → /course-details?id=<courseGUID> (там «Программа курса» с этапами).
+{% endcomment %}
+
+{% unless user %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-mortarboard" style="font-size:52px;color:#64748B;display:block;margin-bottom:16px;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin-bottom:6px;">Войдите в систему</h2>
+  <p style="font-size:13px;color:#64748B;margin-bottom:20px;">Для просмотра курсов необходимо авторизоваться.</p>
+  <a href="/SignIn" class="btn btn-primary" style="border-radius:8px;">Войти</a>
+</div>
+{% else %}
+
+{% comment %}── Курсы ──{% endcomment %}
+{% fetchxml crs %}
+<fetch>
+  <entity name="msdynce_course">
+    <attribute name="msdynce_courseid" />
+    <attribute name="msdynce_coursename" />
+    <attribute name="msdynce_coursecategory" />
+    <attribute name="msdynce_coursedescription" />
+    <filter><condition attribute="statuscode" operator="eq" value="1" /></filter>
+    <order attribute="msdynce_coursename" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Привязанные к курсам H5P-уроки ──{% endcomment %}
+{% fetchxml linked %}
+<fetch>
+  <entity name="new_h5pcontent">
+    <attribute name="new_h5pcontentid" />
+    <attribute name="new_relatedcourse" />
+    <filter type="and">
+      <condition attribute="new_isactive" operator="eq" value="1" />
+      <condition attribute="new_relatedcourse" operator="not-null" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Завершённые уроки пользователя ──{% endcomment %}
+{% fetchxml mydone %}
+<fetch>
+  <entity name="new_h5pprogress">
+    <attribute name="new_h5pcontent" />
+    <filter>
+      <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
+      <condition attribute="new_completion" operator="eq" value="1" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign done_ids = '|' %}
+{% for p in mydone.results.entities %}{% if p.new_h5pcontent %}{% assign done_ids = done_ids | append: p.new_h5pcontent.id | append: '|' %}{% endif %}{% endfor %}
+
+{% comment %}── Рендер карточек в capture + сбор статистики за один проход ──{% endcomment %}
+{% assign n_courses = 0 %}
+{% assign n_progress = 0 %}
+{% assign n_mandatory = 0 %}
+{% assign covers = 'paper,navy,warm,slate' | split: ',' %}
+{% capture cards_html %}
+{% for c in crs.results.entities %}
+  {% assign cid = c.msdynce_courseid %}
+  {% assign cname = c.msdynce_coursename | default: 'Курс' %}
+  {% assign cdesc = c.msdynce_coursedescription | default: '' %}
+  {% assign catlabel = '' %}{% if c.msdynce_coursecategory %}{% assign catlabel = c.msdynce_coursecategory.label | default: '' %}{% endif %}
+  {% assign ctot = 0 %}{% assign cdone = 0 %}
+  {% for h in linked.results.entities %}
+    {% if h.new_relatedcourse.id == cid %}
+      {% assign ctot = ctot | plus: 1 %}
+      {% if done_ids contains h.new_h5pcontentid %}{% assign cdone = cdone | plus: 1 %}{% endif %}
+    {% endif %}
+  {% endfor %}
+  {% assign cpct = 0 %}{% if ctot > 0 %}{% assign cpct = cdone | times: 100 | divided_by: ctot %}{% endif %}
+  {% assign cpts = ctot | times: 100 %}
+  {% assign cstatus = 'notstarted' %}{% if cpct == 100 and ctot > 0 %}{% assign cstatus = 'done' %}{% elsif cdone > 0 %}{% assign cstatus = 'progress' %}{% endif %}
+  {% assign is_mand = false %}
+  {% if catlabel contains 'Compliance' or catlabel contains 'Безопас' or catlabel contains 'Обязат' or catlabel contains 'Complience' %}{% assign is_mand = true %}{% endif %}
+  {% assign cover = covers[forloop.index0 | modulo: 4] %}
+  {% assign n_courses = n_courses | plus: 1 %}
+  {% if cstatus == 'progress' %}{% assign n_progress = n_progress | plus: 1 %}{% endif %}
+  {% if is_mand %}{% assign n_mandatory = n_mandatory | plus: 1 %}{% endif %}
+  <a href="/course-details?id={{ cid }}" class="fv-cc-card" data-status="{{ cstatus }}" data-mand="{% if is_mand %}1{% else %}0{% endif %}" data-search="{{ cname | downcase }} {{ catlabel | downcase }}">
+    <div class="fv-cc-cover fv-cc-cover--{{ cover }}">
+      <span class="fv-cc-cover-cat">{{ catlabel | default: 'Курс' }}</span>
+      {% if is_mand %}<span class="fv-cc-badge fv-cc-badge--req">обязательно</span>{% elsif cstatus == 'done' %}<span class="fv-cc-badge fv-cc-badge--done">завершён</span>{% endif %}
+      <span class="fv-cc-cover-title">{{ cname }}</span>
+    </div>
+    <div class="fv-cc-body">
+      <div class="fv-cc-meta">{% if catlabel != '' %}{{ catlabel }}{% else %}Курс{% endif %}{% if ctot > 0 %} · {{ ctot }} этап{% if ctot >= 2 and ctot < 5 %}а{% elsif ctot >= 5 %}ов{% endif %}{% endif %}</div>
+      {% if cdesc != '' %}<p class="fv-cc-desc">{{ cdesc }}</p>{% endif %}
+      <div class="fv-cc-foot">
+        <div class="fv-cc-prog">
+          <div class="fv-cc-prog-top"><span>{{ cpct }}% пройдено</span><span class="fv-cc-pts">+{{ cpts }} баллов</span></div>
+          <div class="fv-cc-bar"><div style="width:{{ cpct }}%;background:{% if cpct == 100 %}#15803D{% else %}linear-gradient(90deg,#15803D,#D97706){% endif %};"></div></div>
+        </div>
+      </div>
+    </div>
+  </a>
+{% endfor %}
+{% endcapture %}
+
+<style>
+  .fv-cc { padding: 12px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; max-width: none; margin: 0 auto; }
+  .fv-cc-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  .fv-cc-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #1E3A8A; }
+  .fv-cc-title { font-size: 28px; font-weight: 800; letter-spacing: -0.015em; color: #0B1220; margin: 4px 0 4px; }
+  .fv-cc-sub { font-size: 14px; color: #475569; margin: 0; }
+  .fv-cc-tabs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .fv-cc-tab { padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; background: #fff; color: #475569; border: 1px solid #E5E7EB; transition: background .14s, color .14s, border-color .14s; }
+  .fv-cc-tab.active { background: #0B1220; color: #fff; border-color: #0B1220; }
+  .fv-cc-tab:hover:not(.active) { border-color: #D1D5DB; color: #0B1220; }
+
+  .fv-cc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  @media (max-width: 1000px) { .fv-cc-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px)  { .fv-cc-grid { grid-template-columns: 1fr; } }
+
+  .fv-cc-card { display: block; background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(11,18,32,.04); text-decoration: none !important; transition: box-shadow .18s, transform .18s, border-color .18s; }
+  .fv-cc-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(11,18,32,.10); border-color: #D1D5DB; text-decoration: none !important; }
+
+  .fv-cc-cover { position: relative; height: 150px; padding: 16px; overflow: hidden; }
+  .fv-cc-cover::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(0deg, transparent 23px, rgba(255,255,255,0.05) 24px), linear-gradient(90deg, transparent 23px, rgba(255,255,255,0.05) 24px); background-size: 24px 24px; opacity: .5; }
+  .fv-cc-cover--navy  { background: linear-gradient(135deg,#1E3A8A,#15306E); }
+  .fv-cc-cover--slate { background: linear-gradient(135deg,#475569,#334155); }
+  .fv-cc-cover--warm  { background: linear-gradient(135deg,#FAF3E8,#F4E5C9); }
+  .fv-cc-cover--paper { background: linear-gradient(135deg,#F6F7F9,#E5E7EB); }
+  .fv-cc-cover--navy .fv-cc-cover-cat, .fv-cc-cover--slate .fv-cc-cover-cat { color: rgba(255,255,255,.65); }
+  .fv-cc-cover--navy .fv-cc-cover-title, .fv-cc-cover--slate .fv-cc-cover-title { color: #fff; }
+  .fv-cc-cover--warm .fv-cc-cover-cat, .fv-cc-cover--paper .fv-cc-cover-cat { color: #94A3B8; }
+  .fv-cc-cover--warm .fv-cc-cover-title, .fv-cc-cover--paper .fv-cc-cover-title { color: #0B1220; }
+  .fv-cc-cover-cat { position: relative; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+  .fv-cc-cover-title { position: absolute; left: 16px; right: 16px; bottom: 14px; font-size: 20px; font-weight: 800; line-height: 1.1; letter-spacing: -0.01em; }
+  .fv-cc-badge { position: absolute; top: 14px; right: 14px; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; }
+  .fv-cc-badge--req { background: #B91C1C; color: #fff; }
+  .fv-cc-badge--done { background: #ECF6EF; color: #15803D; }
+
+  .fv-cc-body { padding: 16px; }
+  .fv-cc-meta { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #94A3B8; }
+  .fv-cc-desc { font-size: 13px; color: #475569; margin: 8px 0 14px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .fv-cc-foot { margin-top: 12px; }
+  .fv-cc-prog-top { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #475569; margin-bottom: 6px; }
+  .fv-cc-pts { font-weight: 700; color: #B45309; font-variant-numeric: tabular-nums; }
+  .fv-cc-bar { height: 6px; border-radius: 999px; background: #E5E7EB; overflow: hidden; }
+  .fv-cc-bar > div { height: 100%; border-radius: 999px; }
+
+  .fv-cc-empty { text-align: center; padding: 56px 24px; color: #94A3B8; }
+  .fv-cc-empty i { font-size: 44px; color: #CBD5E1; display: block; margin-bottom: 14px; }
+</style>
+
+<div class="container fv-cc">
+
+  <div class="fv-cc-head">
+    <div>
+      <span class="fv-cc-eyebrow">Каталог</span>
+      <h1 class="fv-cc-title">Курсы и обучение</h1>
+      <p class="fv-cc-sub">{{ n_courses }} курс{% if n_courses >= 2 and n_courses < 5 %}а{% elsif n_courses == 0 or n_courses >= 5 %}ов{% endif %}{% if n_progress > 0 %} · {{ n_progress }} в работе{% endif %}{% if n_mandatory > 0 %} · {{ n_mandatory }} обязательн{% if n_mandatory == 1 %}ый{% else %}ых{% endif %}{% endif %}</p>
+    </div>
+  </div>
+
+  <div class="fv-cc-tabs" role="group" aria-label="Фильтр курсов">
+    <button type="button" class="fv-cc-tab active" data-filter="all">Все курсы</button>
+    <button type="button" class="fv-cc-tab" data-filter="mand">Обязательные</button>
+    <button type="button" class="fv-cc-tab" data-filter="progress">В работе</button>
+    <button type="button" class="fv-cc-tab" data-filter="done">Завершённые</button>
+    <button type="button" class="fv-cc-tab" data-filter="notstarted">Не начатые</button>
+  </div>
+
+  {% if n_courses == 0 %}
+  <div class="fv-cc-empty">
+    <i class="bi bi-mortarboard"></i>
+    <p>Курсов пока нет. Добавьте курсы в Dataverse и привяжите к ним H5P-уроки.</p>
+  </div>
+  {% else %}
+  <div class="fv-cc-grid" id="ccGrid">{{ cards_html }}</div>
+  <div class="fv-cc-empty" id="ccEmpty" style="display:none;"><i class="bi bi-search"></i><p>Нет курсов в этой категории.</p></div>
+  {% endif %}
+
+</div>
+
+<script>
+  (function () {
+    var tabs = document.querySelectorAll('.fv-cc-tab');
+    var cards = document.querySelectorAll('#ccGrid .fv-cc-card');
+    var empty = document.getElementById('ccEmpty');
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        var f = tab.getAttribute('data-filter');
+        tabs.forEach(function (t) { t.classList.toggle('active', t === tab); });
+        var any = false;
+        cards.forEach(function (c) {
+          var show = f === 'all'
+            || (f === 'mand' && c.getAttribute('data-mand') === '1')
+            || (c.getAttribute('data-status') === f);
+          c.style.display = show ? '' : 'none';
+          if (show) any = true;
+        });
+        if (empty) empty.style.display = any ? 'none' : 'block';
+      });
+    });
+  })();
+</script>
+
+{% endunless %}

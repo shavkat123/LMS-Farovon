@@ -1,0 +1,102 @@
+{% comment %}
+  Admin Paths — Траектории (/admin/paths). Дизайн: AdminPaths.jsx. Примитивы .adm-* — customtheme.css.
+  ДЕМО-данные: управление траекториями подключится к msdynce_course/new_relatedcourse позже.
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+<style>
+  .admp { padding: 24px 0 56px; }
+  .admp-head { margin-bottom: 20px; }
+  .admp-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .admp-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .admp-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 900px) { .admp-kpis { grid-template-columns: repeat(2, 1fr); } }
+  .admp-tbl-wrap { overflow-x: auto; }
+  .admp-ico { width: 30px; height: 30px; border-radius: var(--adm-radius-sm); display: inline-flex; align-items: center; justify-content: center; background: var(--adm-primary-50); color: var(--adm-primary); flex-shrink: 0; }
+</style>
+
+<div class="container adm-scope admp">
+
+  <div class="admp-head">
+    <div style="display:flex;align-items:center;gap:8px;"><span class="adm-eyebrow">Контент</span><span class="adm-demo-chip">демо</span></div>
+    <h1>Траектории</h1>
+    <p>Структурированные программы роста: последовательности курсов и шагов.</p>
+  </div>
+
+  <div class="admp-kpis">
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Траекторий</span><i class="bi bi-diagram-2"></i></div><div class="adm-stat-val">12</div><div class="adm-stat-foot"><span class="adm-stat-delta adm-stat-delta--up"><i class="bi bi-arrow-up-right"></i>+2</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">На треках</span><i class="bi bi-people"></i></div><div class="adm-stat-val">262</div><div class="adm-stat-foot"><span class="adm-stat-sub">сотрудников</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Средн. завершение</span><i class="bi bi-check-circle"></i></div><div class="adm-stat-val">61%</div><div class="adm-stat-foot"><span class="adm-stat-sub">по трекам</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Ср. длительность</span><i class="bi bi-clock"></i></div><div class="adm-stat-val">24 <span style="font-size:16px;font-weight:600;color:var(--adm-fg-3);">дн</span></div><div class="adm-stat-foot"><span class="adm-stat-sub">на трек</span></div></div>
+  </div>
+
+  <div class="adm-card adm-toolbar" style="margin-bottom:16px;">
+    <div style="position:relative;flex:1 1 260px;min-width:220px;">
+      <i class="bi bi-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--adm-fg-3);font-size:14px;"></i>
+      <input type="text" class="adm-input" style="padding-left:32px;" placeholder="Название траектории…" disabled>
+    </div>
+    <button type="button" class="adm-chip" disabled><span class="l">Отдел:</span> Все <i class="bi bi-chevron-down" style="font-size:11px;color:var(--adm-fg-3);"></i></button>
+    <div style="flex:1;"></div>
+    <button type="button" class="adm-btn adm-btn--primary" disabled><i class="bi bi-plus-lg"></i> Создать траекторию</button>
+  </div>
+
+  <div class="adm-card" style="overflow:hidden;">
+    <div class="admp-tbl-wrap">
+      <table class="adm-table">
+        <thead>
+          <tr>
+            <th>Траектория</th>
+            <th style="width:150px;">Отдел</th>
+            <th class="adm-r" style="width:80px;">Шагов</th>
+            <th class="adm-r" style="width:100px;">Записано</th>
+            <th style="width:190px;">Средний прогресс</th>
+            <th style="width:130px;">Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% comment %} имя|отдел|шагов|записано|прогресс|статус {% endcomment %}
+          {% assign paths = 'Junior → Middle Analyst|Аналитика|5|42|68|active;Онбординг сотрудника (30 дней)|Все отделы|6|128|84|active;Soft skills для тимлида|Менеджмент|6|24|41|active;Путь инженера по безопасности|Безопасность|8|12|22|draft;Продажи: базовый трек|Продажи|4|56|90|active;Введение в продуктовую аналитику|Продукт|4|0|0|draft' | split: ';' %}
+          {% for p in paths %}
+            {% assign f = p | split: '|' %}
+            {% assign done = f[4] | plus: 0 %}
+            {% if done >= 80 %}{% assign bc = 'var(--adm-success)' %}{% else %}{% assign bc = 'var(--adm-primary)' %}{% endif %}
+          <tr>
+            <td>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="admp-ico"><i class="bi bi-signpost-split"></i></span>
+                <span style="font-weight:600;">{{ f[0] }}</span>
+              </div>
+            </td>
+            <td style="color:var(--adm-fg-2);">{{ f[1] }}</td>
+            <td class="adm-r adm-num">{{ f[2] }}</td>
+            <td class="adm-r adm-num" style="font-weight:600;">{{ f[3] }}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div class="adm-bar" style="flex:1;"><div style="width:{{ done }}%;background:{{ bc }};"></div></div>
+                <span class="adm-num" style="font-size:11px;font-weight:600;color:var(--adm-fg-2);min-width:30px;">{{ done }}%</span>
+              </div>
+            </td>
+            <td>{% if f[5] == 'active' %}<span class="adm-pill adm-pill--success adm-pill--dot">Опубликован</span>{% else %}<span class="adm-pill adm-pill--neutral adm-pill--dot">Черновик</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="background:var(--adm-accent-50);border:1px solid #F4E5C9;border-radius:10px;padding:10px 16px;margin-top:16px;font-size:12px;color:var(--adm-accent);display:flex;align-items:center;gap:10px;">
+    <i class="bi bi-info-circle-fill" style="flex-shrink:0;"></i>
+    <span>Демо-данные. Управление траекториями подключится к курсам (msdynce_course) позже.</span>
+  </div>
+
+</div>
+
+{% endunless %}
