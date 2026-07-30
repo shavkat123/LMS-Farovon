@@ -1,0 +1,194 @@
+{% comment %}
+  Forum Thread Detail — страница темы форума (/forum-thread?id=<threadId>).
+  Тема (new_forumthread) + лента ответов (new_forumreply where new_thread == id) + форма ответа.
+  Ответ → Web API POST /_api/new_forumreplies (new_thread@odata.bind + new_author@odata.bind) + PATCH replycount.
+{% endcomment %}
+
+{% unless request.params['id'] %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-chat-square-text" style="font-size:52px;color:#64748B;display:block;margin-bottom:16px;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin-bottom:6px;">Тема не выбрана</h2>
+  <a href="/forum" class="btn btn-primary" style="border-radius:8px;">К форуму</a>
+</div>
+{% else %}
+
+{% assign tid = request.params['id'] | xml_escape %}
+{% fetchxml thread %}
+<fetch top="1">
+  <entity name="new_forumthread">
+    <attribute name="new_forumthreadid" />
+    <attribute name="new_name" />
+    <attribute name="new_body" />
+    <attribute name="new_tag" />
+    <attribute name="new_votes" />
+    <attribute name="new_replycount" />
+    <attribute name="createdon" />
+    <link-entity name="contact" from="contactid" to="new_author" alias="auth" link-type="outer"><attribute name="fullname" /></link-entity>
+    <filter><condition attribute="new_forumthreadid" operator="eq" value="{{ tid }}" /></filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% if thread.results.entities.size == 0 %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-search" style="font-size:52px;color:#64748B;display:block;margin-bottom:16px;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin-bottom:6px;">Тема не найдена</h2>
+  <a href="/forum" class="btn btn-primary" style="border-radius:8px;">К форуму</a>
+</div>
+{% else %}
+
+{% assign t = thread.results.entities[0] %}
+{% assign t_author = t['auth.fullname'] | default: 'Участник' %}
+
+{% fetchxml replies %}
+<fetch>
+  <entity name="new_forumreply">
+    <attribute name="new_forumreplyid" />
+    <attribute name="new_body" />
+    <attribute name="createdon" />
+    <link-entity name="contact" from="contactid" to="new_author" alias="ra" link-type="outer"><attribute name="fullname" /></link-entity>
+    <filter><condition attribute="new_thread" operator="eq" value="{{ tid }}" /></filter>
+    <order attribute="createdon" ascending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign reply_count = replies.results.entities.size %}
+
+<style>
+  .fv-ft { font-family: 'Inter', ui-sans-serif, sans-serif; padding: 12px 0 56px; color: #0B1220; max-width: 860px; }
+  .fv-ft-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #64748B !important; text-decoration: none !important; margin-bottom: 16px; }
+  .fv-ft-back:hover { color: #1E3A8A !important; }
+  .fv-ft-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; padding: 24px 26px; box-shadow: 0 1px 3px rgba(11,18,32,.05); margin-bottom: 20px; }
+  .fv-ft-tag { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #1E3A8A; background: #EFF6FF; border-radius: 6px; padding: 3px 9px; margin-bottom: 12px; }
+  .fv-ft-title { font-size: 24px; font-weight: 800; letter-spacing: -0.015em; line-height: 1.2; margin: 0 0 14px; color: #0B1220; }
+  .fv-ft-byline { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .fv-ft-av { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; color: #fff; background: linear-gradient(135deg,#1E3A8A,#3B82F6); flex-shrink: 0; }
+  .fv-ft-au { font-size: 13px; font-weight: 700; color: #0B1220; }
+  .fv-ft-dt { font-size: 12px; color: #94A3B8; }
+  .fv-ft-body { font-size: 14px; line-height: 1.65; color: #334155; white-space: pre-wrap; }
+  .fv-ft-sechead { font-size: 15px; font-weight: 800; color: #0B1220; margin: 0 0 14px; }
+  .fv-ft-reply { display: flex; gap: 12px; padding: 16px 0; border-bottom: 1px solid #F1F5F9; }
+  .fv-ft-reply:last-child { border-bottom: none; }
+  .fv-ft-rav { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #fff; background: linear-gradient(135deg,#7C3AED,#1E3A8A); flex-shrink: 0; }
+  .fv-ft-rbody { flex: 1; min-width: 0; }
+  .fv-ft-rhead { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+  .fv-ft-rname { font-size: 13px; font-weight: 700; color: #0B1220; }
+  .fv-ft-rtext { font-size: 13.5px; line-height: 1.6; color: #334155; white-space: pre-wrap; }
+  .fv-ft-empty { font-size: 13px; color: #94A3B8; padding: 8px 0 16px; }
+  .fv-ft-form textarea { width: 100%; border: 1px solid #E5E7EB; border-radius: 12px; padding: 12px 14px; font-size: 14px; font-family: inherit; resize: vertical; min-height: 90px; }
+  .fv-ft-form textarea:focus { outline: none; border-color: #1E3A8A; box-shadow: 0 0 0 3px rgba(30,58,138,.08); }
+  .fv-ft-submit { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; padding: 10px 20px; border-radius: 12px; font-size: 14px; font-weight: 600; background: #1E3A8A; color: #fff !important; border: none; cursor: pointer; text-decoration: none !important; }
+  .fv-ft-submit:hover { background: #15306E; }
+  .fv-ft-err { display: none; font-size: 12px; color: #DC2626; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 8px 12px; margin-top: 10px; }
+  .fv-ft-login { font-size: 13px; color: #64748B; }
+</style>
+
+<div class="fv-ft">
+  <a href="/forum" class="fv-ft-back"><i class="bi bi-arrow-left"></i> К форуму</a>
+
+  {% comment %}── Тема ──{% endcomment %}
+  <div class="fv-ft-card">
+    {% if t.new_tag %}<span class="fv-ft-tag">{{ t.new_tag }}</span>{% endif %}
+    <h1 class="fv-ft-title">{{ t.new_name | default: 'Тема' }}</h1>
+    <div class="fv-ft-byline">
+      <span class="fv-ft-av">{{ t_author | slice: 0, 1 | upcase }}</span>
+      <div>
+        <div class="fv-ft-au">{{ t_author }}</div>
+        <div class="fv-ft-dt">{{ t.createdon | date: 'dd.MM.yyyy HH:mm' }}</div>
+      </div>
+    </div>
+    {% if t.new_body %}<div class="fv-ft-body">{{ t.new_body }}</div>{% endif %}
+  </div>
+
+  {% comment %}── Ответы ──{% endcomment %}
+  <div class="fv-ft-card">
+    <h2 class="fv-ft-sechead">Ответы{% if reply_count > 0 %} · {{ reply_count }}{% endif %}</h2>
+    {% if reply_count == 0 %}
+    <div class="fv-ft-empty">Пока нет ответов. Будьте первым!</div>
+    {% else %}
+    {% for r in replies.results.entities %}
+      {% assign r_author = r['ra.fullname'] | default: 'Участник' %}
+    <div class="fv-ft-reply">
+      <span class="fv-ft-rav">{{ r_author | slice: 0, 1 | upcase }}</span>
+      <div class="fv-ft-rbody">
+        <div class="fv-ft-rhead">
+          <span class="fv-ft-rname">{{ r_author }}</span>
+          <span class="fv-ft-dt">· {{ r.createdon | date: 'dd.MM.yyyy HH:mm' }}</span>
+        </div>
+        <div class="fv-ft-rtext">{{ r.new_body }}</div>
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+
+  {% comment %}── Форма ответа ──{% endcomment %}
+  <div class="fv-ft-card">
+    <h2 class="fv-ft-sechead">Ваш ответ</h2>
+    {% if user %}
+    <div class="fv-ft-form">
+      <textarea id="fvRText" placeholder="Напишите ответ…"></textarea>
+      <div class="fv-ft-err" id="fvRErr"></div>
+      <button type="button" class="fv-ft-submit" id="fvRSubmit"><i class="bi bi-send"></i> Ответить</button>
+    </div>
+    {% else %}
+    <p class="fv-ft-login">Чтобы ответить, <a href="/SignIn?returnUrl=/forum-thread?id={{ tid }}">войдите в систему</a>.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if user %}
+<script>
+  (function () {
+    var TID = '{{ tid }}';
+    var CURRENT_USER = '{{ user.id }}';
+    var REPLY_COUNT = {{ t.new_replycount | default: 0 }};
+    var btn = document.getElementById('fvRSubmit');
+    var txt = document.getElementById('fvRText');
+    var err = document.getElementById('fvRErr');
+    if (!btn) return;
+
+    function getToken() {
+      return fetch('/_layout/tokenhtml', { credentials: 'include' }).then(function (r) { return r.text(); })
+        .then(function (h) { var m = h.match(/name="__RequestVerificationToken"[^>]*value="([^"]+)"/); return m ? m[1] : ''; });
+    }
+    function postReply(threadNav, authorNav, body, tok) {
+      var payload = { new_name: body.slice(0, 90), new_body: body };
+      payload[threadNav + '@odata.bind'] = '/new_forumthreads(' + TID + ')';
+      if (authorNav && CURRENT_USER) payload[authorNav + '@odata.bind'] = '/contacts(' + CURRENT_USER + ')';
+      return fetch('/_api/new_forumreplies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', '__RequestVerificationToken': tok },
+        body: JSON.stringify(payload)
+      });
+    }
+    btn.addEventListener('click', function () {
+      err.style.display = 'none';
+      var body = txt.value.trim();
+      if (!body) { err.textContent = 'Введите текст ответа.'; err.style.display = 'block'; return; }
+      btn.disabled = true; btn.innerHTML = 'Отправка…';
+      getToken().then(function (tok) {
+        return postReply('new_thread', 'new_author', body, tok)
+          .then(function (res) { return res.ok ? res : postReply('new_Thread', 'new_Author', body, tok); })
+          .then(function (res) { return res.ok ? res : postReply('new_thread', null, body, tok); })
+          .then(function (res) { return res.ok ? res : postReply('new_Thread', null, body, tok); })
+          .then(function (res) {
+            if (!res.ok) return res.text().then(function (tt) { throw new Error('HTTP ' + res.status + ' — ' + tt.slice(0, 220)); });
+            // счётчик ответов — best-effort
+            return getToken().then(function (tok2) {
+              return fetch('/_api/new_forumthreads(' + TID + ')', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', '__RequestVerificationToken': tok2 },
+                body: JSON.stringify({ new_replycount: REPLY_COUNT + 1 })
+              });
+            }).catch(function () { return true; });
+          });
+      }).then(function () { location.reload(); })
+        .catch(function (e) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send"></i> Ответить'; err.textContent = 'Не удалось отправить: ' + e.message; err.style.display = 'block'; });
+    });
+  })();
+</script>
+{% endif %}
+
+{% endif %}
+{% endunless %}

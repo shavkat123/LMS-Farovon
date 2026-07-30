@@ -448,34 +448,30 @@
   </a>
 
   <nav class="fv-shell-nav">
-    {% assign admin_names = 'Центр адаптации|Управление задачами|Мероприятия|Пользователи|Отчёты|H5P Загрузка' %}
-
+    {% comment %}
+      Пункты сайдбара полностью data-driven из набора «Primary Navigation».
+      Иконка/фон/цвет берутся из adx_description ссылки в формате "иконка,фон,цвет"
+      (например "calendar3,#EEF2F9,#1E3A8A"). Добавить пункт = создать weblink с таким
+      description — правка этого шаблона НЕ нужна. Админ-ссылки вынесены в отдельный
+      набор «Admin Navigation», поэтому здесь их фильтровать не требуется.
+    {% endcomment %}
     {% if primary_nav %}
       <div class="fv-shell-section">Меню</div>
       <ul>
         {% for link in primary_nav.weblinks %}
-          {% unless admin_names contains link.name %}
-            {% case link.name %}
-              {% when 'Главная' %}{% assign ico = 'grid-1x2' %}{% assign tnt = '#EEF2F9' %}{% assign clr = '#1E3A8A' %}
-              {% when 'Курсы' %}{% assign ico = 'book' %}{% assign tnt = '#FAF3E8' %}{% assign clr = '#B45309' %}
-              {% when 'H5P Прогресс' %}{% assign ico = 'bar-chart-line' %}{% assign tnt = '#EEF2F9' %}{% assign clr = '#1E3A8A' %}
-              {% when 'Траектории' %}{% assign ico = 'share' %}{% assign tnt = '#ECF6EF' %}{% assign clr = '#15803D' %}
-              {% when 'Сообщество' %}{% assign ico = 'chat-dots' %}{% assign tnt = '#F0F2F5' %}{% assign clr = '#475569' %}
-              {% when 'Рейтинг' %}{% assign ico = 'trophy' %}{% assign tnt = '#FAF3E8' %}{% assign clr = '#D97706' %}
-              {% when 'Магазин наград' %}{% assign ico = 'gift' %}{% assign tnt = '#ECF6EF' %}{% assign clr = '#15803D' %}
-              {% when 'Мой профиль' %}{% assign ico = 'person-circle' %}{% assign tnt = '#F0F2F5' %}{% assign clr = '#475569' %}
-              {% else %}{% assign ico = 'link-45deg' %}{% assign tnt = '#F0F2F5' %}{% assign clr = '#475569' %}
-            {% endcase %}
-            <li>
-              <a href="{{ link.url | escape }}"
-                 class="fv-shell-link" data-tint="{{ tnt }}" data-clr="{{ clr }}"
-                 aria-label="{{ link.name | escape }}"
-                 {% if link.open_in_new_window %}target="_blank"{% endif %}>
-                <span class="fv-shell-ico" style="background:{{ tnt }};color:{{ clr }};"><i class="bi bi-{{ ico }}" aria-hidden="true"></i></span>
-                <span>{{ link.name | escape }}</span>
-              </a>
-            </li>
-          {% endunless %}
+          {% assign meta = link.description | split: ',' %}
+          {% assign ico = meta[0] | default: 'link-45deg' %}
+          {% assign tnt = meta[1] | default: '#F0F2F5' %}
+          {% assign clr = meta[2] | default: '#475569' %}
+          <li>
+            <a href="{{ link.url | escape }}"
+               class="fv-shell-link" data-tint="{{ tnt }}" data-clr="{{ clr }}"
+               aria-label="{{ link.name | escape }}"
+               {% if link.open_in_new_window %}target="_blank"{% endif %}>
+              <span class="fv-shell-ico" style="background:{{ tnt }};color:{{ clr }};"><i class="bi bi-{{ ico }}" aria-hidden="true"></i></span>
+              <span>{{ link.name | escape }}</span>
+            </a>
+          </li>
         {% endfor %}
       </ul>
 

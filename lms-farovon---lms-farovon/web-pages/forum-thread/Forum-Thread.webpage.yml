@@ -1,15 +1,15 @@
-adx_displayorder: 22
+adx_displayorder: 60
 adx_enablerating: false
 adx_enabletracking: false
-adx_excludefromsearch: false
+adx_excludefromsearch: true
 adx_feedbackpolicy: 756150000
-adx_hiddenfromsitemap: false
+adx_hiddenfromsitemap: true
 adx_isroot: true
-adx_name: Мероприятия
+adx_name: Forum Thread
 adx_pagetemplateid: 0f06e5ed-a538-f111-88b5-7ced8d76b3cc
 adx_parentpageid: a060e5f3-a538-f111-88b5-7ced8d76b3cc
-adx_partialurl: events
+adx_partialurl: forum-thread
 adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
 adx_sharedpageconfiguration: false
-adx_title: Мероприятия
-adx_webpageid: b1b2c3d4-2222-3333-4444-000000000003
+adx_title: Обсуждение
+adx_webpageid: b1b2c3d4-2222-3333-4444-000000000043

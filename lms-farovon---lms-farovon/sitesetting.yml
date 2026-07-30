@@ -181,6 +181,30 @@
 - adx_name: Webapi/new_task/fields
   adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-400000000002
   adx_value: '*'
+- adx_name: Webapi/new_broadcast/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000b1
+  adx_value: true
+- adx_name: Webapi/new_broadcast/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000b2
+  adx_value: '*'
+- adx_name: Webapi/new_trajectory/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000c1
+  adx_value: true
+- adx_name: Webapi/new_trajectory/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000c2
+  adx_value: '*'
+- adx_name: Webapi/new_forumthread/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000d1
+  adx_value: true
+- adx_name: Webapi/new_forumthread/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000d2
+  adx_value: '*'
+- adx_name: Webapi/new_forumreply/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000e1
+  adx_value: true
+- adx_name: Webapi/new_forumreply/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000e2
+  adx_value: '*'
 - adx_name: Webapi/contact/enabled
   adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000005
   adx_value: true

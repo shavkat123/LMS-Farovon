@@ -478,6 +478,17 @@
     if (el) el.textContent = Math.max(0, parseInt(el.textContent, 10) + parseInt(btn.getAttribute('data-dir'), 10));
   });
 
+  /* Клик по карточке темы → страница обсуждения (только реальные GUID) */
+  document.querySelectorAll('#fvThreadList .fv-thread-card[data-id]').forEach(function (card) {
+    var id = card.getAttribute('data-id');
+    if (!id || id.length < 30) return;
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', function (e) {
+      if (e.target.closest('.fv-vote-btn')) return;
+      location.href = '/forum-thread?id=' + id;
+    });
+  });
+
   /* Модалка: Esc, клик по фону, возврат фокуса */
   var modal  = document.getElementById('fvModal');
   var newBtn = document.getElementById('fvNewBtn');
@@ -518,10 +529,16 @@
     toastT = setTimeout(function () { t.classList.remove('show'); }, 4000);
   }
 
+  var CURRENT_USER = '{{ user.id }}';
+  function fvGetToken() {
+    return fetch('/_layout/tokenhtml', { credentials: 'include' }).then(function (r) { return r.text(); })
+      .then(function (h) { var m = h.match(/name="__RequestVerificationToken"[^>]*value="([^"]+)"/); return m ? m[1] : ''; });
+  }
   document.getElementById('fvSubmitBtn').addEventListener('click', function () {
     clearFormError();
     var titleEl = document.getElementById('fvNewTitle');
     var tagEl   = document.getElementById('fvNewTag');
+    var bodyEl  = document.getElementById('fvNewBody');
     var title = titleEl.value.trim();
     var tag   = tagEl.value;
     if (!title || !tag) {
@@ -530,8 +547,30 @@
       showFormError('Заполните заголовок и категорию.');
       return;
     }
-    closeModal();
-    showToast('Тема «' + title + '» будет сохранена после настройки Web API.');
+    if (!CURRENT_USER) { showFormError('Войдите в систему, чтобы создать тему.'); return; }
+    var submitBtn = document.getElementById('fvSubmitBtn');
+    submitBtn.disabled = true; submitBtn.textContent = 'Публикация…';
+
+    function post(navName, tok) {
+      var body = { new_name: title, new_body: bodyEl.value, new_tag: tag, new_votes: 0, new_replycount: 0, new_ispinned: false };
+      if (navName) body[navName + '@odata.bind'] = '/contacts(' + CURRENT_USER + ')';
+      return fetch('/_api/new_forumthreads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', '__RequestVerificationToken': tok },
+        body: JSON.stringify(body)
+      });
+    }
+    fvGetToken().then(function (tok) {
+      return post('new_author', tok)
+        .then(function (res) { return res.ok ? res : post('new_Author', tok); })
+        .then(function (res) { return res.ok ? res : post(null, tok); });
+    }).then(function (res) {
+      if (res.ok) { location.reload(); return; }
+      return res.text().then(function (t) { throw new Error('HTTP ' + res.status + ' — ' + t.slice(0, 220)); });
+    }).catch(function (e) {
+      submitBtn.disabled = false; submitBtn.textContent = 'Опубликовать тему';
+      showFormError('Не удалось опубликовать: ' + e.message);
+    });
   });
 
   render();

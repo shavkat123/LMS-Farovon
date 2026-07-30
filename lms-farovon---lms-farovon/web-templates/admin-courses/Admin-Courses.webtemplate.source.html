@@ -80,7 +80,7 @@
       <i class="bi bi-search"></i>
       <input type="text" class="adm-input" id="admcoSearch" placeholder="Название курса, инструктор…" autocomplete="off">
     </div>
-    <a href="/admin/create-course" class="admco-new"><i class="bi bi-plus-lg"></i> Создать курс</a>
+    <a href="/admin/course-form" class="admco-new"><i class="bi bi-plus-lg"></i> Создать курс</a>
   </div>
 
   <div class="adm-card" style="overflow:hidden;">
@@ -132,7 +132,7 @@
             <td style="font-size:12px;color:var(--adm-fg-3);">{{ c.msdynce_registerationdeadline | date: 'dd.MM.yyyy' }}</td>
             <td>
               <div style="display:flex;gap:6px;justify-content:flex-end;">
-                <a href="/admin/edit-course?id={{ cid }}" class="admco-act" title="Редактировать"><i class="bi bi-pencil"></i></a>
+                <a href="/admin/course-form?id={{ cid }}" class="admco-act" title="Редактировать"><i class="bi bi-pencil"></i></a>
                 <a href="/admin/delete-course?id={{ cid }}" class="admco-act admco-act--del" title="Удалить"><i class="bi bi-trash"></i></a>
               </div>
             </td>

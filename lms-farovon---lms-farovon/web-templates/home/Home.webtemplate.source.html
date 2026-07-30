@@ -179,6 +179,69 @@
   {% else %}{% assign fv_mon = 'декабря' %}
 {% endcase %}
 
+{% comment %}── Ближайшие события из new_event (для правого рейла) ──{% endcomment %}
+{% fetchxml home_events %}
+<fetch top="8">
+  <entity name="new_event">
+    <attribute name="new_eventid" />
+    <attribute name="new_name" />
+    <attribute name="new_startdatetime" />
+    <attribute name="new_enddatetime" />
+    <attribute name="new_eventtype" />
+    <attribute name="new_location" />
+    <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
+    <order attribute="new_startdatetime" ascending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign ev_now_num   = 'now' | date: 'yyyyMMddHHmm' | plus: 0 %}
+{% assign ev_ru_months = 'янв,фев,мар,апр,мая,июн,июл,авг,сен,окт,ноя,дек' | split: ',' %}
+
+{% comment %}── Траектория развития: первая активная траектория + её курсы-шаги ──{% endcomment %}
+{% fetchxml home_trajs %}
+<fetch top="1">
+  <entity name="new_trajectory">
+    <attribute name="new_trajectoryid" />
+    <attribute name="new_name" />
+    <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
+    <order attribute="new_name" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign has_traj = false %}
+{% if home_trajs.results.entities.size > 0 and user %}
+  {% assign has_traj = true %}
+  {% assign htraj = home_trajs.results.entities[0] %}
+  {% assign htrajid = htraj.new_trajectoryid %}
+  {% fetchxml home_tcourses %}
+  <fetch>
+    <entity name="msdynce_course">
+      <attribute name="msdynce_courseid" />
+      <attribute name="msdynce_coursename" />
+      <filter type="and">
+        <condition attribute="statuscode" operator="eq" value="1" />
+        <condition attribute="new_trajectory" operator="eq" value="{{ htrajid }}" />
+      </filter>
+      <order attribute="new_trajectoryorder" />
+    </entity>
+  </fetch>
+  {% endfetchxml %}
+  {% fetchxml home_tlinked %}
+  <fetch>
+    <entity name="new_h5pcontent">
+      <attribute name="new_h5pcontentid" />
+      <attribute name="new_relatedcourse" />
+      <filter type="and">
+        <condition attribute="new_isactive" operator="eq" value="1" />
+        <condition attribute="new_relatedcourse" operator="not-null" />
+      </filter>
+    </entity>
+  </fetch>
+  {% endfetchxml %}
+  {% assign hdone_ids = '|' %}
+  {% for p in user_progress.results.entities %}{% if p.new_completion and p.new_h5pcontent %}{% assign hpid = p.new_h5pcontent.id %}{% unless hdone_ids contains hpid %}{% assign hdone_ids = hdone_ids | append: hpid | append: '|' %}{% endunless %}{% endif %}{% endfor %}
+{% endif %}
+
 <style>
   .fv-dash { padding: 24px 0 48px; }
   .fv-hero {
@@ -446,43 +509,54 @@
         {% endif %}
       </div>
 
-      <!-- ТРАЕКТОРИЯ РАЗВИТИЯ (демо до появления реальных траекторий) -->
+      <!-- ТРАЕКТОРИЯ РАЗВИТИЯ (реальная, new_trajectory) -->
       <div class="fv-card mb-4">
         <div class="fv-card-head" style="padding-bottom:2px;">
           <div>
-            <span class="fv-card-eyebrow" style="color:#15803D;">Траектория развития<span class="fv-demo-chip">демо</span></span>
-            <h2 class="fv-card-title">Ваш путь развития</h2>
+            <span class="fv-card-eyebrow" style="color:#15803D;">Траектория развития</span>
+            <h2 class="fv-card-title">{% if has_traj %}{{ htraj.new_name | default: 'Ваш путь развития' }}{% else %}Ваш путь развития{% endif %}</h2>
           </div>
           <a href="/paths" class="fv-card-link">Открыть полностью →</a>
         </div>
         <div class="fv-card-body">
+          {% if has_traj %}
+            {% assign hstep_total = home_tcourses.results.entities.size %}
+            {% if hstep_total == 0 %}
+              <div style="text-align:center;padding:18px 12px;color:#94A3B8;font-size:12px;">К этой траектории ещё не привязаны курсы.</div>
+            {% else %}
+              {% assign hcompleted = 0 %}{% assign hcurrent_set = false %}
+              {% capture htrack %}
+                {% for c in home_tcourses.results.entities %}
+                  {% assign cid = c.msdynce_courseid %}
+                  {% assign ctotal = 0 %}{% assign cdone = 0 %}
+                  {% for h in home_tlinked.results.entities %}{% if h.new_relatedcourse.id == cid %}{% assign ctotal = ctotal | plus: 1 %}{% if hdone_ids contains h.new_h5pcontentid %}{% assign cdone = cdone | plus: 1 %}{% endif %}{% endif %}{% endfor %}
+                  {% assign is_done = false %}{% if ctotal > 0 and cdone == ctotal %}{% assign is_done = true %}{% endif %}
+                  {% if is_done %}{% assign hcompleted = hcompleted | plus: 1 %}{% endif %}
+                  {% assign is_current = false %}{% if is_done == false and hcurrent_set == false %}{% assign is_current = true %}{% assign hcurrent_set = true %}{% endif %}
+                <div class="fv-path-step">
+                  {% if is_done %}<div class="fv-path-dot" style="background:#15803D;color:#fff;border:4px solid #ECF6EF;"><i class="bi bi-check"></i></div>
+                  {% elsif is_current %}<div class="fv-path-dot" style="background:#B45309;color:#fff;border:4px solid #FAF3E8;">{{ forloop.index }}</div>
+                  {% else %}<div class="fv-path-dot" style="background:#fff;color:#475569;border:4px solid #E5E7EB;">{{ forloop.index }}</div>{% endif %}
+                  <div class="fv-path-lbl"{% if is_current %} style="font-weight:700;"{% endif %}>{{ c.msdynce_coursename | default: 'Курс' | truncate: 20 }}</div>
+                  {% if is_current %}<div class="fv-path-now">сейчас</div>{% endif %}
+                </div>
+                {% endfor %}
+              {% endcapture %}
+              {% assign hfill = 0 %}{% if hstep_total > 0 %}{% assign hfill = hcompleted | times: 100 | divided_by: hstep_total %}{% endif %}
           <div class="fv-path-track">
             <div class="fv-path-line"></div>
-            <div class="fv-path-line-fill" style="width:40%;"></div>
-            <div class="fv-path-steps">
-              <div class="fv-path-step">
-                <div class="fv-path-dot" style="background:#15803D;color:#fff;border:4px solid #ECF6EF;"><i class="bi bi-check"></i></div>
-                <div class="fv-path-lbl">Основы</div>
-              </div>
-              <div class="fv-path-step">
-                <div class="fv-path-dot" style="background:#15803D;color:#fff;border:4px solid #ECF6EF;"><i class="bi bi-check"></i></div>
-                <div class="fv-path-lbl">Работа с данными</div>
-              </div>
-              <div class="fv-path-step">
-                <div class="fv-path-dot" style="background:#B45309;color:#fff;border:4px solid #FAF3E8;">3</div>
-                <div class="fv-path-lbl" style="font-weight:700;">Презентации</div>
-                <div class="fv-path-now">сейчас</div>
-              </div>
-              <div class="fv-path-step">
-                <div class="fv-path-dot" style="background:#fff;color:#475569;border:4px solid #E5E7EB;">4</div>
-                <div class="fv-path-lbl">Анализ данных</div>
-              </div>
-              <div class="fv-path-step">
-                <div class="fv-path-dot" style="background:#F0F2F5;color:#64748B;border:4px solid #E5E7EB;"><i class="bi bi-lock"></i></div>
-                <div class="fv-path-lbl" style="color:#64748B;">Финальный проект</div>
-              </div>
+            <div class="fv-path-line-fill" style="width:{{ hfill }}%;"></div>
+            <div class="fv-path-steps" style="grid-template-columns:repeat({{ hstep_total }},1fr);">
+              {{ htrack }}
             </div>
           </div>
+            {% endif %}
+          {% else %}
+          <div style="text-align:center;padding:20px 12px;color:#94A3B8;font-size:12px;">
+            <i class="bi bi-signpost-2" style="font-size:26px;display:block;margin-bottom:6px;color:#CBD5E1;"></i>
+            Траектории развития появятся здесь
+          </div>
+          {% endif %}
         </div>
       </div>
 
@@ -570,40 +644,46 @@
     <!-- ПРАВЫЙ РЕЙЛ -->
     <div class="col-lg-4">
 
-      <!-- БЛИЖАЙШИЕ СОБЫТИЯ (демо до создания таблицы new_event) -->
+      <!-- БЛИЖАЙШИЕ СОБЫТИЯ (реальные, new_event) -->
       <div class="fv-card mb-4">
         <div class="fv-card-head" style="padding-bottom:10px;">
           <div>
-            <span class="fv-card-eyebrow" style="color:#1E3A8A;">Ближайшие события<span class="fv-demo-chip">демо</span></span>
+            <span class="fv-card-eyebrow" style="color:#1E3A8A;">Ближайшие события</span>
             <h2 class="fv-card-title">Календарь</h2>
           </div>
-          {% if is_admin_role %}<a href="/admin/events" class="fv-card-link">Все →</a>{% endif %}
+          <a href="/events" class="fv-card-link">Все →</a>
         </div>
         <div class="fv-card-body" style="padding-top:4px;">
+          {% assign ev_shown = 0 %}
+          {% for e in home_events.results.entities %}
+            {% assign esn = e.new_startdatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+            {% assign een = e.new_enddatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+            {% assign epast = false %}
+            {% if een > 0 %}{% if ev_now_num > een %}{% assign epast = true %}{% endif %}{% else %}{% if ev_now_num > esn %}{% assign epast = true %}{% endif %}{% endif %}
+            {% unless epast %}{% if ev_shown < 3 %}
+              {% assign elive  = false %}{% if een > 0 and ev_now_num >= esn and ev_now_num <= een %}{% assign elive = true %}{% endif %}
+              {% assign eday   = e.new_startdatetime | date: 'dd' %}
+              {% assign emon_s = e.new_startdatetime | date: 'MM' %}
+              {% case emon_s %}{% when '01' %}{% assign emon = 'янв' %}{% when '02' %}{% assign emon = 'фев' %}{% when '03' %}{% assign emon = 'мар' %}{% when '04' %}{% assign emon = 'апр' %}{% when '05' %}{% assign emon = 'мая' %}{% when '06' %}{% assign emon = 'июн' %}{% when '07' %}{% assign emon = 'июл' %}{% when '08' %}{% assign emon = 'авг' %}{% when '09' %}{% assign emon = 'сен' %}{% when '10' %}{% assign emon = 'окт' %}{% when '11' %}{% assign emon = 'ноя' %}{% else %}{% assign emon = 'дек' %}{% endcase %}
+              {% assign etime  = e.new_startdatetime | date: 'HH:mm' %}
+              {% assign etype  = e.new_eventtype.label | default: 'Событие' %}
           <div class="fv-ev-row">
-            <div class="fv-ev-date"><div class="fv-ev-day">08</div><div class="fv-ev-mon">июл</div></div>
+            <div class="fv-ev-date"><div class="fv-ev-day">{{ eday }}</div><div class="fv-ev-mon">{{ emon }}</div></div>
             <div style="flex:1;min-width:0;">
-              <span class="fv-ev-tag" style="background:#F0F2F5;color:#475569;">live</span>
-              <div class="fv-ev-name">Вебинар: культура обратной связи</div>
-              <div class="fv-ev-time">14:00 · онлайн</div>
+              {% if elive %}<span class="fv-ev-tag" style="background:#FBEAEA;color:#B91C1C;">live</span>{% else %}<span class="fv-ev-tag" style="background:#EEF2F9;color:#1E3A8A;">{{ etype }}</span>{% endif %}
+              <div class="fv-ev-name">{{ e.new_name | default: 'Событие' }}</div>
+              <div class="fv-ev-time">{{ etime }}{% if e.new_location %} · {{ e.new_location }}{% endif %}</div>
             </div>
           </div>
-          <div class="fv-ev-row">
-            <div class="fv-ev-date"><div class="fv-ev-day">15</div><div class="fv-ev-mon">июл</div></div>
-            <div style="flex:1;min-width:0;">
-              <span class="fv-ev-tag" style="background:#EEF2F9;color:#1E3A8A;">1:1</span>
-              <div class="fv-ev-name">Ревью с наставником</div>
-              <div class="fv-ev-time">11:30 · MS Teams</div>
-            </div>
+              {% assign ev_shown = ev_shown | plus: 1 %}
+            {% endif %}{% endunless %}
+          {% endfor %}
+          {% if ev_shown == 0 %}
+          <div style="text-align:center;padding:22px 12px;color:#94A3B8;font-size:12px;">
+            <i class="bi bi-calendar-x" style="font-size:26px;display:block;margin-bottom:6px;color:#CBD5E1;"></i>
+            Пока нет запланированных событий
           </div>
-          <div class="fv-ev-row">
-            <div class="fv-ev-date"><div class="fv-ev-day">22</div><div class="fv-ev-mon">июл</div></div>
-            <div style="flex:1;min-width:0;">
-              <span class="fv-ev-tag" style="background:#ECF6EF;color:#15803D;">офис</span>
-              <div class="fv-ev-name">Тимбилдинг: командные игры</div>
-              <div class="fv-ev-time">17:00 · офис</div>
-            </div>
-          </div>
+          {% endif %}
         </div>
       </div>
 

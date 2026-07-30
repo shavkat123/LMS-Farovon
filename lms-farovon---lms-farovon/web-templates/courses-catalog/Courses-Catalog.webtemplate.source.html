@@ -86,6 +86,7 @@
   {% if is_mand %}{% assign n_mandatory = n_mandatory | plus: 1 %}{% endif %}
   <a href="/course-details?id={{ cid }}" class="fv-cc-card" data-status="{{ cstatus }}" data-mand="{% if is_mand %}1{% else %}0{% endif %}" data-search="{{ cname | downcase }} {{ catlabel | downcase }}">
     <div class="fv-cc-cover fv-cc-cover--{{ cover }}">
+      <img class="fv-cc-cover-img" src="/_api/msdynce_courses({{ cid }})/msdynce_entityimage/$value?size=full" alt="" loading="lazy" onload="this.closest('.fv-cc-cover').classList.add('has-img')" onerror="this.remove()">
       <span class="fv-cc-cover-cat">{{ catlabel | default: 'Курс' }}</span>
       {% if is_mand %}<span class="fv-cc-badge fv-cc-badge--req">обязательно</span>{% elsif cstatus == 'done' %}<span class="fv-cc-badge fv-cc-badge--done">завершён</span>{% endif %}
       <span class="fv-cc-cover-title">{{ cname }}</span>
@@ -132,9 +133,14 @@
   .fv-cc-cover--navy .fv-cc-cover-title, .fv-cc-cover--slate .fv-cc-cover-title { color: #fff; }
   .fv-cc-cover--warm .fv-cc-cover-cat, .fv-cc-cover--paper .fv-cc-cover-cat { color: #94A3B8; }
   .fv-cc-cover--warm .fv-cc-cover-title, .fv-cc-cover--paper .fv-cc-cover-title { color: #0B1220; }
-  .fv-cc-cover-cat { position: relative; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
-  .fv-cc-cover-title { position: absolute; left: 16px; right: 16px; bottom: 14px; font-size: 20px; font-weight: 800; line-height: 1.1; letter-spacing: -0.01em; }
-  .fv-cc-badge { position: absolute; top: 14px; right: 14px; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; }
+  .fv-cc-cover-cat { position: relative; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; z-index: 2; }
+  .fv-cc-cover-title { position: absolute; left: 16px; right: 16px; bottom: 14px; font-size: 20px; font-weight: 800; line-height: 1.1; letter-spacing: -0.01em; z-index: 2; }
+  .fv-cc-badge { position: absolute; top: 14px; right: 14px; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; z-index: 2; }
+  /* Реальная обложка курса (msdynce_entityimage) — поверх градиента; текст читаем за счёт затемнения */
+  .fv-cc-cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+  .fv-cc-cover.has-img::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(11,18,32,.18) 0%, rgba(11,18,32,.02) 40%, rgba(11,18,32,.62) 100%); z-index: 1; }
+  .fv-cc-cover.has-img .fv-cc-cover-cat { color: rgba(255,255,255,.85) !important; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+  .fv-cc-cover.has-img .fv-cc-cover-title { color: #fff !important; text-shadow: 0 1px 3px rgba(0,0,0,.45); }
   .fv-cc-badge--req { background: #B91C1C; color: #fff; }
   .fv-cc-badge--done { background: #ECF6EF; color: #15803D; }
 

@@ -1,7 +1,8 @@
 {% comment %}
   Events — Мероприятия (handoff v2 design, user-facing)
-  Демо-данные: featured live-событие + фильтр-табы + список с записью и баллами.
-  Подключится к таблице new_event после её создания.
+  РЕАЛЬНЫЕ данные: таблица new_event (активные, по дате начала).
+  Статус (Идёт сейчас / Открыта запись / прошло) вычисляется сравнением дат как чисел yyyyMMddHHmm.
+  Кнопка «Записаться» → new_registrationurl. Учёт «кто записан» — отдельный шаг (таблица-связка).
 {% endcomment %}
 
 {% unless user %}
@@ -12,6 +13,45 @@
   <a href="/SignIn" class="btn btn-primary" style="border-radius:8px;">Войти</a>
 </div>
 {% else %}
+
+{% comment %}── Реальные события из new_event (активные, по дате начала).
+   ВАЖНО: имя фетча НЕ 'events' — это встроенный объект Power Pages (adx_event), конфликтует. ──{% endcomment %}
+{% fetchxml evt_list %}
+<fetch>
+  <entity name="new_event">
+    <attribute name="new_eventid" />
+    <attribute name="new_name" />
+    <attribute name="new_startdatetime" />
+    <attribute name="new_enddatetime" />
+    <attribute name="new_eventtype" />
+    <attribute name="new_location" />
+    <attribute name="new_points" />
+    <attribute name="new_capacity" />
+    <attribute name="new_registrationurl" />
+    <attribute name="new_description" />
+    <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
+    <order attribute="new_startdatetime" ascending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── now как число yyyyMMddHHmm для сравнения дат (DotLiquid не сравнивает даты напрямую) ──{% endcomment %}
+{% assign now_num   = 'now' | date: 'yyyyMMddHHmm' | plus: 0 %}
+{% assign ru_months = 'янв,фев,мар,апр,мая,июн,июл,авг,сен,окт,ноя,дек' | split: ',' %}
+
+{% comment %}── Первый проход: ближайшее не-прошедшее событие = featured; счётчик активных ──{% endcomment %}
+{% assign feat_id      = '' %}
+{% assign active_count = 0 %}
+{% for e in evt_list.results.entities %}
+  {% assign snum = e.new_startdatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+  {% assign enum = e.new_enddatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+  {% assign past = false %}
+  {% if enum > 0 %}{% if now_num > enum %}{% assign past = true %}{% endif %}{% else %}{% if now_num > snum %}{% assign past = true %}{% endif %}{% endif %}
+  {% unless past %}
+    {% assign active_count = active_count | plus: 1 %}
+    {% if feat_id == '' %}{% assign feat_id = e.new_eventid %}{% endif %}
+  {% endunless %}
+{% endfor %}
 
 <style>
   .fv-ev { padding: 12px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
@@ -42,13 +82,9 @@
   .fv-feat-meta { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; margin-top: 20px; }
   .fv-feat-meta span { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #475569; }
   .fv-feat-meta i { color: #94A3B8; font-size: 15px; }
-  .fv-feat-speaker { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
-  .fv-feat-av { width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; background: #EEF2F9; color: #1E3A8A; }
-  .fv-feat-sp-name { font-size: 13px; font-weight: 600; color: #0B1220; }
-  .fv-feat-sp-role { font-size: 12px; color: #94A3B8; }
   .fv-feat-cta { display: flex; align-items: center; gap: 16px; margin-top: 24px; flex-wrap: wrap; }
-  .fv-feat-join { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 600; background: #1E3A8A; border: none; color: #fff; cursor: pointer; }
-  .fv-feat-join:hover { background: #15306E; color: #fff; }
+  .fv-feat-join { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 600; background: #1E3A8A; border: none; color: #fff !important; cursor: pointer; text-decoration: none !important; }
+  .fv-feat-join:hover { background: #15306E; color: #fff !important; }
   .fv-feat-pts { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: #475569; }
   .fv-feat-pts i { color: #B45309; font-size: 14px; }
 
@@ -57,8 +93,6 @@
   .fv-seat-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,.12); color: #fff; }
   .fv-seat-lbl { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.6); }
   .fv-seat-num { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; margin-top: 2px; }
-  .fv-seat-bar { height: 6px; width: 180px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,.2); margin-top: 12px; }
-  .fv-seat-bar > div { height: 100%; border-radius: 999px; background: #fff; }
 
   /* Tabs */
   .fv-ev-tabs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
@@ -82,20 +116,16 @@
   .fv-ev-meta { display: flex; align-items: center; gap: 16px; margin-top: 6px; flex-wrap: wrap; }
   .fv-ev-meta span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #94A3B8; }
   .fv-ev-meta i.pts { color: #B45309; }
-  .fv-ev-reg { padding: 8px 16px; border-radius: 12px; font-size: 12px; font-weight: 600; flex-shrink: 0; cursor: pointer; background: #1E3A8A; color: #fff; border: 1px solid #1E3A8A; transition: background .14s, color .14s; }
-  .fv-ev-reg:hover { background: #15306E; }
-  .fv-ev-reg.is-reg { background: #ECF6EF; color: #15803D; border-color: #ECF6EF; }
-  .fv-ev-reg.is-reg:hover { background: #DCEEE2; }
+  .fv-ev-reg { padding: 8px 16px; border-radius: 12px; font-size: 12px; font-weight: 600; flex-shrink: 0; cursor: pointer; background: #1E3A8A; color: #fff !important; border: 1px solid #1E3A8A; transition: background .14s, color .14s; text-decoration: none !important; display: inline-flex; align-items: center; gap: 6px; }
+  .fv-ev-reg:hover { background: #15306E; color: #fff !important; }
 
   .fv-ev-empty { text-align: center; padding: 48px 24px; color: #94A3B8; font-size: 13px; }
   .fv-ev-empty i { font-size: 40px; color: #CBD5E1; display: block; margin-bottom: 12px; }
 
-  .fv-ev-demo { background: #FAF3E8; border: 1px solid #F4E5C9; border-radius: 12px; padding: 10px 16px; margin-top: 20px; font-size: 12px; color: #B45309; display: flex; align-items: center; gap: 10px; }
-
   @media (max-width: 576px) {
     .fv-ev-title { font-size: 24px; }
     .fv-ev-row { flex-wrap: wrap; }
-    .fv-ev-reg { width: 100%; }
+    .fv-ev-reg { width: 100%; justify-content: center; }
   }
 </style>
 
@@ -107,168 +137,121 @@
       <h1 class="fv-ev-title">Календарь событий</h1>
       <p class="fv-ev-sub">Вебинары, встречи и офлайн-мероприятия. За участие начисляются баллы.</p>
     </div>
-    <div class="fv-ev-actions">
-      <a href="/calendar" class="fv-ev-btn-sec"><i class="bi bi-calendar3"></i> Вид календаря</a>
-      <button type="button" class="fv-ev-btn-pri" id="fv-ev-suggest"><i class="bi bi-plus-lg"></i> Предложить событие</button>
-    </div>
   </div>
 
-  {% comment %}── Featured live event ──{% endcomment %}
+  {% comment %}── Featured — ближайшее не-прошедшее событие ──{% endcomment %}
+  {% if feat_id != '' %}
+  {% for e in evt_list.results.entities %}{% if e.new_eventid == feat_id %}
+    {% assign f_type   = e.new_eventtype.label | default: 'Событие' %}
+    {% assign f_snum   = e.new_startdatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+    {% assign f_enum   = e.new_enddatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+    {% assign f_live   = false %}{% if f_enum > 0 and now_num >= f_snum and now_num <= f_enum %}{% assign f_live = true %}{% endif %}
+    {% assign f_day    = e.new_startdatetime | date: 'dd' %}
+    {% assign f_mon_s  = e.new_startdatetime | date: 'MM' %}
+    {% case f_mon_s %}{% when '01' %}{% assign f_mon = 'янв' %}{% when '02' %}{% assign f_mon = 'фев' %}{% when '03' %}{% assign f_mon = 'мар' %}{% when '04' %}{% assign f_mon = 'апр' %}{% when '05' %}{% assign f_mon = 'мая' %}{% when '06' %}{% assign f_mon = 'июн' %}{% when '07' %}{% assign f_mon = 'июл' %}{% when '08' %}{% assign f_mon = 'авг' %}{% when '09' %}{% assign f_mon = 'сен' %}{% when '10' %}{% assign f_mon = 'окт' %}{% when '11' %}{% assign f_mon = 'ноя' %}{% else %}{% assign f_mon = 'дек' %}{% endcase %}
+    {% assign f_time   = e.new_startdatetime | date: 'HH:mm' %}
+    {% assign f_endt   = e.new_enddatetime | date: 'HH:mm' %}
+    {% assign f_pts    = e.new_points | plus: 0 %}
+    {% assign f_cap    = e.new_capacity | plus: 0 %}
+    {% assign f_url    = e.new_registrationurl %}
   <div class="fv-card fv-feat">
     <div class="fv-feat-grid">
       <div class="fv-feat-body">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
-          <span class="fv-chip-live"><span class="fv-dot"></span> Идёт сейчас</span>
-          <span class="fv-feat-kind">Вебинар</span>
+          {% if f_live %}<span class="fv-chip-live"><span class="fv-dot"></span> Идёт сейчас</span>{% else %}<span class="fv-ev-chip" style="background:#ECF6EF;color:#15803D;">Открыта запись</span>{% endif %}
+          <span class="fv-feat-kind">{{ f_type }}</span>
         </div>
-        <h2 class="fv-feat-title">Культура обратной связи: как давать и принимать</h2>
+        <h2 class="fv-feat-title">{{ e.new_name | default: 'Событие' }}</h2>
 
         <div class="fv-feat-meta">
-          <span><i class="bi bi-calendar-event"></i> 14 марта, 14:00–15:30</span>
-          <span><i class="bi bi-camera-video"></i> Онлайн · Zoom</span>
+          <span><i class="bi bi-calendar-event"></i> {{ f_day }} {{ f_mon }}, {{ f_time }}{% if e.new_enddatetime %}–{{ f_endt }}{% endif %}</span>
+          {% if e.new_location %}<span><i class="bi bi-geo-alt"></i> {{ e.new_location }}</span>{% endif %}
         </div>
 
-        <div class="fv-feat-speaker">
-          <div class="fv-feat-av">МС</div>
-          <div>
-            <div class="fv-feat-sp-name">Мадина Саидова</div>
-            <div class="fv-feat-sp-role">HR Lead</div>
-          </div>
-        </div>
+        {% if e.new_description %}<p style="font-size:14px;color:#475569;line-height:1.6;margin:16px 0 0;max-width:520px;">{{ e.new_description }}</p>{% endif %}
 
         <div class="fv-feat-cta">
-          <button type="button" class="fv-feat-join">Присоединиться <i class="bi bi-arrow-right"></i></button>
-          <span class="fv-feat-pts"><i class="bi bi-award"></i> +80 баллов</span>
+          {% if f_url %}<a href="{{ f_url }}" target="_blank" rel="noopener" class="fv-feat-join">{% if f_live %}Подключиться{% else %}Записаться{% endif %} <i class="bi bi-arrow-right"></i></a>{% endif %}
+          {% if f_pts > 0 %}<span class="fv-feat-pts"><i class="bi bi-award"></i> +{{ f_pts }} баллов</span>{% endif %}
         </div>
       </div>
 
       <div class="fv-feat-cover">
         <div class="fv-feat-cover-in">
-          <span class="fv-seat-chip"><i class="bi bi-people"></i> 42/100 мест</span>
+          {% if f_cap > 0 %}<span class="fv-seat-chip"><i class="bi bi-people"></i> {{ f_cap }} мест</span>{% else %}<span></span>{% endif %}
           <div>
-            <div class="fv-seat-lbl">Свободно мест</div>
-            <div class="fv-seat-num">58</div>
-            <div class="fv-seat-bar"><div style="width:42%;"></div></div>
+            <div class="fv-seat-lbl">Награда за участие</div>
+            <div class="fv-seat-num">+{{ f_pts }}</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:2px;">баллов в магазин наград</div>
           </div>
         </div>
       </div>
     </div>
   </div>
+  {% endif %}{% endfor %}
+  {% endif %}
 
-  {% comment %}── Filter tabs ──{% endcomment %}
+  {% comment %}── Filter tabs (data-kind = метка Choice new_eventtype) ──{% endcomment %}
   <div class="fv-ev-tabs" role="group" aria-label="Фильтр событий">
     <button type="button" class="fv-ev-tab active" data-kind="Все">Все</button>
-    <button type="button" class="fv-ev-tab" data-kind="Вебинары">Вебинары</button>
-    <button type="button" class="fv-ev-tab" data-kind="Встречи 1:1">Встречи 1:1</button>
+    <button type="button" class="fv-ev-tab" data-kind="Вебинар">Вебинары</button>
+    <button type="button" class="fv-ev-tab" data-kind="Встреча 1:1">Встречи 1:1</button>
     <button type="button" class="fv-ev-tab" data-kind="Офлайн">Офлайн</button>
-    <button type="button" class="fv-ev-tab" data-kind="Записи">Записи</button>
+    <button type="button" class="fv-ev-tab" data-kind="Запись">Записи</button>
   </div>
 
-  {% comment %}── Event list (demo) ──{% endcomment %}
+  {% comment %}── Event list (реальные, не-прошедшие) ──{% endcomment %}
   <div class="fv-card" style="overflow:hidden;">
     <div id="fv-ev-list">
-
-      <div class="fv-ev-row" data-kind="Вебинары">
-        <div class="fv-ev-date"><div class="wd">Пт</div><div class="d">14</div><div class="m">мар</div></div>
+      {% for e in evt_list.results.entities %}
+        {% assign snum = e.new_startdatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+        {% assign enum = e.new_enddatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+        {% assign past = false %}
+        {% if enum > 0 %}{% if now_num > enum %}{% assign past = true %}{% endif %}{% else %}{% if now_num > snum %}{% assign past = true %}{% endif %}{% endif %}
+        {% unless past %}
+          {% assign r_type  = e.new_eventtype.label | default: 'Событие' %}
+          {% assign r_live  = false %}{% if enum > 0 and now_num >= snum and now_num <= enum %}{% assign r_live = true %}{% endif %}
+          {% assign r_day   = e.new_startdatetime | date: 'dd' %}
+          {% assign r_mon_s = e.new_startdatetime | date: 'MM' %}
+          {% case r_mon_s %}{% when '01' %}{% assign r_mon = 'янв' %}{% when '02' %}{% assign r_mon = 'фев' %}{% when '03' %}{% assign r_mon = 'мар' %}{% when '04' %}{% assign r_mon = 'апр' %}{% when '05' %}{% assign r_mon = 'мая' %}{% when '06' %}{% assign r_mon = 'июн' %}{% when '07' %}{% assign r_mon = 'июл' %}{% when '08' %}{% assign r_mon = 'авг' %}{% when '09' %}{% assign r_mon = 'сен' %}{% when '10' %}{% assign r_mon = 'окт' %}{% when '11' %}{% assign r_mon = 'ноя' %}{% else %}{% assign r_mon = 'дек' %}{% endcase %}
+          {% assign r_time  = e.new_startdatetime | date: 'HH:mm' %}
+          {% assign r_pts   = e.new_points | plus: 0 %}
+          {% assign r_url   = e.new_registrationurl %}
+      <div class="fv-ev-row" data-kind="{{ r_type }}">
+        <div class="fv-ev-date"><div class="d">{{ r_day }}</div><div class="m">{{ r_mon }}</div></div>
         <div class="fv-ev-main">
           <div class="fv-ev-tags">
-            <span class="fv-ev-kind">Вебинар</span>
-            <span class="fv-ev-chip" style="background:#FBEAEA;color:#B91C1C;"><span class="fv-dot"></span> Идёт сейчас</span>
+            <span class="fv-ev-kind">{{ r_type }}</span>
+            {% if r_live %}<span class="fv-ev-chip" style="background:#FBEAEA;color:#B91C1C;"><span class="fv-dot"></span> Идёт сейчас</span>{% else %}<span class="fv-ev-chip" style="background:#ECF6EF;color:#15803D;">Открыта запись</span>{% endif %}
           </div>
-          <div class="fv-ev-name">Культура обратной связи</div>
+          <div class="fv-ev-name">{{ e.new_name | default: 'Событие' }}</div>
           <div class="fv-ev-meta">
-            <span><i class="bi bi-clock"></i> 14:00</span>
-            <span><i class="bi bi-camera-video"></i> Zoom</span>
-            <span><i class="bi bi-award pts"></i> +80</span>
+            <span><i class="bi bi-clock"></i> {{ r_time }}</span>
+            {% if e.new_location %}<span><i class="bi bi-geo-alt"></i> {{ e.new_location }}</span>{% endif %}
+            {% if r_pts > 0 %}<span><i class="bi bi-award pts"></i> +{{ r_pts }}</span>{% endif %}
           </div>
         </div>
-        <button type="button" class="fv-ev-reg is-reg"><i class="bi bi-check-lg"></i> Вы записаны</button>
+        {% if r_url %}<a href="{{ r_url }}" target="_blank" rel="noopener" class="fv-ev-reg">{% if r_live %}Подключиться{% else %}Записаться{% endif %}</a>{% else %}<span class="fv-ev-reg" style="opacity:.55;cursor:default;background:#F0F2F5;color:#94A3B8;border-color:#F0F2F5;">Скоро</span>{% endif %}
       </div>
-
-      <div class="fv-ev-row" data-kind="Встречи 1:1">
-        <div class="fv-ev-date"><div class="wd">Вт</div><div class="d">18</div><div class="m">мар</div></div>
-        <div class="fv-ev-main">
-          <div class="fv-ev-tags">
-            <span class="fv-ev-kind">Встреча 1:1</span>
-            <span class="fv-ev-chip" style="background:#EEF2F9;color:#1E3A8A;">Скоро</span>
-          </div>
-          <div class="fv-ev-name">Ревью с ментором</div>
-          <div class="fv-ev-meta">
-            <span><i class="bi bi-clock"></i> 11:30</span>
-            <span><i class="bi bi-camera-video"></i> MS Teams</span>
-          </div>
-        </div>
-        <button type="button" class="fv-ev-reg is-reg"><i class="bi bi-check-lg"></i> Вы записаны</button>
-      </div>
-
-      <div class="fv-ev-row" data-kind="Офлайн">
-        <div class="fv-ev-date"><div class="wd">Сб</div><div class="d">22</div><div class="m">мар</div></div>
-        <div class="fv-ev-main">
-          <div class="fv-ev-tags">
-            <span class="fv-ev-kind">Офлайн</span>
-            <span class="fv-ev-chip" style="background:#ECF6EF;color:#15803D;">Открыта запись</span>
-          </div>
-          <div class="fv-ev-name">Тимбилдинг: командные игры</div>
-          <div class="fv-ev-meta">
-            <span><i class="bi bi-clock"></i> 17:00</span>
-            <span><i class="bi bi-geo-alt"></i> Офис, 5 этаж</span>
-            <span><i class="bi bi-award pts"></i> +50</span>
-          </div>
-        </div>
-        <button type="button" class="fv-ev-reg">Записаться</button>
-      </div>
-
-      <div class="fv-ev-row" data-kind="Вебинары">
-        <div class="fv-ev-date"><div class="wd">Чт</div><div class="d">27</div><div class="m">мар</div></div>
-        <div class="fv-ev-main">
-          <div class="fv-ev-tags">
-            <span class="fv-ev-kind">Вебинар</span>
-            <span class="fv-ev-chip" style="background:#ECF6EF;color:#15803D;">Открыта запись</span>
-          </div>
-          <div class="fv-ev-name">Мастер-класс: Power BI</div>
-          <div class="fv-ev-meta">
-            <span><i class="bi bi-clock"></i> 16:00</span>
-            <span><i class="bi bi-camera-video"></i> Zoom</span>
-            <span><i class="bi bi-award pts"></i> +120</span>
-          </div>
-        </div>
-        <button type="button" class="fv-ev-reg">Записаться</button>
-      </div>
-
-      <div class="fv-ev-row" data-kind="Офлайн">
-        <div class="fv-ev-date"><div class="wd">Ср</div><div class="d">02</div><div class="m">апр</div></div>
-        <div class="fv-ev-main">
-          <div class="fv-ev-tags">
-            <span class="fv-ev-kind">Офлайн</span>
-            <span class="fv-ev-chip" style="background:#ECF6EF;color:#15803D;">Открыта запись</span>
-          </div>
-          <div class="fv-ev-name">Q&amp;A с CEO</div>
-          <div class="fv-ev-meta">
-            <span><i class="bi bi-clock"></i> 12:00</span>
-            <span><i class="bi bi-geo-alt"></i> Конференц-зал</span>
-            <span><i class="bi bi-award pts"></i> +60</span>
-          </div>
-        </div>
-        <button type="button" class="fv-ev-reg">Записаться</button>
-      </div>
-
+        {% endunless %}
+      {% endfor %}
     </div>
+    {% if active_count == 0 %}
+    <div class="fv-ev-empty">
+      <i class="bi bi-calendar-x"></i>
+      Пока нет запланированных событий. Загляните позже.
+    </div>
+    {% endif %}
     <div id="fv-ev-empty" class="fv-ev-empty" style="display:none;">
       <i class="bi bi-calendar-x"></i>
       Нет событий в этой категории.
     </div>
   </div>
 
-  <div class="fv-ev-demo">
-    <i class="bi bi-info-circle-fill" style="flex-shrink:0;"></i>
-    <span>Демо-данные. Список событий и запись подключатся к таблице new_event после её создания.</span>
-  </div>
-
 </div>
 
 <script>
   (function () {
-    // Filter tabs
     var tabs  = document.querySelectorAll('.fv-ev-tab');
     var rows  = document.querySelectorAll('.fv-ev-row');
     var empty = document.getElementById('fv-ev-empty');
@@ -283,14 +266,6 @@
           if (show) { any = true; }
         });
         if (empty) { empty.style.display = any ? 'none' : 'block'; }
-      });
-    });
-
-    // Register toggle (optimistic, no backend yet)
-    document.querySelectorAll('.fv-ev-reg').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var on = btn.classList.toggle('is-reg');
-        btn.innerHTML = on ? '<i class="bi bi-check-lg"></i> Вы записаны' : 'Записаться';
       });
     });
   })();

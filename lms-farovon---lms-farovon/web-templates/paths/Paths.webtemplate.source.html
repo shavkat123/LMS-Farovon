@@ -1,29 +1,51 @@
 {% comment %}
-  Paths — Карьерные траектории
-  EntityReference safety: check h.new_relatedcourse != blank BEFORE accessing .id / .name
-  Demo cards rendered when no real courses exist (total_courses == 0).
+  Paths — Карьерные траектории. РЕАЛЬНЫЕ данные (new_trajectory).
+  Модель: траектория → курсы (msdynce_course.new_trajectory + new_trajectoryorder) → уроки H5P
+  (new_relatedcourse) → прогресс пользователя (new_h5pprogress, completion=1, дедуп в done_ids).
 {% endcomment %}
 
-{% comment %}── 1. All active H5P content (no relatedcourse fetch — safe iteration) ──{% endcomment %}
-{% fetchxml all_h5p %}
+{% unless user %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-signpost-split" style="font-size:52px;color:#64748B;display:block;margin-bottom:16px;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin-bottom:6px;">Войдите в систему</h2>
+  <p style="font-size:13px;color:#64748B;margin-bottom:20px;">Для просмотра траекторий необходимо авторизоваться.</p>
+  <a href="/SignIn" class="btn btn-primary" style="border-radius:8px;">Войти</a>
+</div>
+{% else %}
+
+{% comment %}── Активные траектории ──{% endcomment %}
+{% fetchxml trajs %}
 <fetch>
-  <entity name="new_h5pcontent">
-    <attribute name="new_h5pcontentid" />
+  <entity name="new_trajectory">
+    <attribute name="new_trajectoryid" />
     <attribute name="new_name" />
-    <attribute name="new_librarytype" />
-    <filter>
-      <condition attribute="new_isactive" operator="eq" value="1" />
-    </filter>
+    <attribute name="new_description" />
+    <attribute name="new_department" />
+    <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
+    <order attribute="new_name" />
   </entity>
 </fetch>
 {% endfetchxml %}
 
-{% comment %}── 2. Only contents WITH a related course (safe: filter pre-excludes nulls) ──{% endcomment %}
+{% comment %}── Активные курсы с траекторией и порядком ──{% endcomment %}
+{% fetchxml courses %}
+<fetch>
+  <entity name="msdynce_course">
+    <attribute name="msdynce_courseid" />
+    <attribute name="msdynce_coursename" />
+    <attribute name="new_trajectory" />
+    <attribute name="new_trajectoryorder" />
+    <filter><condition attribute="statuscode" operator="eq" value="1" /></filter>
+    <order attribute="new_trajectoryorder" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Активные H5P с привязкой к курсу ──{% endcomment %}
 {% fetchxml linked_h5p %}
 <fetch>
   <entity name="new_h5pcontent">
     <attribute name="new_h5pcontentid" />
-    <attribute name="new_name" />
     <attribute name="new_relatedcourse" />
     <filter type="and">
       <condition attribute="new_isactive" operator="eq" value="1" />
@@ -33,12 +55,10 @@
 </fetch>
 {% endfetchxml %}
 
-{% comment %}── 3. Current user's completed lessons ──{% endcomment %}
-{% if user %}
+{% comment %}── Завершённые уроки пользователя (уникальные) ──{% endcomment %}
 {% fetchxml my_done %}
 <fetch>
   <entity name="new_h5pprogress">
-    <attribute name="new_h5pprogressid" />
     <attribute name="new_h5pcontent" />
     <filter>
       <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
@@ -47,62 +67,22 @@
   </entity>
 </fetch>
 {% endfetchxml %}
-{% endif %}
-
-{% comment %}── Build unique courses from linked_h5p (all records guaranteed non-null) ──{% endcomment %}
-{% assign seen_cids     = '' %}
-{% assign c_ids_str     = '' %}
-{% assign c_names_str   = '' %}
-{% assign total_courses = 0 %}
-{% assign linked_count  = 0 %}
-{% assign linked_ids    = '' %}
-{% for h in linked_h5p.results.entities %}
-  {% assign linked_count = linked_count | plus: 1 %}
-  {% assign linked_ids   = linked_ids | append: h.new_h5pcontentid | append: ',' %}
-  {% assign cid   = h.new_relatedcourse.id %}
-  {% assign cname = h.new_relatedcourse.name | default: 'Без названия' %}
-  {% unless seen_cids contains cid %}
-    {% assign seen_cids     = seen_cids   | append: cid   | append: ',' %}
-    {% assign c_ids_str     = c_ids_str   | append: cid   | append: '§' %}
-    {% assign c_names_str   = c_names_str | append: cname | append: '§' %}
-    {% assign total_courses = total_courses | plus: 1 %}
-  {% endunless %}
-{% endfor %}
-{% assign dyn_course_ids   = c_ids_str   | split: '§' %}
-{% assign dyn_course_names = c_names_str | split: '§' %}
-
-{% comment %}── Pre-compute totals ──
-   ВАЖНО: у пользователя может быть НЕСКОЛЬКО записей new_h5pprogress с completion=1 на один урок
-   (повторные попытки). Считаем УНИКАЛЬНЫЕ пройденные уроки через done_ids='|guid|guid|',
-   иначе c_done>c_total → 200% / «2 из 1». {% endcomment %}
-{% assign total_lessons = 0 %}
-{% for h in all_h5p.results.entities %}
-  {% assign total_lessons = total_lessons | plus: 1 %}
-{% endfor %}
-{% assign done_ids   = '|' %}
+{% assign done_ids = '|' %}
 {% assign total_done = 0 %}
-{% if user %}
-  {% for p in my_done.results.entities %}
-    {% if p.new_h5pcontent %}
-      {% assign pcid = p.new_h5pcontent.id %}
-      {% unless done_ids contains pcid %}
-        {% assign done_ids   = done_ids | append: pcid | append: '|' %}
-        {% assign total_done = total_done | plus: 1 %}
-      {% endunless %}
-    {% endif %}
-  {% endfor %}
-{% endif %}
+{% for p in my_done.results.entities %}
+  {% if p.new_h5pcontent %}
+    {% assign pcid = p.new_h5pcontent.id %}
+    {% unless done_ids contains pcid %}{% assign done_ids = done_ids | append: pcid | append: '|' %}{% assign total_done = total_done | plus: 1 %}{% endunless %}
+  {% endif %}
+{% endfor %}
 
-{% comment %}── Demo mode triggers when no courses are linked yet ──{% endcomment %}
-{% assign demo_mode = false %}
-{% if total_courses == 0 %}
-  {% assign demo_mode = true %}
-{% endif %}
+{% comment %}── Статистика ──{% endcomment %}
+{% assign n_traj = trajs.results.entities.size %}
+{% assign stat_courses = 0 %}
+{% for c in courses.results.entities %}{% if c.new_trajectory %}{% assign stat_courses = stat_courses | plus: 1 %}{% endif %}{% endfor %}
 
 <style>
   .fv-paths { padding: 12px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
-
-  /* ── Breadcrumb ── */
   .fv-breadcrumb { margin-bottom: 18px; }
   .fv-breadcrumb ol { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .fv-breadcrumb li { font-size: 12px; color: #64748B; display: flex; align-items: center; gap: 6px; }
@@ -112,322 +92,147 @@
   .fv-breadcrumb a:hover { color: #15803D; }
   .fv-breadcrumb li:last-child { color: #0B1220; font-weight: 600; }
 
-  /* ── Header ── */
-  .fv-paths-header { margin-bottom: 24px; }
+  .fv-paths-header { margin-bottom: 22px; }
   .fv-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #15803D; display: block; margin-bottom: 5px; }
   .fv-paths-title { font-size: 26px; font-weight: 800; color: #0B1220; margin: 0 0 5px; }
   .fv-paths-sub { font-size: 13px; color: #64748B; margin: 0; }
 
-  /* ── Stats strip ── */
-  .fv-paths-stats { display: flex; gap: 14px; margin-bottom: 28px; flex-wrap: wrap; }
+  .fv-paths-stats { display: flex; gap: 14px; margin-bottom: 26px; flex-wrap: wrap; }
   .fv-pstat { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 14px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
   .fv-pstat-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
   .fv-pstat-val { font-size: 20px; font-weight: 800; color: #0B1220; line-height: 1; }
   .fv-pstat-lbl { font-size: 11px; color: #64748B; margin-top: 2px; }
 
-  /* ── Demo banner ── */
-  .fv-demo-banner {
-    display: flex; align-items: center; gap: 10px;
-    background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px;
-    padding: 10px 16px; margin-bottom: 20px; font-size: 12px; color: #92400E;
-  }
-  .fv-demo-banner i { font-size: 15px; color: #F59E0B; flex-shrink: 0; }
+  /* ── Trajectory card ── */
+  .fv-traj { background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; padding: 22px 24px; box-shadow: 0 1px 4px rgba(0,0,0,.04); margin-bottom: 18px; }
+  .fv-traj-head { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .fv-traj-icon { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+  .fv-traj-info { flex: 1; min-width: 200px; }
+  .fv-traj-name { font-size: 17px; font-weight: 800; color: #0B1220; margin: 0; letter-spacing: -0.01em; }
+  .fv-traj-meta { font-size: 12px; color: #64748B; margin-top: 3px; }
+  .fv-traj-desc { font-size: 13px; color: #475569; margin: 8px 0 0; line-height: 1.5; max-width: 640px; }
+  .fv-traj-prog-box { text-align: right; flex-shrink: 0; }
+  .fv-traj-pct { font-size: 24px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  .fv-traj-frac { font-size: 11px; color: #94A3B8; margin-top: 3px; }
+  .fv-traj-bar { height: 8px; border-radius: 999px; background: #F1F5F9; overflow: hidden; margin: 16px 0; }
+  .fv-traj-bar-fill { height: 100%; border-radius: 999px; transition: width .4s; }
+  .fv-traj-steps { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+  .fv-traj-step { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 12px; border: 1px solid #E5E7EB; background: #fff; text-decoration: none !important; transition: border-color .14s, box-shadow .14s, transform .14s; }
+  .fv-traj-step:hover { border-color: #15803D; box-shadow: 0 3px 12px rgba(0,0,0,.07); transform: translateY(-1px); text-decoration: none !important; }
+  .fv-traj-num { width: 30px; height: 30px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; flex-shrink: 0; }
+  .fv-traj-step--done .fv-traj-num { background: #15803D; color: #fff; }
+  .fv-traj-step--prog .fv-traj-num { background: #FEF3C7; color: #B45309; }
+  .fv-traj-step--new  .fv-traj-num { background: #F0F2F5; color: #64748B; }
+  .fv-traj-step-body { min-width: 0; }
+  .fv-traj-step-name { display: block; font-size: 13px; font-weight: 600; color: #0B1220; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fv-traj-step-prog { display: block; font-size: 11px; color: #94A3B8; margin-top: 2px; }
+  .fv-traj-empty { font-size: 12px; color: #94A3B8; padding: 6px 0; }
 
-  /* ── Cards grid ── */
-  .fv-paths-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-  @media (max-width: 900px) { .fv-paths-grid { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 576px) { .fv-paths-grid { grid-template-columns: 1fr; } }
-
-  /* ── Path card ── */
-  .fv-path-card {
-    background: #fff; border: 1px solid #E5E7EB; border-radius: 16px;
-    padding: 22px; box-shadow: 0 1px 4px rgba(0,0,0,.04);
-    display: flex; flex-direction: column; gap: 14px;
-    transition: box-shadow .18s, transform .18s;
-  }
-  .fv-path-card:hover { box-shadow: 0 6px 24px rgba(0,0,0,.09); transform: translateY(-2px); }
-  .fv-path-card.demo-card { opacity: .85; }
-  .fv-path-icon { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
-  .fv-path-name { font-size: 15px; font-weight: 700; color: #0B1220; margin: 0; line-height: 1.3; }
-  .fv-path-meta { font-size: 12px; color: #64748B; margin: 4px 0 0; }
-  .fv-path-bar-wrap { height: 6px; border-radius: 3px; background: #F1F5F9; overflow: hidden; }
-  .fv-path-bar { height: 100%; border-radius: 3px; transition: width .4s; }
-  .fv-path-pct { font-size: 12px; font-weight: 700; }
-  .fv-path-btn {
-    display: block; text-align: center; padding: 9px 16px; border-radius: 10px;
-    font-size: 13px; font-weight: 600; text-decoration: none !important;
-    transition: opacity .15s; border: none; cursor: pointer; width: 100%;
-  }
-  .fv-path-btn:hover { opacity: .85; }
-
-  /* ── Pagination ── */
-  .fv-pagination { display: none; align-items: center; justify-content: center; gap: 12px; margin-top: 28px; }
-  .fv-page-btn {
-    background: #fff; border: 1px solid #E5E7EB; border-radius: 10px;
-    padding: 8px 18px; font-size: 13px; font-weight: 600; color: #374151;
-    cursor: pointer; transition: background .15s, border-color .15s;
-  }
-  .fv-page-btn:hover:not(:disabled) { background: #ECF6EF; border-color: #15803D; color: #15803D; }
-  .fv-page-btn:disabled { opacity: .4; cursor: default; }
-  .fv-page-info { font-size: 13px; color: #64748B; min-width: 110px; text-align: center; }
-  .fv-page-dots { display: flex; gap: 6px; align-items: center; }
-  .fv-page-dot { width: 8px; height: 8px; border-radius: 50%; background: #E5E7EB; cursor: pointer; transition: background .15s, transform .15s; }
-  .fv-page-dot.active { background: #15803D; transform: scale(1.3); }
-
-  /* ── Empty state ── */
-  .fv-paths-empty { text-align: center; padding: 60px 20px; color: #64748B; }
-  .fv-paths-empty i { font-size: 42px; display: block; margin-bottom: 12px; }
-  .fv-paths-empty p { font-size: 13px; margin: 0; }
+  .fv-paths-blank { text-align: center; padding: 56px 24px; background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; }
+  .fv-paths-blank i { font-size: 44px; color: #CBD5E1; display: block; margin-bottom: 14px; }
+  .fv-paths-blank h3 { font-size: 16px; font-weight: 700; color: #0B1220; margin: 0 0 6px; }
+  .fv-paths-blank p { font-size: 13px; color: #64748B; margin: 0 auto; max-width: 460px; }
 </style>
 
-<div class="fv-paths container-fluid px-3 px-md-4">
+<div class="fv-paths">
 
   <nav class="fv-breadcrumb" aria-label="breadcrumb">
-    <ol>
-      <li><a href="/">Главная</a></li>
-      <li aria-current="page">Траектории</li>
-    </ol>
+    <ol><li><a href="/">Главная</a></li><li>Траектории</li></ol>
   </nav>
 
   <div class="fv-paths-header">
     <span class="fv-eyebrow">Карьерные траектории</span>
     <h1 class="fv-paths-title">Ваши пути развития</h1>
-    <p class="fv-paths-sub">Структурированные программы роста — курсы, уроки, отслеживание прогресса.</p>
+    <p class="fv-paths-sub">Структурированные программы роста — курсы и уроки по порядку, с отслеживанием прогресса.</p>
   </div>
-
-  {% assign display_courses = total_courses %}
-  {% assign display_lessons = total_lessons %}
-  {% if demo_mode %}
-    {% assign display_courses = 6 %}
-    {% assign display_lessons = 38 %}
-  {% endif %}
 
   <div class="fv-paths-stats">
     <div class="fv-pstat">
-      <div class="fv-pstat-icon" style="background:#ECF6EF;color:#15803D;"><i class="bi bi-map"></i></div>
-      <div>
-        <div class="fv-pstat-val">{{ display_courses }}</div>
-        <div class="fv-pstat-lbl">Траекторий</div>
-      </div>
+      <div class="fv-pstat-icon" style="background:#ECF6EF;color:#15803D;"><i class="bi bi-signpost-split"></i></div>
+      <div><div class="fv-pstat-val">{{ n_traj }}</div><div class="fv-pstat-lbl">Траекторий</div></div>
     </div>
     <div class="fv-pstat">
-      <div class="fv-pstat-icon" style="background:#EFF6FF;color:#2563EB;"><i class="bi bi-collection-play"></i></div>
-      <div>
-        <div class="fv-pstat-val">{{ display_lessons }}</div>
-        <div class="fv-pstat-lbl">Уроков всего</div>
-      </div>
+      <div class="fv-pstat-icon" style="background:#EEF2F9;color:#1E3A8A;"><i class="bi bi-mortarboard"></i></div>
+      <div><div class="fv-pstat-val">{{ stat_courses }}</div><div class="fv-pstat-lbl">Курсов в траекториях</div></div>
     </div>
     <div class="fv-pstat">
       <div class="fv-pstat-icon" style="background:#F0FDF4;color:#22C55E;"><i class="bi bi-check2-all"></i></div>
-      <div>
-        <div class="fv-pstat-val">{{ total_done }}</div>
-        <div class="fv-pstat-lbl">Завершено</div>
-      </div>
+      <div><div class="fv-pstat-val">{{ total_done }}</div><div class="fv-pstat-lbl">Уроков завершено</div></div>
     </div>
   </div>
 
-  {% assign palette_colors = '#15803D,#1E3A8A,#EA580C,#2563EB,#334155,#0369A1' | split: ',' %}
-  {% assign palette_tints  = '#ECF6EF,#EEF2F9,#FFF7ED,#EFF6FF,#F0F2F5,#E0F2FE' | split: ',' %}
-  {% assign palette_icons  = 'bi-bar-chart-line,bi-people,bi-bullseye,bi-code-slash,bi-lightbulb,bi-mortarboard' | split: ',' %}
-
-  {% if demo_mode %}
-
-  <div class="fv-demo-banner">
-    <i class="bi bi-info-circle-fill"></i>
-    <span>Демо-режим — курсы ещё не привязаны к урокам. Привяжите поле «Связанный курс» в H5P Content, и данные появятся автоматически.</span>
+  {% if n_traj == 0 %}
+  <div class="fv-paths-blank">
+    <i class="bi bi-signpost-2"></i>
+    <h3>Траекторий пока нет</h3>
+    <p>Создайте траектории в админке (или Power Apps), привяжите к ним курсы через поле «Траектория» — и здесь появятся пути развития с прогрессом.</p>
   </div>
-
-  {% assign demo_names = 'Продажи и переговоры,Управление проектами,Цифровые навыки,Лидерство и коммуникации,Финансовая грамотность,Data-анализ' | split: ',' %}
-
-  <div class="fv-paths-grid">
-    {% for dname in demo_names %}
-      {% assign di    = forloop.index0 %}
-      {% assign dc    = palette_colors[di] %}
-      {% assign dt    = palette_tints[di] %}
-      {% assign dicon = palette_icons[di] %}
-      {% comment %}Integer literals avoid string-concat bug with split+plus:0{% endcomment %}
-      {% assign dtotal = 0 %}{% assign ddone = 0 %}
-      {% case di %}
-        {% when 0 %}{% assign dtotal = 8 %}{% assign ddone = 5 %}
-        {% when 1 %}{% assign dtotal = 6 %}{% assign ddone = 3 %}
-        {% when 2 %}{% assign dtotal = 5 %}{% assign ddone = 5 %}
-        {% when 3 %}{% assign dtotal = 7 %}{% assign ddone = 1 %}
-        {% when 4 %}{% assign dtotal = 4 %}{% assign ddone = 0 %}
-        {% when 5 %}{% assign dtotal = 8 %}{% assign ddone = 4 %}
-      {% endcase %}
-      {% if dtotal > 0 %}
-        {% assign dpct = ddone | times: 100 | divided_by: dtotal %}
-      {% else %}
-        {% assign dpct = 0 %}
-      {% endif %}
-      <div class="fv-path-card demo-card" data-course-card>
-        <div class="fv-path-icon" style="background:{{ dt }};color:{{ dc }};">
-          <i class="{{ dicon }}"></i>
-        </div>
-        <div>
-          <h3 class="fv-path-name">{{ dname }}</h3>
-          <p class="fv-path-meta">{{ ddone }} из {{ dtotal }} уроков завершено</p>
-        </div>
-        <div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-            <span class="fv-path-pct" style="color:{{ dc }};">{{ dpct }}%</span>
-            <span style="font-size:11px;color:#64748B;">{{ dtotal }} уроков</span>
-          </div>
-          <div class="fv-path-bar-wrap">
-            <div class="fv-path-bar" style="width:{{ dpct }}%;background:{{ dc }};"></div>
-          </div>
-        </div>
-        <a href="/h5p-catalog" class="fv-path-btn" style="background:{{ dt }};color:{{ dc }};">
-          {% if ddone == 0 %}Начать траекторию{% elsif ddone == dtotal %}Пройдено ✓{% else %}Продолжить{% endif %}
-        </a>
-      </div>
-    {% endfor %}
-  </div>
-
   {% else %}
 
-  <div class="fv-paths-grid">
+  {% for tj in trajs.results.entities %}
+    {% assign tjid = tj.new_trajectoryid %}
+    {% assign tj_idx = forloop.index0 | modulo: 6 %}
+    {% case tj_idx %}
+      {% when 0 %}{% assign tcol = '#15803D' %}{% assign ttint = '#ECF6EF' %}{% assign tico = 'bi-signpost-2' %}
+      {% when 1 %}{% assign tcol = '#1E3A8A' %}{% assign ttint = '#EEF2F9' %}{% assign tico = 'bi-graph-up-arrow' %}
+      {% when 2 %}{% assign tcol = '#B45309' %}{% assign ttint = '#FAF3E8' %}{% assign tico = 'bi-people' %}
+      {% when 3 %}{% assign tcol = '#7C3AED' %}{% assign ttint = '#F3F0FF' %}{% assign tico = 'bi-lightbulb' %}
+      {% when 4 %}{% assign tcol = '#0369A1' %}{% assign ttint = '#E0F2FE' %}{% assign tico = 'bi-bar-chart-line' %}
+      {% else %}{% assign tcol = '#334155' %}{% assign ttint = '#F0F2F5' %}{% assign tico = 'bi-mortarboard' %}
+    {% endcase %}
 
-    {% for c_id in dyn_course_ids %}
-      {% if c_id != '' and c_id != blank %}
-      {% assign cidx    = forloop.index0 | modulo: 6 %}
-      {% assign c_color = palette_colors[cidx] %}
-      {% assign c_tint  = palette_tints[cidx] %}
-      {% assign c_icon  = palette_icons[cidx] %}
-      {% assign c_name  = dyn_course_names[forloop.index0] %}
-
-      {% assign c_total = 0 %}
-      {% assign c_done  = 0 %}
-      {% for h in linked_h5p.results.entities %}
-        {% if h.new_relatedcourse.id == c_id %}
-          {% assign c_total = c_total | plus: 1 %}
-          {% if done_ids contains h.new_h5pcontentid %}
-            {% assign c_done = c_done | plus: 1 %}
-          {% endif %}
+    {% assign tj_total = 0 %}{% assign tj_done = 0 %}{% assign tj_courses = 0 %}
+    {% capture steps_html %}
+      {% for c in courses.results.entities %}
+        {% if c.new_trajectory and c.new_trajectory.id == tjid %}
+          {% assign tj_courses = tj_courses | plus: 1 %}
+          {% assign cid = c.msdynce_courseid %}
+          {% assign cname = c.msdynce_coursename | default: 'Курс' %}
+          {% assign ctotal = 0 %}{% assign cdone = 0 %}
+          {% for h in linked_h5p.results.entities %}
+            {% if h.new_relatedcourse.id == cid %}
+              {% assign ctotal = ctotal | plus: 1 %}
+              {% if done_ids contains h.new_h5pcontentid %}{% assign cdone = cdone | plus: 1 %}{% endif %}
+            {% endif %}
+          {% endfor %}
+          {% assign tj_total = tj_total | plus: ctotal %}
+          {% assign tj_done = tj_done | plus: cdone %}
+          {% assign cpct = 0 %}{% if ctotal > 0 %}{% assign cpct = cdone | times: 100 | divided_by: ctotal %}{% endif %}
+          {% assign cstatus = 'new' %}{% if cpct == 100 and ctotal > 0 %}{% assign cstatus = 'done' %}{% elsif cdone > 0 %}{% assign cstatus = 'prog' %}{% endif %}
+      <a href="/course-details?id={{ cid }}" class="fv-traj-step fv-traj-step--{{ cstatus }}">
+        <span class="fv-traj-num">{% if cstatus == 'done' %}<i class="bi bi-check-lg"></i>{% else %}{{ tj_courses }}{% endif %}</span>
+        <span class="fv-traj-step-body">
+          <span class="fv-traj-step-name">{{ cname }}</span>
+          <span class="fv-traj-step-prog">{% if ctotal > 0 %}{{ cdone }}/{{ ctotal }} уроков · {{ cpct }}%{% else %}уроки не привязаны{% endif %}</span>
+        </span>
+      </a>
         {% endif %}
       {% endfor %}
+    {% endcapture %}
+    {% assign tj_pct = 0 %}{% if tj_total > 0 %}{% assign tj_pct = tj_done | times: 100 | divided_by: tj_total %}{% endif %}
 
-      {% if c_total == 0 %}{% assign c_pct = 0 %}{% else %}
-        {% assign c_pct = c_done | times: 100 | divided_by: c_total %}
-      {% endif %}
-
-      <div class="fv-path-card" data-course-card>
-        <div class="fv-path-icon" style="background:{{ c_tint }};color:{{ c_color }};">
-          <i class="{{ c_icon }}"></i>
+    <div class="fv-traj">
+      <div class="fv-traj-head">
+        <span class="fv-traj-icon" style="background:{{ ttint }};color:{{ tcol }};"><i class="bi {{ tico }}"></i></span>
+        <div class="fv-traj-info">
+          <h3 class="fv-traj-name">{{ tj.new_name | default: 'Траектория' }}</h3>
+          <div class="fv-traj-meta">{% if tj.new_department %}{{ tj.new_department }} · {% endif %}{{ tj_courses }} курс{% if tj_courses == 1 %}{% elsif tj_courses >= 2 and tj_courses < 5 %}а{% else %}ов{% endif %}</div>
+          {% if tj.new_description %}<p class="fv-traj-desc">{{ tj.new_description }}</p>{% endif %}
         </div>
-        <div>
-          <h3 class="fv-path-name">{{ c_name }}</h3>
-          <p class="fv-path-meta">{{ c_done }} из {{ c_total }} уроков завершено</p>
+        <div class="fv-traj-prog-box">
+          <div class="fv-traj-pct" style="color:{{ tcol }};">{{ tj_pct }}%</div>
+          <div class="fv-traj-frac">{{ tj_done }}/{{ tj_total }} уроков</div>
         </div>
-        <div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-            <span class="fv-path-pct" style="color:{{ c_color }};">{{ c_pct }}%</span>
-            <span style="font-size:11px;color:#64748B;">{{ c_total }} уроков</span>
-          </div>
-          <div class="fv-path-bar-wrap">
-            <div class="fv-path-bar" style="width:{{ c_pct }}%;background:{{ c_color }};"></div>
-          </div>
-        </div>
-        <a href="/h5p-catalog" class="fv-path-btn" style="background:{{ c_tint }};color:{{ c_color }};">
-          {% if c_done == 0 %}Начать траекторию{% elsif c_done == c_total %}Пройдено ✓{% else %}Продолжить{% endif %}
-        </a>
       </div>
-      {% endif %}
-    {% endfor %}
-
-    {% comment %}── Uncategorized = total active minus linked. Done = progress whose content is NOT in linked_ids ──{% endcomment %}
-    {% assign uncategorized      = total_lessons | minus: linked_count %}
-    {% assign uncategorized_done = 0 %}
-    {% if user and uncategorized > 0 %}
-      {% assign done_arr = done_ids | split: '|' %}
-      {% for did in done_arr %}
-        {% if did != '' %}
-          {% unless linked_ids contains did %}
-            {% assign uncategorized_done = uncategorized_done | plus: 1 %}
-          {% endunless %}
-        {% endif %}
-      {% endfor %}
-    {% endif %}
-    {% if uncategorized > 0 %}
-      {% if uncategorized_done > uncategorized %}{% assign uncategorized_done = uncategorized %}{% endif %}
-      {% assign unc_pct = uncategorized_done | times: 100 | divided_by: uncategorized %}
-      <div class="fv-path-card" data-course-card>
-        <div class="fv-path-icon" style="background:#F8FAFC;color:#64748B;">
-          <i class="bi bi-collection"></i>
-        </div>
-        <div>
-          <h3 class="fv-path-name">Общие уроки</h3>
-          <p class="fv-path-meta">{{ uncategorized_done }} из {{ uncategorized }} уроков завершено</p>
-        </div>
-        <div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-            <span class="fv-path-pct" style="color:#64748B;">{{ unc_pct }}%</span>
-            <span style="font-size:11px;color:#64748B;">{{ uncategorized }} уроков</span>
-          </div>
-          <div class="fv-path-bar-wrap">
-            <div class="fv-path-bar" style="width:{{ unc_pct }}%;background:#64748B;"></div>
-          </div>
-        </div>
-        <a href="/h5p-catalog" class="fv-path-btn" style="background:#F1F5F9;color:#475569;">
-          Перейти к урокам
-        </a>
+      <div class="fv-traj-bar"><div class="fv-traj-bar-fill" style="width:{{ tj_pct }}%;background:{{ tcol }};"></div></div>
+      <div class="fv-traj-steps">
+        {% if tj_courses == 0 %}<div class="fv-traj-empty">Курсы к этой траектории ещё не привязаны.</div>{% else %}{{ steps_html }}{% endif %}
       </div>
-    {% endif %}
-
-  </div>
+    </div>
+  {% endfor %}
 
   {% endif %}
 
-  <div class="fv-pagination" id="fvPagination">
-    <button type="button" class="fv-page-btn" id="fvPrevBtn">&#8249; Назад</button>
-    <div class="fv-page-dots" id="fvDots"></div>
-    <span class="fv-page-info" id="fvPageInfo"></span>
-    <button type="button" class="fv-page-btn" id="fvNextBtn">Вперёд &#8250;</button>
-  </div>
-
-  <script>
-  (function () {
-    var PER_PAGE = 6;
-    var page = 1;
-    var cards = Array.from(document.querySelectorAll('[data-course-card]'));
-    var total = cards.length;
-    var pages = Math.ceil(total / PER_PAGE);
-    if (pages <= 1) return;
-
-    var pag  = document.getElementById('fvPagination');
-    var prev = document.getElementById('fvPrevBtn');
-    var next = document.getElementById('fvNextBtn');
-    var info = document.getElementById('fvPageInfo');
-    var dots = document.getElementById('fvDots');
-    pag.style.display = 'flex';
-
-    for (var d = 0; d < pages; d++) {
-      var dot = document.createElement('span');
-      dot.className = 'fv-page-dot';
-      dot.setAttribute('data-p', d + 1);
-      dot.onclick = (function (p) { return function () { goTo(p); }; })(d + 1);
-      dots.appendChild(dot);
-    }
-
-    function goTo(p) {
-      page = p;
-      var start = (page - 1) * PER_PAGE;
-      cards.forEach(function (c, i) {
-        c.style.display = (i >= start && i < start + PER_PAGE) ? '' : 'none';
-      });
-      info.textContent = 'Страница ' + page + ' из ' + pages;
-      prev.disabled = page === 1;
-      next.disabled = page === pages;
-      dots.querySelectorAll('.fv-page-dot').forEach(function (d) {
-        d.classList.toggle('active', +d.getAttribute('data-p') === page);
-      });
-    }
-
-    window.fvChangePage = function (dir) { goTo(Math.max(1, Math.min(pages, page + dir))); };
-    document.getElementById('fvPrevBtn').addEventListener('click', function () { window.fvChangePage(-1); });
-    document.getElementById('fvNextBtn').addEventListener('click', function () { window.fvChangePage(1); });
-    goTo(1);
-  })();
-  </script>
-
 </div>
+
+{% endunless %}

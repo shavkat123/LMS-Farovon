@@ -215,20 +215,76 @@ function updateCourse() {
     dataObject['msdynce_entityimage_file_type'] = courseImageType.substring(courseImageType.indexOf('/') + 1);
   }
 
-  //Call the API
+  //Call the API.
+  // ВАЖНО: редирект ТОЛЬКО в success — безусловный редирект после safeAjax обрывал
+  // асинхронный PATCH навигацией, и изменения (включая обложку) не сохранялись.
   webapi.safeAjax({
     type: 'PATCH',
     url: "/_api/msdynce_courses({{request.params['id']}})",
     contentType: 'application/json',
     data: JSON.stringify(dataObject),
     success: function (res, status, xhr) {
-      //Redirect back to home
-      window.location.href = "{{ sitemarkers['C1 Home'].url }}";
+      window.location.href = '/admin/courses';
     },
     error: function (res, status, xhr) {
       console.log(res.responseText);
+      alert('Не удалось сохранить курс. Детали в консоли (F12).');
+      var btn = document.getElementById('updateCourseButton');
+      if (btn) { btn.disabled = false; btn.value = 'Сохранить'; btn.textContent = 'Сохранить'; }
     },
   });
-
-  window.location.href = "{{ sitemarkers['C1 Home'].url }}";
 }
+
+// ── Русификация подписей формы: подписи полей приходят из Dataverse-формы
+//    "Portal Course Form" на английском; переводим на клиенте (безопасно —
+//    только точные совпадения). Повторные вызовы — для PCF (обложка), он рендерится позже.
+function fvRuForm() {
+  var RU = {
+    'Course Name': 'Название курса',
+    'Instructor': 'Преподаватель',
+    'Format': 'Формат',
+    'One-time event': 'Тип события',
+    'Recurring': 'Повторяющийся',
+    'Description': 'Описание',
+    'Category': 'Категория',
+    'Level': 'Уровень',
+    'Max capacity': 'Вместимость',
+    'Registration deadline': 'Дедлайн регистрации',
+    'Start Date': 'Дата начала',
+    'End Date': 'Дата окончания',
+    'Start Time': 'Время начала',
+    'End Time': 'Время окончания',
+    'Day(s)': 'Дни проведения',
+    'Frequency': 'Периодичность',
+    'Upload media': 'Обложка курса',
+    'Upload a jpg, png, or other compatible media file.': 'Загрузите jpg или png — это обложка курса.',
+    'Submit': 'Сохранить',
+    'Create': 'Создать',
+    'Update': 'Сохранить'
+  };
+  $('.course-form-container, .course-form-header').find('label, h2, h3, h4, legend, p, span, div, button').each(function () {
+    var el = this;
+    if (el.children.length > 0) {
+      // есть вложенные элементы (например * обязательности) — меняем только первый текстовый узел
+      for (var i = 0; i < el.childNodes.length; i++) {
+        var n = el.childNodes[i];
+        if (n.nodeType === 3) {
+          var t = (n.nodeValue || '').trim();
+          if (RU[t]) { n.nodeValue = RU[t]; }
+        }
+      }
+      return;
+    }
+    var txt = (el.textContent || '').trim();
+    if (RU[txt]) { el.textContent = RU[txt]; }
+  });
+  $('.course-form-container input[type=submit], .course-form-container input[type=button], .btn-container input[type=submit], .btn-container input[type=button]').each(function () {
+    var v = (this.value || '').trim();
+    if (RU[v]) { this.value = RU[v]; }
+  });
+}
+$(function () {
+  fvRuForm();
+  setTimeout(fvRuForm, 800);
+  setTimeout(fvRuForm, 2500);
+});
