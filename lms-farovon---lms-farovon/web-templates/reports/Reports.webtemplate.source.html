@@ -1,0 +1,227 @@
+{% comment %}
+  Analytics — Аналитика (/admin/reports)
+  Дизайн: admin_console/AdminConsole.html (Analytics.jsx). Примитивы .adm-* — customtheme.css.
+  Реально: KPI + топ-стажёры (aggregate new_h5pprogress). Демо: отделы, воронка.
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+{% fetchxml prog_by_user %}
+<fetch aggregate="true">
+  <entity name="new_h5pprogress">
+    <attribute name="new_user" groupby="true" alias="uid" />
+    <attribute name="new_h5pprogressid" aggregate="count" alias="cnt" />
+    <attribute name="new_completion" aggregate="sum" alias="completed" />
+    <link-entity name="contact" from="contactid" to="new_user" alias="ctc" link-type="outer">
+      <attribute name="fullname" groupby="true" alias="fname" />
+      <attribute name="jobtitle" groupby="true" alias="fjob" />
+    </link-entity>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml content_count %}
+<fetch aggregate="true">
+  <entity name="new_h5pcontent">
+    <attribute name="new_h5pcontentid" aggregate="count" alias="total" />
+    <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign total_active = 0 %}
+{% for r in content_count.results.entities %}{% assign total_active = r.total %}{% endfor %}
+
+{% assign total_trainees = 0 %}
+{% assign total_completions = 0 %}
+{% assign total_attempts = 0 %}
+{% for r in prog_by_user.results.entities %}
+  {% assign total_trainees = total_trainees | plus: 1 %}
+  {% assign total_completions = total_completions | plus: r.completed %}
+  {% assign total_attempts = total_attempts | plus: r.cnt %}
+{% endfor %}
+{% assign avg_rate = 0 %}
+{% if total_attempts > 0 %}{% assign avg_rate = total_completions | times: 100 | divided_by: total_attempts %}{% endif %}
+
+<style>
+  .adma { padding: 24px 0 56px; }
+  .adma-head { margin-bottom: 20px; }
+  .adma-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .adma-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .adma-filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .adma-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .adma-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 20px; }
+  @media (max-width: 900px) { .adma-kpis { grid-template-columns: repeat(2, 1fr); } .adma-row { grid-template-columns: 1fr; } }
+  .adma-tbl-wrap { overflow-x: auto; }
+  .adma-funnel li { margin-bottom: 12px; }
+  .adma-funnel .fr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+</style>
+
+<div class="container adm-scope adma">
+
+  <div class="adma-head">
+    <span class="adm-eyebrow">Обзор</span>
+    <h1>Аналитика</h1>
+    <p>KPI обучения, разбивка по отделам, воронка прохождения.</p>
+  </div>
+
+  {% comment %}── Filter row (декоративно) + экспорт ──{% endcomment %}
+  <div class="adma-filters">
+    <button type="button" class="adm-chip" disabled><span class="l">Период:</span> Всё время <i class="bi bi-chevron-down" style="font-size:11px;color:var(--adm-fg-3);"></i></button>
+    <button type="button" class="adm-chip" disabled><span class="l">Отдел:</span> Все <i class="bi bi-chevron-down" style="font-size:11px;color:var(--adm-fg-3);"></i></button>
+    <button type="button" class="adm-chip" disabled><span class="l">Курс:</span> Все <i class="bi bi-chevron-down" style="font-size:11px;color:var(--adm-fg-3);"></i></button>
+    <div style="flex:1;"></div>
+    <button type="button" class="adm-btn adm-btn--ghost" id="admaExport"><i class="bi bi-download"></i> Экспорт PDF</button>
+  </div>
+
+  {% comment %}── KPI tiles (реальные) ──{% endcomment %}
+  <div class="adma-kpis">
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Активных стажёров</span><i class="bi bi-people" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ total_trainees }}</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">с прогрессом по урокам</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Уроков активно</span><i class="bi bi-collection-play" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ total_active }}</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">в каталоге</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Уроков пройдено</span><i class="bi bi-check2-all" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ total_completions }}</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">завершений всего</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Средняя завершаемость</span><i class="bi bi-graph-up" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ avg_rate }}%</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">завершено из попыток</span></div>
+    </div>
+  </div>
+
+  {% comment %}── Отделы (демо) + Воронка (демо) ──{% endcomment %}
+  <div class="adma-row">
+    <div class="adm-card" style="overflow:hidden;">
+      <div class="adm-cardhead">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;"><span class="adm-eyebrow">По отделам</span><span class="adm-demo-chip">демо</span></div>
+          <div class="adm-cardhead-title">Завершаемость и нагрузка</div>
+        </div>
+      </div>
+      <div class="adma-tbl-wrap">
+        <table class="adm-table">
+          <thead>
+            <tr><th>Отдел</th><th class="adm-r" style="width:64px;">Люди</th><th style="width:190px;">Завершаемость</th><th class="adm-r" style="width:80px;">Часы</th><th style="width:56px;">Тренд</th></tr>
+          </thead>
+          <tbody>
+            {% assign depts = 'Операции|86|84|412|up;IT|54|76|298|up;Финансы|38|92|240|flat;HR|22|95|180|up;Маркетинг|28|68|142|down;Безопасность|14|88|96|flat' | split: ';' %}
+            {% for d in depts %}
+              {% assign f = d | split: '|' %}
+              {% assign comp = f[2] | plus: 0 %}
+              {% if comp >= 85 %}{% assign bc = 'var(--adm-success)' %}{% elsif comp < 70 %}{% assign bc = 'var(--adm-danger)' %}{% else %}{% assign bc = 'var(--adm-primary)' %}{% endif %}
+            <tr>
+              <td style="font-weight:600;">{{ f[0] }}</td>
+              <td class="adm-r adm-num">{{ f[1] }}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div class="adm-bar" style="flex:1;"><div style="width:{{ comp }}%;background:{{ bc }};"></div></div>
+                  <span class="adm-num" style="font-size:11px;font-weight:600;color:var(--adm-fg-2);min-width:32px;">{{ comp }}%</span>
+                </div>
+              </td>
+              <td class="adm-r adm-num">{{ f[3] }}</td>
+              <td>
+                {% if f[4] == 'up' %}<i class="bi bi-arrow-up-right" style="color:var(--adm-success);"></i>{% elsif f[4] == 'down' %}<i class="bi bi-arrow-down-right" style="color:var(--adm-danger);"></i>{% else %}<i class="bi bi-dash" style="color:var(--adm-fg-3);"></i>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="adm-card" style="padding:20px;">
+      <div style="display:flex;align-items:center;gap:8px;"><span class="adm-eyebrow">Воронка прохождения</span><span class="adm-demo-chip">демо</span></div>
+      <div style="font-size:14px;font-weight:600;color:var(--adm-fg-1);margin-top:2px;">«Безопасность на рабочем месте»</div>
+      <ul class="adma-funnel" style="margin-top:18px;">
+        {% assign funnel = 'Назначено|312|100;Начали|281|90;Половина|234|75;Финальный тест|198|63;Сертификат|187|60' | split: ';' %}
+        {% for s in funnel %}
+          {% assign f = s | split: '|' %}
+          <li>
+            <div class="fr">
+              <span style="font-size:12px;color:var(--adm-fg-2);">{{ f[0] }}</span>
+              <span class="adm-num" style="font-size:12px;font-weight:600;color:var(--adm-fg-1);">{{ f[1] }} <span style="color:var(--adm-fg-3);font-weight:500;">· {{ f[2] }}%</span></span>
+            </div>
+            <div class="adm-bar" style="height:8px;"><div style="width:{{ f[2] }}%;"></div></div>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  {% comment %}── Топ-стажёры (реальные) ──{% endcomment %}
+  <div class="adm-card" style="overflow:hidden;">
+    <div class="adm-cardhead">
+      <div>
+        <span class="adm-eyebrow">Активность</span>
+        <div class="adm-cardhead-title">Топ-стажёры по прогрессу</div>
+      </div>
+      <a href="/leaderboard" class="adm-btn adm-btn--ghost" style="padding:4px 10px;font-size:12px;"><i class="bi bi-trophy"></i> Рейтинг</a>
+    </div>
+    {% if total_trainees > 0 %}
+    <div class="adma-tbl-wrap">
+      <table class="adm-table">
+        <thead>
+          <tr><th>Стажёр</th><th style="width:180px;">Должность</th><th class="adm-r" style="width:90px;">Попыток</th><th class="adm-r" style="width:90px;">Пройдено</th><th class="adm-r" style="width:120px;">Завершаемость</th></tr>
+        </thead>
+        <tbody>
+          {% for r in prog_by_user.results.entities limit: 10 %}
+            {% assign fname = r.fname | default: 'Без имени' %}
+            {% assign fjob  = r.fjob  | default: '—' %}
+            {% assign cnt   = r.cnt %}
+            {% assign comp  = r.completed %}
+            {% if cnt > 0 %}{% assign rate = comp | times: 100 | divided_by: cnt %}{% else %}{% assign rate = 0 %}{% endif %}
+            {% assign parts = fname | split: ' ' %}
+            {% assign ini1 = parts[0] | slice: 0, 1 | upcase %}
+            {% assign ini2 = '' %}
+            {% if parts.size > 1 %}{% assign ini2 = parts[1] | slice: 0, 1 | upcase %}{% endif %}
+            {% if rate >= 80 %}{% assign rc = 'var(--adm-success)' %}{% elsif rate >= 50 %}{% assign rc = 'var(--adm-accent)' %}{% else %}{% assign rc = 'var(--adm-danger)' %}{% endif %}
+          <tr>
+            <td>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="adm-avatar">{{ ini1 }}{{ ini2 }}</span>
+                <span style="font-weight:600;">{{ fname }}</span>
+              </div>
+            </td>
+            <td style="color:var(--adm-fg-2);">{{ fjob }}</td>
+            <td class="adm-r adm-num">{{ cnt }}</td>
+            <td class="adm-r adm-num">{{ comp }}</td>
+            <td class="adm-r adm-num" style="font-weight:700;color:{{ rc }};">{{ rate }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding:36px 20px;text-align:center;color:var(--adm-fg-3);font-size:13px;">
+      <i class="bi bi-graph-up" style="display:block;font-size:34px;color:#CBD5E1;margin-bottom:10px;"></i>
+      Пока нет прогресса. Данные появятся, когда стажёры начнут проходить уроки.
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  (function () {
+    var b = document.getElementById('admaExport');
+    if (b) b.addEventListener('click', function () { window.print(); });
+  })();
+</script>
+
+{% endunless %}

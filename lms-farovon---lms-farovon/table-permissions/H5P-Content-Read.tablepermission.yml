@@ -1,0 +1,12 @@
+adx_append: false
+adx_appendto: false
+adx_create: false
+adx_delete: false
+adx_entitylogicalname: new_h5pcontent
+adx_entityname: H5P Content Read
+adx_entitypermission_webrole:
+- 2ccfddf9-a538-f111-88b5-7ced8d76b3cc
+adx_entitypermissionid: 98fe6d23-dd3d-40d3-9891-7ba2bffeb0fc
+adx_read: true
+adx_scope: 756150000
+adx_write: false

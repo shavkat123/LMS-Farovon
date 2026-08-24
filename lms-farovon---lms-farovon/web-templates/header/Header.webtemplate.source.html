@@ -1,156 +1,649 @@
-<!-- Navigation based on web roles -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
 {% assign is_hr = false %}
 {% assign is_nastavnik = false %}
 {% assign is_rukovoditel = false %}
 {% assign is_new_employee = false %}
-
+{% assign is_sysadmin = false %}
 {% if user %}
   {% if user.roles contains 'HR' %}{% assign is_hr = true %}{% endif %}
   {% if user.roles contains 'Наставник' %}{% assign is_nastavnik = true %}{% endif %}
   {% if user.roles contains 'Руководитель' %}{% assign is_rukovoditel = true %}{% endif %}
   {% if user.roles contains 'Новый сотрудник' %}{% assign is_new_employee = true %}{% endif %}
+  {% if user.roles contains 'Administrators' %}{% assign is_sysadmin = true %}{% endif %}
+{% endif %}
+{% assign is_admin_role = false %}
+{% if is_hr or is_nastavnik or is_rukovoditel or is_sysadmin %}{% assign is_admin_role = true %}{% endif %}
+
+{% comment %}
+  Раздел /admin — тёмный admin-rail вместо белого сайдбара.
+  ВАЖНО: используем page.url (привязан к текущей странице), а НЕ request.path —
+  request-объект кешируется в выводе web-template, поэтому request.path «залипает»
+  на /admin и тёмный rail протекает на портальные страницы (в т.ч. на главную).
+{% endcomment %}
+{% assign in_admin = false %}
+{% if is_admin_role %}
+  {% assign fv_path6 = page.url | slice: 0, 6 %}
+  {% if fv_path6 == '/admin' %}{% assign in_admin = true %}{% endif %}
 {% endif %}
 
-{% assign is_admin_role = false %}
-{% if is_hr or is_nastavnik or is_rukovoditel %}{% assign is_admin_role = true %}{% endif %}
-<!-- END Navigation based on web roles -->
-
-{% assign defaultlang = settings['LanguageLocale/Code'] | default: 'en-us' %}
 {% assign homeurl = website.adx_partialurl %}
-<div class="navbar-expand-xl navbar navbar-dark static-top" style="flex-wrap:wrap;" role="banner">
-  <div class="skip-to-content"><a href="#mainContent">{{ resx.Skip_To_Content | default: "Skip to main content" }}</a></div><div class="container custom-container">
-    <!--div class="visible-xs-block">
-      {% editable snippets 'Mobile Header' type: 'html' %}
-    </div-->
-    <div class="d-xs-block d-sm-block d-md-block d-lg-block navbar-brand navbar-header">
-      {% editable snippets 'Mobile Header' type: 'html' %}
-    </div>
-    <button type="button" class="navbar-toggler collapsed custom-navbar-toggler" title="{{ snippets["Header/Toggle Navigation"] | default: resx['Toggle_Navigation'] | h }}" data-bs-toggle="collapse" data-bs-target="#navbar" aria-expanded="false" onclick="setHeight();">
-      <span class="visually-hidden">{{ snippets["Header/Toggle Navigation"] | default: resx['Toggle_Navigation'] | h }}</span>
-      <span class="navbar-toggler-icon"></span>
-    </button>
+{% assign search_enabled = settings['Search/Enabled'] | boolean | default:true %}
 
-    <div id="navbar" class="navbar-collapse collapse">
-      {% if is_admin_role or is_new_employee == false %}
-        {% assign primary_nav = weblinks["Primary Navigation"] %}
-      {% else %}
-        {% assign primary_nav = nil %}
-      {% endif %}
-      {% if primary_nav %}
-      <nav aria-label="{{ resx.Main_Navigation | default: "Main Navigation" }}" class="ms-auto menu-bar {% if primary_nav.editable %}xrm-entity xrm-editable-adx_weblinkset{% endif %}" data-weblinks-maxdepth="2">
-        <ul class="nav navbar-nav weblinks">
-          {% for link in primary_nav.weblinks %}
-          {% unless forloop.first %}
-          <li class="nav-item divider-vertical" aria-hidden="true"></li>
-          {% endunless %}
-          {% if link.display_page_child_links %}
-          {% if link.url != null %}
-          {% assign sublinks = sitemap[link.url].children %}
-          {% endif %}
-          {% else %}
-          {% assign sublinks = link.weblinks %}
-          {% endif %}
-          <li class="nav-item weblink {% if sublinks.size > 0 %} dropdown{% endif %}">
-            <a aria-label="{{ link.name | escape }}" {% if sublinks.size > 0 -%} href="#" role="button" class="dropdown-toggle nav-link" data-bs-toggle="dropdown" {%- else -%} href="{{ link.url | escape }}" class="nav-link" aria-roledescription="link" {%- endif -%} {%- if link.Open_In_New_Window %} target="_blank" {% endif -%} {%- if link.nofollow %} rel="nofollow" {% endif -%} {%- if link.tooltip %} title="{{ link.tooltip | escape }}" {% endif %}>
-              {%- if link.image -%}
-              {%- if link.image.url  -%}
-              {%- if link.image.url.first == '.' -%}
-              <span class="{{ link.image.url | split:'.' | join }}" aria-hidden="true"></span>
-              {%- endif -%}
-              {%- else -%}
-              <img src="{{ link.image.url | escape }}" alt="{{ link.image.alternate_text | default:link.tooltip | escape }}" {% if link.image.width %}width="{{ link.image.width | escape }}" {% endif %} {% if link.image.height %}height="{{ link.image.height | escape }}" {% endif %} />
-              {%- endif -%}
-              {%- endif -%}
-              {%- unless link.display_image_only -%}
-              {{ link.name | escape }}
-              {%- endunless -%}
-              {%- if sublinks.size > 0 -%}
-              {%- endif -%}
+{% if user %}
+  {% assign name_parts = user.fullname | split: ' ' %}
+  {% assign init1 = name_parts[0] | slice: 0, 1 | upcase %}
+  {% assign init2 = name_parts[1] | slice: 0, 1 | upcase %}
+  {% assign initials = init1 | append: init2 %}
+{% endif %}
+
+{% if is_admin_role or is_new_employee == false %}
+  {% assign primary_nav = weblinks["Primary Navigation"] %}
+{% else %}
+  {% assign primary_nav = nil %}
+{% endif %}
+{% assign portal_nav = weblinks["User Portal Navigation"] %}
+
+<style>
+  /* ═══ Farovon v2 App Shell — сайдбар слева + топбар (дизайн-кит web_app_v2) ═══ */
+
+  /* ── Sidebar ── */
+  .fv-shell {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: 260px;
+    background: #fff;
+    border-right: 1px solid #E5E7EB;
+    display: flex;
+    flex-direction: column;
+    z-index: 1040;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    transition: transform 0.2s ease;
+  }
+  .fv-shell-brand {
+    height: 72px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 22px;
+    border-bottom: 1px solid #E5E7EB;
+    text-decoration: none !important;
+    flex-shrink: 0;
+  }
+  .fv-shell-brand img { width: 32px; height: 32px; object-fit: contain; }
+  .fv-shell-brand-name { display: block; font-size: 16px; font-weight: 800; letter-spacing: -0.01em; color: #0B1220; line-height: 1.15; }
+  .fv-shell-brand-sub  { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.15em; color: #64748B; }
+
+  .fv-shell-nav { flex: 1; overflow-y: auto; padding: 12px 12px 4px; scrollbar-width: thin; scrollbar-color: #D1D5DB transparent; }
+  .fv-shell-nav::-webkit-scrollbar { width: 6px; }
+  .fv-shell-nav::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
+  .fv-shell-nav::-webkit-scrollbar-track { background: transparent; }
+  .fv-shell-nav ul { list-style: none; margin: 0; padding: 0; }
+  .fv-shell-nav li { margin-bottom: 3px; }
+  .fv-shell-section {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: #64748B; padding: 12px 12px 6px;
+  }
+  .fv-shell-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 10px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #475569 !important;
+    text-decoration: none !important;
+    transition: background 0.14s, color 0.14s;
+  }
+  .fv-shell-link:hover { background: #F6F7F9; text-decoration: none !important; }
+  .fv-shell-link.active { font-weight: 600; }
+  .fv-shell-ico {
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  /* Карточка баланса */
+  .fv-shell-balance {
+    margin: 12px;
+    padding: 16px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #FFF4DC 0%, #FFE0C2 100%);
+    border: 1px solid #FFD9A8;
+    flex-shrink: 0;
+  }
+  .fv-shell-balance-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .fv-shell-balance-lbl { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #92400E; }
+  .fv-shell-balance-num { font-size: 28px; font-weight: 800; color: #7C3A0E; line-height: 1; font-variant-numeric: tabular-nums; }
+  .fv-shell-balance-unit { font-size: 12px; font-weight: 600; color: #92400E; margin-left: 4px; }
+  .fv-shell-balance-btn {
+    display: block; margin-top: 12px; width: 100%;
+    text-align: center; padding: 7px 0;
+    border-radius: 10px; font-size: 12px; font-weight: 600;
+    background: #fff; color: #92400E !important;
+    border: 1px solid #FFD9A8;
+    text-decoration: none !important;
+    transition: background 0.14s;
+  }
+  .fv-shell-balance-btn:hover { background: #FFF9EF; }
+
+  /* ── Контекст сайдбара выбирается КЛИЕНТСКИ (класс ctx-admin/ctx-portal на <html>),
+        т.к. серверный in_admin (page.url) кешируется в шапке и «залипает».
+        Оба рейла в DOM для админов; показывается нужный по location.pathname. ── */
+  .fv-ctx { display: none; flex: 1 1 auto; min-height: 0; flex-direction: column; }
+  html.ctx-admin  .fv-ctx--admin  { display: flex; }
+  html.ctx-portal .fv-ctx--portal { display: flex; }
+  /* до срабатывания JS (или без него) не мигать: по умолчанию портал */
+  html:not(.ctx-admin):not(.ctx-portal) .fv-ctx--portal { display: flex; }
+
+  /* ── Admin Console — тёмный rail (дизайн-кит ui_kits/admin/admin.css) ── */
+  html.ctx-admin .fv-shell { background: #0E1A35; border-right-color: rgba(255,255,255,0.08); }
+  .fv-ctx--admin .fv-shell-brand { border-bottom-color: rgba(255,255,255,0.08); }
+  .fv-adm-logo-box { width: 32px; height: 32px; background: #fff; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .fv-adm-logo-box img { width: 22px; height: 22px; object-fit: contain; }
+  .fv-ctx--admin .fv-shell-brand-name { color: #fff; font-size: 13px; }
+  .fv-ctx--admin .fv-shell-brand-sub { color: #8A99BD; }
+  .fv-ctx--admin .fv-shell-section { color: #8A99BD; opacity: 0.6; }
+  .fv-ctx--admin .fv-shell-nav { scrollbar-color: #182849 transparent; }
+  .fv-shell--adm .fv-shell-nav::-webkit-scrollbar-thumb { background: #182849; }
+  .fv-adm-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #8A99BD !important;
+    text-decoration: none !important;
+    transition: background 0.12s, color 0.12s;
+  }
+  .fv-adm-link i { font-size: 15px; min-width: 18px; text-align: center; }
+  .fv-adm-link:hover { background: rgba(255,255,255,0.04); color: #fff !important; }
+  .fv-adm-link.active { background: #182849; color: #fff !important; font-weight: 600; box-shadow: inset 2px 0 0 #B45309; }
+  .fv-adm-user {
+    margin: 12px 12px 8px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.03);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .fv-adm-user-name { font-size: 12px; font-weight: 600; color: #fff; line-height: 1.2; }
+  .fv-adm-user-role { font-size: 10px; color: #8A99BD; line-height: 1.2; }
+  .fv-adm-back {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 12px 12px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #C7D2E8 !important;
+    background: rgba(255,255,255,0.05);
+    text-decoration: none !important;
+    transition: background 0.12s;
+    flex-shrink: 0;
+  }
+  .fv-adm-back:hover { background: rgba(255,255,255,0.1); color: #fff !important; }
+
+  /* Мобильный режим: сайдбар выезжает */
+  .fv-shell-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(11,18,32,0.45);
+    z-index: 1039;
+  }
+  @media (max-width: 991.98px) {
+    .fv-shell { transform: translateX(-100%); }
+    .fv-shell.open { transform: translateX(0); box-shadow: 0 8px 32px rgba(11,18,32,0.25); }
+    .fv-shell-backdrop.show { display: block; }
+  }
+
+  /* ── Topbar ── */
+  .fv-header-wrap {
+    position: sticky;
+    top: 0;
+    z-index: 1030;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  }
+  .fv-topbar {
+    background: #fff;
+    border-bottom: 1px solid #E9ECEF;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 12px;
+  }
+  .fv-topbar-inner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: none;
+    margin: 0 auto;
+  }
+
+  /* Бренд в топбаре — только для гостей (у вошедших он в сайдбаре) */
+  .fv-brand { display: flex; align-items: center; gap: 10px; text-decoration: none !important; flex-shrink: 0; margin-right: 8px; }
+  .fv-brand img { width: 32px; height: 32px; object-fit: contain; }
+  .fv-brand-text { font-size: 15px; font-weight: 800; color: #0B1220; letter-spacing: -0.01em; line-height: 1.1; }
+  .fv-brand-sub  { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; color: #64748B; text-transform: uppercase; }
+
+  /* Поиск */
+  .fv-topbar-search { position: relative; flex: 1; max-width: 480px; }
+  .fv-topbar-search .fv-si { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #64748B; font-size: 14px; pointer-events: none; }
+  .fv-topbar-search input {
+    width: 100%;
+    padding: 10px 14px 10px 38px;
+    background: #F0F2F5;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    font-size: 13px;
+    color: #0B1220;
+    outline: none;
+    transition: all 0.14s;
+  }
+  .fv-topbar-search input:focus { background: #fff; border-color: #1E3A8A; box-shadow: 0 0 0 3px rgba(30,58,138,0.08); }
+  .fv-topbar-search input::placeholder { color: #64748B; }
+
+  .fv-topbar-gap { flex: 1; }
+
+  .fv-icon-btn {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; color: #475569 !important;
+    background: transparent; border: none; cursor: pointer;
+    transition: all 0.14s; position: relative; flex-shrink: 0;
+    text-decoration: none !important;
+  }
+  .fv-icon-btn:hover { background: #F1F5F9; color: #1E3A8A !important; }
+  .fv-icon-dot { position: absolute; top: 9px; right: 10px; width: 7px; height: 7px; border-radius: 50%; background: #EF4444; border: 2px solid #fff; }
+
+  .fv-topbar-div { width: 1px; height: 30px; background: #E5E7EB; flex-shrink: 0; margin: 0 4px; }
+
+  .fv-lang-btn {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 12px; font-weight: 600; color: #475569;
+    background: transparent; border: none; cursor: pointer;
+    padding: 6px 8px; border-radius: 7px; flex-shrink: 0;
+    transition: all 0.14s;
+  }
+  .fv-lang-btn:hover { background: #F1F5F9; color: #1E3A8A; }
+
+  .fv-user-btn {
+    display: flex; align-items: center; gap: 10px;
+    padding: 5px 12px 5px 5px;
+    border-radius: 40px;
+    border: 1px solid #E5E7EB;
+    background: #fff; cursor: pointer;
+    transition: all 0.14s;
+    text-decoration: none !important;
+  }
+  .fv-user-btn:hover { background: #F8FAFC; border-color: #CBD5E1; }
+  .fv-user-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: linear-gradient(135deg, #2D4FBF, #7B5BFF);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .fv-user-name { font-size: 13px; font-weight: 600; color: #0B1220; line-height: 1.2; }
+  .fv-user-role { font-size: 10px; color: #64748B; line-height: 1.2; }
+
+  .fv-user-menu {
+    border: 1px solid #E5E7EB !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 24px rgba(11,18,32,0.12) !important;
+    padding: 6px !important;
+    min-width: 200px;
+  }
+  .fv-user-menu .dropdown-item {
+    border-radius: 7px;
+    font-size: 13px; font-weight: 500;
+    color: #0B1220;
+    padding: 8px 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .fv-user-menu .dropdown-item:hover { background: #EEF2F9; color: #1E3A8A; }
+  .fv-user-menu .dropdown-divider { border-color: #F1F5F9; margin: 4px 0; }
+  .fv-user-menu .fv-menu-header { padding: 8px 12px 6px; font-size: 12px; color: #64748B; }
+  .fv-user-menu .fv-menu-header strong { display: block; font-size: 13px; font-weight: 600; color: #0B1220; }
+
+  .fv-signin-btn {
+    padding: 8px 18px; border-radius: 9px;
+    background: #1E3A8A; color: #fff !important;
+    font-size: 13px; font-weight: 600;
+    text-decoration: none !important;
+    transition: background 0.14s;
+    border: none;
+  }
+  .fv-signin-btn:hover { background: #15306E !important; }
+
+  .fv-toggler {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: #475569;
+    background: transparent; border: 1px solid #E5E7EB; cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .fv-skip { position: absolute; left: -9999px; }
+  .fv-skip:focus { left: 8px; top: 8px; z-index: 9999; padding: 6px 12px; background: #1E3A8A; color: #fff !important; border-radius: 6px; text-decoration: none; }
+</style>
+
+{% if user %}
+<style>
+  /* Контент сдвигается вправо от фиксированного сайдбара */
+  @media (min-width: 992px) {
+    body { padding-left: 260px; }
+    .fv-toggler { display: none; }
+  }
+</style>
+
+{% comment %}── Баланс: формула как в rewards-shop. Считаем всегда — портальный ctx рендерится всегда ──{% endcomment %}
+{% fetchxml fv_hd_done %}
+<fetch>
+  <entity name="new_h5pprogress">
+    <attribute name="new_scorescaled" />
+    <filter>
+      <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
+      <condition attribute="new_completion" operator="eq" value="1" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% fetchxml fv_hd_spent %}
+<fetch>
+  <entity name="new_rewardpurchase">
+    <attribute name="new_pointsspent" />
+    <filter>
+      <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign fv_hd_earned = 0 %}
+{% for p in fv_hd_done.results.entities %}
+  {% assign fv_hd_pts = 0 %}
+  {% if p.new_scorescaled %}
+    {% assign fv_hd_pts = p.new_scorescaled | times: 50 | round %}
+  {% endif %}
+  {% assign fv_hd_earned = fv_hd_earned | plus: 100 | plus: fv_hd_pts %}
+{% endfor %}
+{% assign fv_hd_sp = 0 %}
+{% for pur in fv_hd_spent.results.entities %}
+  {% assign fv_hd_sp = fv_hd_sp | plus: pur.new_pointsspent %}
+{% endfor %}
+{% assign fv_hd_balance = fv_hd_earned | minus: fv_hd_sp %}
+
+<!-- Контекст сайдбара выбирается на клиенте (обходит кеш page.url в шапке) -->
+<script>(function(){var adm={% if is_admin_role %}true{% else %}false{% endif %};document.documentElement.classList.add((adm && /^\/admin(\/|$)/.test(location.pathname))?'ctx-admin':'ctx-portal');})();</script>
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="fv-shell" id="fvSidebar" aria-label="Основная навигация">
+  {% if is_admin_role %}
+  <div class="fv-ctx fv-ctx--admin">
+  <!-- ── Admin Console: тёмный rail (дизайн-кит ui_kits/admin) ── -->
+  <a href="/admin" class="fv-shell-brand">
+    <span class="fv-adm-logo-box"><img src="/logo%201.png" alt="Farovon" onerror="this.style.display='none'" /></span>
+    <span>
+      <span class="fv-shell-brand-name">Farovon LMS</span>
+      <span class="fv-shell-brand-sub">ADMIN CONSOLE</span>
+    </span>
+  </a>
+
+  <nav class="fv-shell-nav">
+    {% assign cur = page.url %}
+    {% assign adm_secs = 'Обзор~Дашборд;/admin;grid-1x2,Аналитика;/admin/reports;bar-chart-line|Люди~Сотрудники;/admin/users;people,Группы;/admin/groups;diagram-3,Роли;/admin/roles;shield-check,Центр адаптации;/admin/adaptation-center;person-check,Задачи;/admin/tasks;kanban|Коммуникации~Форум;/admin/forum;chat-dots,Рассылки;/admin/broadcasts;send,Мероприятия;/admin/events;calendar3|Контент~Курсы;/admin/courses;book,Траектории;/admin/paths;signpost-split,Библиотека;/admin/library;collection-play,Тесты;/admin/tests;clipboard-check,Загрузка H5P;/admin/h5p-upload;cloud-upload,Программы;/admin/admin-home;journal-text|Система~Настройки;/admin/settings;gear,Интеграции;/admin/integrations;plug,Журнал;/admin/audit;file-text' | split: '|' %}
+    {% for sec in adm_secs %}
+      {% assign sec_parts = sec | split: '~' %}
+      <div class="fv-shell-section">{{ sec_parts[0] }}</div>
+      <ul>
+        {% assign sec_items = sec_parts[1] | split: ',' %}
+        {% for it in sec_items %}
+          {% assign f = it | split: ';' %}
+          {% assign au = f[1] %}
+          {% assign au2 = au | append: '/' %}
+          <li>
+            <a href="{{ au }}" class="fv-adm-link" aria-label="{{ f[0] }}">
+              <i class="bi bi-{{ f[2] }}" aria-hidden="true"></i><span>{{ f[0] }}</span>
             </a>
-            {% if sublinks.size > 0 %}
-            <ul class="dropdown-menu dropdown-menu-end">
-              {% if link.name %}
-              <li>
-                <a class="dropdown-item" aria-label="{{ link.name | escape }}" href="{{ link.url }}" {% if link.Open_In_New_Window %} target="_blank" {% endif %} {% if link.nofollow %}rel="nofollow" {% endif %} {% if link.tooltip %}title="{{ link.tooltip | escape }}" {% endif %}>{{ link.name | escape }}</a>
-              </li>
-              <div class="dropdown-divider"></div>
-              {% endif %}
-              {% for sublink in sublinks %}
-              <li>
-                <a class="dropdown-item" aria-label="{{ sublink.name | default:sublink.title | escape }}" href="{{ sublink.url }}" {% if sublink.Open_In_New_Window %} target="_blank" {% endif %} {% if sublink.nofollow %}rel="nofollow" {% endif %} {% if sublink.tooltip %}title="{{ sublink.tooltip | escape }}" {% endif %}>
-                  {{ sublink.name | default:sublink.title | escape }}
-                </a>
-              </li>
-              {% endfor %}
-            </ul>
-            {% endif %}
           </li>
-          {% endfor %}
-          {% assign search_enabled = settings['Search/Enabled'] | boolean | default:true %}
-          {% if search_enabled %}
-          <li class=" nav-item divider-vertical" aria-hidden="true"></li>
-          <li class=" nav-item dropdown">
-            <a id="search" class=" nav-link navbar-icon" href="#" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-label="{{ snippets["Header/Search/ToolTip"] | default:resx["Search_DefaultText"] | escape }}">
-              <span class="glyphicon fa-solid fa-magnifying-glass">
-            </a>
-            </a>
-            <div class="dropdown-menu dropdown-search dropdown-menu-end">
-              {% include 'Search', search_id:'q' %}
-            </div>
-          </li>
-          {% endif %}
-          <li class="nav-item divider-vertical" aria-hidden="true"></li>
-          {% if website.languages.size > 1 %}
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" aria-label="{{ website.selected_language.name | escape }}" aria-haspopup="true" aria-expanded="false" title="{{ website.selected_language.name | escape }}">
-              <span class="drop_language">{{ website.selected_language.name | escape }}</span>
-            </a>
-            {% include 'Languages Dropdown' %}
-          </li>
-          <li class="nav-item divider-vertical" aria-hidden="true"></li>
-          {% endif %}
-          {% if user %}
-          <li class="nav-item dropdown">
-            {% assign username=user.fullname | escape %}
-            <a href="#" class="nav-link dropdown-toggle" title="{{username | default: resx['Default_Profile_name'] }}" data-bs-toggle="dropdown" role="button" aria-expanded="false">
-              <span class="username">{{ username | default: resx['Default_Profile_name'] }}</span>
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end">
-              {% assign show_profile_nav = settings["Header/ShowAllProfileNavigationLinks"] | boolean | default:true %}
-              {% if show_profile_nav %}
-              {% assign profile_nav = weblinks["Profile Navigation"] %}
-              {% if profile_nav %}
-              {% for link in profile_nav.weblinks %}
-              <li>
-                <a class="dropdown-item" aria-label="{{ link.name | escape }}" href="{{ link.url | escape }}" title="{{ link.name | escape }}">{{ link.name | escape }}</a>
-              </li>
-              {% endfor %}
-              {% endif %}
-              {% else %}
-              <li><a class="dropdown-item" aria-label="{{ snippets["Profile Link Text"] | default:resx["Profile_Text"] | escape }}" href="{{ sitemarkers['Profile'].url | escape }}">{{ snippets["Profile Link Text"] | default:resx["Profile_Text"] | escape }}</a></li>
-              {% endif %}
-              <li class="dropdown-divider" role="separator" aria-hidden="true"></li>
-              <li>
-                <a class="dropdown-item" aria-label="{{ snippets["links/logout"] | default:resx["Sign_Out"] | escape }}" href="{% if homeurl%}/{{ homeurl }}{% endif %}{{ website.sign_out_url_substitution }}" title="{{ snippets["links/logout"] | default:resx["Sign_Out"] | escape }}">
-                  {{ snippets["links/logout"] | default:resx["Sign_Out"] | escape }}
-                </a>
-              </li>
-            </ul>
-          </li>
-          {% else %}
-          <li class="nav-item">
-            <a class="nav-link" aria-label="{{ snippets["links/login"] | default:resx["Sign_In"] | escape }}" href="{% if homeurl%}/{{ homeurl }}{% endif %}{{ website.sign_in_url_substitution }}">
-              {{ snippets["links/login"] | default:resx["Sign_In"] | escape }}
-            </a>
-          </li>
-          {% endif %}
-        </ul>
-        {% editable primary_nav %}
-      </nav>
-      {% endif %}
+        {% endfor %}
+      </ul>
+    {% endfor %}
+  </nav>
+
+  <div class="fv-adm-user">
+    <div class="fv-user-avatar" style="width:32px;height:32px;font-size:11px;">{{ initials }}</div>
+    <div style="flex:1;min-width:0;">
+      <div class="fv-adm-user-name">{{ user.fullname | escape }}</div>
+      <div class="fv-adm-user-role">{% if is_hr %}HR{% elsif is_nastavnik %}Наставник{% elsif is_rukovoditel %}Руководитель{% else %}Администратор{% endif %} · Admin</div>
     </div>
   </div>
-</div>
+  <a href="{{ sitemarkers['Home'].url | default: '/' }}" class="fv-adm-back"><i class="bi bi-arrow-left" aria-hidden="true"></i> Вернуться на портал</a>
+
+  </div>
+  {% endif %}
+  <div class="fv-ctx fv-ctx--portal">
+  <!-- ── Портал: белый сайдбар ── -->
+  <a href="/" class="fv-shell-brand">
+    <img src="/logo%201.png" alt="Farovon" onerror="this.style.display='none'" />
+    <span>
+      <span class="fv-shell-brand-name">FAROVON</span>
+      <span class="fv-shell-brand-sub">LEARNING HUB</span>
+    </span>
+  </a>
+
+  <nav class="fv-shell-nav">
+    {% comment %}
+      Пункты сайдбара полностью data-driven из набора «Primary Navigation».
+      Иконка/фон/цвет берутся из adx_description ссылки в формате "иконка,фон,цвет"
+      (например "calendar3,#EEF2F9,#1E3A8A"). Добавить пункт = создать weblink с таким
+      description — правка этого шаблона НЕ нужна. Админ-ссылки вынесены в отдельный
+      набор «Admin Navigation», поэтому здесь их фильтровать не требуется.
+    {% endcomment %}
+    {% if primary_nav %}
+      <div class="fv-shell-section">Меню</div>
+      <ul>
+        {% for link in primary_nav.weblinks %}
+          {% assign meta = link.description | split: ',' %}
+          {% assign ico = meta[0] | default: 'link-45deg' %}
+          {% assign tnt = meta[1] | default: '#F0F2F5' %}
+          {% assign clr = meta[2] | default: '#475569' %}
+          <li>
+            <a href="{{ link.url | escape }}"
+               class="fv-shell-link" data-tint="{{ tnt }}" data-clr="{{ clr }}"
+               aria-label="{{ link.name | escape }}"
+               {% if link.open_in_new_window %}target="_blank"{% endif %}>
+              <span class="fv-shell-ico" style="background:{{ tnt }};color:{{ clr }};"><i class="bi bi-{{ ico }}" aria-hidden="true"></i></span>
+              <span>{{ link.name | escape }}</span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+
+      {% if is_admin_role %}
+      <div class="fv-shell-section">Система</div>
+      <ul>
+        <li>
+          <a href="/admin" class="fv-shell-link" aria-label="Админ-консоль">
+            <span class="fv-shell-ico" style="background:#0E1A35;color:#C7D2E8;"><i class="bi bi-shield-lock" aria-hidden="true"></i></span>
+            <span>Админ-консоль</span>
+          </a>
+        </li>
+      </ul>
+      {% endif %}
+
+    {% elsif portal_nav %}
+      {% comment %}── Новый сотрудник: меню адаптации ──{% endcomment %}
+      <div class="fv-shell-section">Меню</div>
+      {% assign p_icons  = "person-check,newspaper,building,list-task,calendar3,person-video2,journal-bookmark,telephone-inbound,chat-dots,shop" | split: "," %}
+      {% assign p_tints  = "#EEF2F9,#FAF3E8,#F0F2F5,#ECF6EF,#EEF2F9,#FAF3E8,#ECF6EF,#F0F2F5,#EEF2F9,#FAF3E8" | split: "," %}
+      {% assign p_colors = "#1E3A8A,#B45309,#475569,#15803D,#1E3A8A,#B45309,#15803D,#475569,#1E3A8A,#D97706" | split: "," %}
+      <ul>
+        {% for link in portal_nav.weblinks %}
+          {% assign ico = p_icons[forloop.index0] %}
+          {% assign tnt = p_tints[forloop.index0] %}
+          {% assign clr = p_colors[forloop.index0] %}
+          {% unless ico %}{% assign ico = "link-45deg" %}{% endunless %}
+          {% unless tnt %}{% assign tnt = "#F0F2F5" %}{% endunless %}
+          {% unless clr %}{% assign clr = "#475569" %}{% endunless %}
+          <li>
+            <a href="{{ link.url | escape }}"
+               class="fv-shell-link" data-tint="{{ tnt }}" data-clr="{{ clr }}"
+               aria-label="{{ link.name | escape }}"
+               {% if link.open_in_new_window %}target="_blank"{% endif %}>
+              <span class="fv-shell-ico" style="background:{{ tnt }};color:{{ clr }};"><i class="bi bi-{{ ico }}" aria-hidden="true"></i></span>
+              <span>{{ link.name | escape }}</span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </nav>
+
+  <div class="fv-shell-balance">
+    <div class="fv-shell-balance-top">
+      <span class="fv-shell-balance-lbl">Ваш баланс</span>
+      <i class="bi bi-stars" style="color:#D97706;" aria-hidden="true"></i>
+    </div>
+    <div aria-live="polite">
+      <span class="fv-shell-balance-num">{{ fv_hd_balance }}</span><span class="fv-shell-balance-unit">баллов</span>
+    </div>
+    <a class="fv-shell-balance-btn" href="/rewards-shop/">В магазин →</a>
+  </div>
+  </div>
+</aside>
+<div class="fv-shell-backdrop" id="fvShellBackdrop"></div>
+{% endif %}
+
+<!-- ═══ TOPBAR ═══ -->
+<div class="fv-header-wrap" role="banner">
+  <a href="#mainContent" class="fv-skip">{{ resx.Skip_To_Content | default: "Skip to main content" }}</a>
+
+  <div class="fv-topbar">
+    <div class="fv-topbar-inner">
+
+      {% if user %}
+      <button class="fv-toggler" type="button" id="fvShellToggle"
+              aria-label="{{ snippets['Header/Toggle Navigation'] | default: 'Открыть меню' }}"
+              aria-controls="fvSidebar" aria-expanded="false">
+        <i class="bi bi-list"></i>
+      </button>
+      {% else %}
+      <a href="/" class="fv-brand">
+        <img src="/logo%201.png" alt="Farovon" onerror="this.style.display='none'" />
+        <span class="d-none d-sm-block">
+          <span class="fv-brand-text">FAROVON</span>
+          <span class="fv-brand-sub" style="display:block;">LEARNING HUB</span>
+        </span>
+      </a>
+      {% endif %}
+
+      <div class="fv-topbar-search d-none d-md-block">
+        <i class="bi bi-search fv-si"></i>
+        <form action="{{ sitemarkers['Search'].url | default: '/search' }}" method="get">
+          <label for="fvTopSearch" class="fv-skip">Поиск по порталу</label>
+          <input type="text" id="fvTopSearch" name="q" placeholder="Найти урок или тему…" autocomplete="off" />
+        </form>
+      </div>
+
+      <div class="fv-topbar-gap"></div>
+
+      {% if website.languages.size > 1 %}
+      <div class="dropdown d-none d-md-block">
+        <button class="fv-lang-btn dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+          <i class="bi bi-globe2"></i> {{ website.selected_language.name | escape }}
+        </button>
+        {% include 'Languages Dropdown' %}
+      </div>
+      {% endif %}
+
+      {% if is_admin_role %}
+      <a href="/admin/events" class="fv-icon-btn d-none d-md-flex" title="Мероприятия" aria-label="Мероприятия">
+        <i class="bi bi-calendar-check"></i>
+      </a>
+      {% endif %}
+
+      <a href="/news" class="fv-icon-btn d-none d-md-flex" title="Новости" aria-label="Новости">
+        <i class="bi bi-bell"></i>
+        <span class="fv-icon-dot" aria-hidden="true"></span>
+      </a>
+
+      <div class="fv-topbar-div d-none d-md-block"></div>
+
+      {% if user %}
+      <div class="dropdown">
+        <a href="#" class="fv-user-btn dropdown-toggle"
+           data-bs-toggle="dropdown" role="button" aria-expanded="false"
+           title="{{ user.fullname | escape }}">
+          <div class="fv-user-avatar">{{ initials }}</div>
+          <div class="d-none d-lg-block">
+            <div class="fv-user-name">{{ user.fullname | escape }}</div>
+            {% if user.jobtitle %}<div class="fv-user-role">{{ user.jobtitle | escape }}</div>{% endif %}
+          </div>
+          <i class="bi bi-chevron-down" style="font-size:10px;color:#64748B;"></i>
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end fv-user-menu">
+          <li>
+            <div class="fv-menu-header">
+              <strong>{{ user.fullname | escape }}</strong>
+              {{ user.emailaddress1 | escape }}
+            </div>
+          </li>
+          <li><hr class="dropdown-divider"></li>
+          {% assign show_profile_nav = settings["Header/ShowAllProfileNavigationLinks"] | boolean | default:true %}
+          {% if show_profile_nav %}
+            {% assign profile_nav = weblinks["Profile Navigation"] %}
+            {% if profile_nav %}
+              {% for link in profile_nav.weblinks %}
+              <li>
+                <a class="dropdown-item" href="{{ link.url | escape }}" aria-label="{{ link.name | escape }}">
+                  <i class="bi bi-person"></i> {{ link.name | escape }}
+                </a>
+              </li>
+              {% endfor %}
+            {% endif %}
+          {% else %}
+            <li>
+              <a class="dropdown-item" href="{{ sitemarkers['Profile'].url | escape }}">
+                <i class="bi bi-person"></i> {{ snippets["Profile Link Text"] | default:resx["Profile_Text"] | escape }}
+              </a>
+            </li>
+          {% endif %}
+          <li><hr class="dropdown-divider"></li>
+          <li>
+            <a class="dropdown-item" href="{% if homeurl %}/{{ homeurl }}{% endif %}{{ website.sign_out_url_substitution }}"
+               aria-label="{{ snippets['links/logout'] | default:resx['Sign_Out'] | escape }}">
+              <i class="bi bi-box-arrow-right"></i> {{ snippets["links/logout"] | default:resx["Sign_Out"] | escape }}
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      {% else %}
+      <a href="{% if homeurl %}/{{ homeurl }}{% endif %}{{ website.sign_in_url_substitution }}" class="fv-signin-btn">
+        {{ snippets["links/login"] | default:resx["Sign_In"] | escape }}
+      </a>
+      {% endif %}
+
+    </div>
+  </div><!-- /fv-topbar -->
+</div><!-- /fv-header-wrap -->
+
 {% substitution %}
 {% assign current_page = page.id %}
 {% assign sr_page = sitemarkers["Search"].id %}
@@ -158,13 +651,11 @@
 {% if current_page %}
 {% if current_page == sr_page or current_page == forum_page %}
 {% assign section_class = "section-landing-search" %}
-{% if current_page == forum_page %}
-{% assign section_class = "section-landing-forums" %}
-{% endif %}
+{% if current_page == forum_page %}{% assign section_class = "section-landing-forums" %}{% endif %}
 <section class="page_section {{ section_class | h }} color-inverse">
-  <div class="row sectionBlockLayout sectionFixedStyle" style="display: flex; flex-wrap: wrap; text-align: center; min-height: 420px; background: url('/Homehero.png') center / cover no-repeat; padding: 8px; margin: 0px;">
-    <div class="container" style="display: flex; flex-wrap: wrap;">
-      <div class="col-lg-12 columnBlockLayout" style="display: flex; flex-direction: column; justify-content: center;">
+  <div class="row sectionBlockLayout sectionFixedStyle" style="display:flex;flex-wrap:wrap;text-align:center;min-height:420px;background:url('/Homehero.png') center/cover no-repeat;padding:8px;margin:0;">
+    <div class="container" style="display:flex;flex-wrap:wrap;">
+      <div class="col-lg-12 columnBlockLayout" style="display:flex;flex-direction:column;justify-content:center;">
         {% if current_page == sr_page %}
         <h1 id="mainContent">{% editable snippets 'Search/Title' default: resx["Discover_Contoso"] %}</h1>
         {% include 'Search' search_id:'search_control' %}
@@ -176,21 +667,62 @@
 {% endif %}
 {% endif %}
 {% endsubstitution %}
-<script type="text/javascript">
-  window.onload = function() {
-    if (window.navigator.appName == "Microsoft Internet Explorer" || window.navigator.userAgent.indexOf("Trident") > 0) {
-      var searchElement = document.getElementById("search");
-      if (searchElement != null) searchElement.setAttribute("href", "");
+
+<script>
+  (function () {
+    var toggle = document.getElementById('fvShellToggle');
+    var side = document.getElementById('fvSidebar');
+    var backdrop = document.getElementById('fvShellBackdrop');
+    if (!toggle || !side || !backdrop) return;
+    function setOpen(open) {
+      side.classList.toggle('open', open);
+      backdrop.classList.toggle('show', open);
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
-  };
-  function setHeight() {
-    var windowHeight = window.innerHeight - 140;
-    var navbar = document.getElementById("navbar");
-    if (navbar) {
-      navbar.style.maxHeight = windowHeight + "px";
+    toggle.addEventListener('click', function () { setOpen(!side.classList.contains('open')); });
+    backdrop.addEventListener('click', function () { setOpen(false); });
+  })();
+
+  // Admin-rail active highlight — client-side (обходит кеш шапки: page.url «залипает»)
+  (function () {
+    var links = document.querySelectorAll('.fv-adm-link');
+    if (!links.length) return;
+    var path = (location.pathname || '/').replace(/\/+$/, '') || '/';
+    var exact = null, prefix = null, prefixLen = -1;
+    links.forEach(function (a) {
+      a.classList.remove('active');
+      var href = a.getAttribute('href') || '';
+      try { href = new URL(href, location.origin).pathname; } catch (e) {}
+      href = href.replace(/\/+$/, '') || '/';
+      if (href === path) { exact = a; }
+      else if (href !== '/' && path.indexOf(href + '/') === 0 && href.length > prefixLen) { prefix = a; prefixLen = href.length; }
+    });
+    var target = exact || prefix;
+    if (target) target.classList.add('active');
+  })();
+
+  // Белый портальный сайдбар — active client-side + восстановление цветной плитки (тот же кеш page.url)
+  (function () {
+    var links = document.querySelectorAll('.fv-shell-link');
+    if (!links.length) return;
+    var path = (location.pathname || '/').replace(/\/+$/, '') || '/';
+    var exact = null, prefix = null, prefixLen = -1;
+    links.forEach(function (a) {
+      a.classList.remove('active');
+      a.style.removeProperty('background');
+      a.style.removeProperty('color');
+      var href = a.getAttribute('href') || '';
+      try { href = new URL(href, location.origin).pathname; } catch (e) {}
+      href = href.replace(/\/+$/, '') || '/';
+      if (href === path) { exact = a; }
+      else if (href !== '/' && path.indexOf(href + '/') === 0 && href.length > prefixLen) { prefix = a; prefixLen = href.length; }
+    });
+    var t = exact || prefix;
+    if (t) {
+      t.classList.add('active');
+      var tint = t.getAttribute('data-tint'), clr = t.getAttribute('data-clr');
+      if (tint) t.style.setProperty('background', tint, 'important');
+      if (clr)  t.style.setProperty('color', clr, 'important');
     }
-  }
-  window.addEventListener('resize', function(event) {
-    setHeight();
-  });
+  })();
 </script>

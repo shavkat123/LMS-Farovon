@@ -1,0 +1,362 @@
+{% comment %}
+  Admin Paths — Траектории (/admin/paths). Примитивы .adm-* — customtheme.css.
+  РЕАЛЬНЫЕ данные: new_trajectory + курсы (msdynce_course.new_trajectory) + уроки (new_relatedcourse).
+  Управление в портале (Web API): создание траектории (POST new_trajectory) + привязка курсов
+  (PATCH msdynce_course new_trajectory@odata.bind + new_trajectoryorder / DELETE $ref для отвязки).
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+{% fetchxml trajs %}
+<fetch>
+  <entity name="new_trajectory">
+    <attribute name="new_trajectoryid" />
+    <attribute name="new_name" />
+    <attribute name="new_department" />
+    <attribute name="new_isactive" />
+    <order attribute="new_name" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% fetchxml courses %}
+<fetch>
+  <entity name="msdynce_course">
+    <attribute name="msdynce_courseid" />
+    <attribute name="msdynce_coursename" />
+    <attribute name="new_trajectory" />
+    <attribute name="new_trajectoryorder" />
+    <filter><condition attribute="statuscode" operator="eq" value="1" /></filter>
+    <order attribute="msdynce_coursename" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% fetchxml linked_h5p %}
+<fetch>
+  <entity name="new_h5pcontent">
+    <attribute name="new_h5pcontentid" />
+    <attribute name="new_relatedcourse" />
+    <filter type="and">
+      <condition attribute="new_isactive" operator="eq" value="1" />
+      <condition attribute="new_relatedcourse" operator="not-null" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── KPI ──{% endcomment %}
+{% assign k_total = trajs.results.entities.size %}
+{% assign k_active = 0 %}
+{% for t in trajs.results.entities %}{% if t.new_isactive %}{% assign k_active = k_active | plus: 1 %}{% endif %}{% endfor %}
+{% assign k_courses = 0 %}{% assign k_lessons = 0 %}
+{% for c in courses.results.entities %}
+  {% if c.new_trajectory %}
+    {% assign k_courses = k_courses | plus: 1 %}
+    {% for h in linked_h5p.results.entities %}{% if h.new_relatedcourse.id == c.msdynce_courseid %}{% assign k_lessons = k_lessons | plus: 1 %}{% endif %}{% endfor %}
+  {% endif %}
+{% endfor %}
+
+<style>
+  .admp { padding: 24px 0 56px; }
+  .admp-head { margin-bottom: 20px; }
+  .admp-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .admp-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .admp-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 900px) { .admp-kpis { grid-template-columns: repeat(2, 1fr); } }
+  .admp-tbl-wrap { overflow-x: auto; }
+  .admp-ico { width: 30px; height: 30px; border-radius: var(--adm-radius-sm); display: inline-flex; align-items: center; justify-content: center; background: var(--adm-primary-50); color: var(--adm-primary); flex-shrink: 0; }
+  .admp-search { position: relative; flex: 1 1 260px; min-width: 220px; }
+  .admp-search i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--adm-fg-3); font-size: 14px; pointer-events: none; }
+  .admp-search .adm-input { padding-left: 32px; }
+  .admp-mng { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--adm-border); background: #fff; color: var(--adm-fg-2); font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .admp-mng:hover { border-color: var(--adm-primary); color: var(--adm-primary); background: var(--adm-primary-50); }
+  /* modals */
+  .admp-modal { display: none; position: fixed; inset: 0; z-index: 1050; background: rgba(11,18,32,.5); align-items: flex-start; justify-content: center; padding: 40px 16px; overflow: auto; font-family: 'Inter', ui-sans-serif, sans-serif; }
+  .admp-modal-box { background: #fff; border-radius: 16px; max-width: 560px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+  .admp-modal-head { padding: 18px 22px; border-bottom: 1px solid var(--adm-border); display: flex; align-items: center; justify-content: space-between; }
+  .admp-modal-head h2 { font-size: 16px; font-weight: 700; color: var(--adm-fg-1); margin: 0; }
+  .admp-modal-x { background: none; border: none; font-size: 22px; color: var(--adm-fg-3); cursor: pointer; line-height: 1; }
+  .admp-modal-body { padding: 18px 22px; display: flex; flex-direction: column; gap: 13px; }
+  .admp-modal-foot { padding: 14px 22px; border-top: 1px solid var(--adm-border); display: flex; justify-content: flex-end; gap: 10px; }
+  .admp-lbl { display: block; font-size: 12px; font-weight: 600; color: var(--adm-fg-2); margin-bottom: 5px; }
+  .admp-clist { max-height: 360px; overflow: auto; border: 1px solid var(--adm-border); border-radius: 10px; }
+  .admp-crow { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-bottom: 1px solid var(--adm-border-1); cursor: pointer; }
+  .admp-crow:last-child { border-bottom: none; }
+  .admp-crow:hover { background: var(--adm-bg-muted); }
+  .admp-ccheck { width: 16px; height: 16px; accent-color: var(--adm-primary); flex-shrink: 0; }
+  .admp-cname { flex: 1; font-size: 13px; color: var(--adm-fg-1); }
+  .admp-ctag { font-size: 10px; color: var(--adm-accent); background: var(--adm-accent-50); border-radius: 5px; padding: 1px 6px; }
+  .admp-corder { width: 58px; padding: 4px 6px; border: 1px solid var(--adm-border); border-radius: 6px; font-size: 12px; text-align: center; }
+</style>
+
+<div class="container adm-scope admp">
+
+  <div class="admp-head">
+    <span class="adm-eyebrow">Контент</span>
+    <h1>Траектории</h1>
+    <p>Структурированные программы роста: последовательности курсов с прогрессом.</p>
+  </div>
+
+  <div class="admp-kpis">
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Траекторий</span><i class="bi bi-signpost-split"></i></div><div class="adm-stat-val">{{ k_total }}</div><div class="adm-stat-foot"><span class="adm-stat-sub">всего</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Опубликовано</span><i class="bi bi-check-circle"></i></div><div class="adm-stat-val">{{ k_active }}</div><div class="adm-stat-foot"><span class="adm-stat-sub">активных</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Курсов в траекториях</span><i class="bi bi-mortarboard"></i></div><div class="adm-stat-val">{{ k_courses }}</div><div class="adm-stat-foot"><span class="adm-stat-sub">привязано</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Уроков</span><i class="bi bi-collection-play"></i></div><div class="adm-stat-val">{{ k_lessons }}</div><div class="adm-stat-foot"><span class="adm-stat-sub">в траекториях</span></div></div>
+  </div>
+
+  <div class="adm-card adm-toolbar" style="margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="admp-search">
+      <i class="bi bi-search"></i>
+      <input type="text" class="adm-input" id="admpSearch" placeholder="Название траектории, отдел…" autocomplete="off">
+    </div>
+    <button type="button" class="adm-btn adm-btn--primary" id="admpNewBtn"><i class="bi bi-plus-lg"></i> Создать траекторию</button>
+  </div>
+
+  <div class="adm-card" style="overflow:hidden;">
+    {% if k_total == 0 %}
+    <div style="padding:48px 24px;text-align:center;color:var(--adm-fg-3);">
+      <i class="bi bi-signpost-2" style="display:block;font-size:40px;color:#CBD5E1;margin-bottom:12px;"></i>
+      Траекторий пока нет. Нажмите «Создать траекторию», затем привяжите курсы.
+    </div>
+    {% else %}
+    <div class="admp-tbl-wrap">
+      <table class="adm-table" id="admpTable">
+        <thead>
+          <tr>
+            <th>Траектория</th>
+            <th style="width:160px;">Отдел / направление</th>
+            <th class="adm-r" style="width:80px;">Курсов</th>
+            <th class="adm-r" style="width:80px;">Уроков</th>
+            <th style="width:120px;">Статус</th>
+            <th style="width:130px;text-align:right;">Курсы</th>
+          </tr>
+        </thead>
+        <tbody id="admpBody">
+          {% for t in trajs.results.entities %}
+            {% assign tjid = t.new_trajectoryid %}
+            {% assign nm = t.new_name | default: 'Без названия' %}
+            {% assign dep = t.new_department | default: '—' %}
+            {% assign t_courses = 0 %}{% assign t_lessons = 0 %}
+            {% for c in courses.results.entities %}
+              {% if c.new_trajectory and c.new_trajectory.id == tjid %}
+                {% assign t_courses = t_courses | plus: 1 %}
+                {% for h in linked_h5p.results.entities %}{% if h.new_relatedcourse.id == c.msdynce_courseid %}{% assign t_lessons = t_lessons | plus: 1 %}{% endif %}{% endfor %}
+              {% endif %}
+            {% endfor %}
+          <tr data-search="{{ nm | downcase }} {{ dep | downcase }}">
+            <td>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="admp-ico"><i class="bi bi-signpost-split"></i></span>
+                <span style="font-weight:600;">{{ nm }}</span>
+              </div>
+            </td>
+            <td style="color:var(--adm-fg-2);">{{ dep }}</td>
+            <td class="adm-r adm-num" style="font-weight:600;">{{ t_courses }}</td>
+            <td class="adm-r adm-num">{{ t_lessons }}</td>
+            <td>{% if t.new_isactive %}<span class="adm-pill adm-pill--success adm-pill--dot">Опубликована</span>{% else %}<span class="adm-pill adm-pill--neutral adm-pill--dot">Черновик</span>{% endif %}</td>
+            <td style="text-align:right;">
+              <button type="button" class="admp-mng" data-tid="{{ tjid }}" data-tname="{{ nm | escape }}"><i class="bi bi-list-check"></i> Курсы</button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+{% comment %}── Модалка: создать траекторию ──{% endcomment %}
+<div id="admpNewModal" class="admp-modal">
+  <div class="admp-modal-box">
+    <div class="admp-modal-head"><h2>Новая траектория</h2><button type="button" class="admp-modal-x" data-close>&times;</button></div>
+    <div class="admp-modal-body">
+      <div><label class="admp-lbl">Название *</label><input type="text" id="admpF_name" class="adm-input" placeholder="Напр. Путь аналитика" style="width:100%;"></div>
+      <div><label class="admp-lbl">Описание</label><textarea id="admpF_desc" class="adm-input" rows="2" style="width:100%;resize:vertical;"></textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div><label class="admp-lbl">Отдел / направление</label><input type="text" id="admpF_dep" class="adm-input" placeholder="Напр. Аналитика" style="width:100%;"></div>
+        <div><label class="admp-lbl">Целевая роль</label>
+          <select id="admpF_role" class="adm-input" style="width:100%;">
+            <option value="100000000">Все</option>
+            <option value="100000001">Новый сотрудник</option>
+            <option value="100000002">Наставник</option>
+            <option value="100000003">Руководитель</option>
+            <option value="100000004">HR</option>
+          </select>
+        </div>
+      </div>
+      <div id="admpNewErr" style="display:none;font-size:12px;color:#DC2626;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px 12px;"></div>
+    </div>
+    <div class="admp-modal-foot">
+      <button type="button" class="adm-btn" data-close>Отмена</button>
+      <button type="button" class="adm-btn adm-btn--primary" id="admpNewSave">Создать</button>
+    </div>
+  </div>
+</div>
+
+{% comment %}── Модалка: управление курсами траектории ──{% endcomment %}
+<div id="admpCoursesModal" class="admp-modal">
+  <div class="admp-modal-box">
+    <div class="admp-modal-head"><h2>Курсы траектории: <span id="admpCT" style="color:var(--adm-primary);"></span></h2><button type="button" class="admp-modal-x" data-close>&times;</button></div>
+    <div class="admp-modal-body">
+      <p style="font-size:12px;color:var(--adm-fg-3);margin:0;">Отметьте курсы этой траектории и задайте порядок (№ шага). Курс из другой траектории при отметке перейдёт сюда.</p>
+      <div class="admp-clist" id="admpCoursesList">
+        {% for c in courses.results.entities %}
+        <label class="admp-crow" data-cid="{{ c.msdynce_courseid }}" data-traj="{% if c.new_trajectory %}{{ c.new_trajectory.id }}{% endif %}" data-order="{{ c.new_trajectoryorder | default: 0 }}" data-tname="{% if c.new_trajectory %}{{ c.new_trajectory.name | escape }}{% endif %}">
+          <input type="checkbox" class="admp-ccheck">
+          <span class="admp-cname">{{ c.msdynce_coursename | default: 'Курс' }} <span class="admp-ctag" style="display:none;"></span></span>
+          <input type="number" class="admp-corder" min="1" placeholder="№" style="display:none;">
+        </label>
+        {% endfor %}
+      </div>
+      <div id="admpCoursesErr" style="display:none;font-size:12px;color:#DC2626;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px 12px;"></div>
+    </div>
+    <div class="admp-modal-foot">
+      <button type="button" class="adm-btn" data-close>Отмена</button>
+      <button type="button" class="adm-btn adm-btn--primary" id="admpCoursesSave">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    // ── Поиск ──
+    var s = document.getElementById('admpSearch');
+    if (s) {
+      s.addEventListener('input', function () {
+        var q = (s.value || '').toLowerCase();
+        document.querySelectorAll('#admpBody tr[data-search]').forEach(function (r) {
+          var m = !q || (r.getAttribute('data-search') || '').indexOf(q) !== -1;
+          r.style.display = m ? '' : 'none';
+        });
+      });
+    }
+
+    function getToken() {
+      return fetch('/_layout/tokenhtml', { credentials: 'include' })
+        .then(function (r) { return r.text(); })
+        .then(function (h) { var m = h.match(/name="__RequestVerificationToken"[^>]*value="([^"]+)"/); return m ? m[1] : ''; });
+    }
+    function chk(res) { if (res.ok) return true; return res.text().then(function (t) { var e = new Error('HTTP ' + res.status + ' — ' + t.slice(0, 220)); e.status = res.status; throw e; }); }
+
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(el) { el.style.display = 'none'; }
+    document.querySelectorAll('.admp-modal [data-close]').forEach(function (b) {
+      b.addEventListener('click', function () { closeModal(b.closest('.admp-modal')); });
+    });
+    document.querySelectorAll('.admp-modal').forEach(function (m) {
+      m.addEventListener('click', function (e) { if (e.target === m) closeModal(m); });
+    });
+
+    // ── Создать траекторию ──
+    var newBtn = document.getElementById('admpNewBtn');
+    if (newBtn) {
+      newBtn.addEventListener('click', function () { openModal('admpNewModal'); });
+      var nSave = document.getElementById('admpNewSave');
+      var nErr = document.getElementById('admpNewErr');
+      nSave.addEventListener('click', function () {
+        nErr.style.display = 'none';
+        var name = document.getElementById('admpF_name').value.trim();
+        if (!name) { nErr.textContent = 'Укажите название траектории.'; nErr.style.display = 'block'; return; }
+        var payload = {
+          new_name: name,
+          new_description: document.getElementById('admpF_desc').value,
+          new_department: document.getElementById('admpF_dep').value,
+          new_targetrole: parseInt(document.getElementById('admpF_role').value, 10),
+          new_isactive: true
+        };
+        nSave.disabled = true; nSave.textContent = 'Создание…';
+        getToken().then(function (tok) {
+          return fetch('/_api/new_trajectories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', '__RequestVerificationToken': tok },
+            body: JSON.stringify(payload)
+          }).then(chk);
+        }).then(function () { location.reload(); })
+          .catch(function (e) { nErr.textContent = 'Ошибка: ' + e.message; nErr.style.display = 'block'; nSave.disabled = false; nSave.textContent = 'Создать'; });
+      });
+    }
+
+    // ── Управление курсами ──
+    var cModal = document.getElementById('admpCoursesModal');
+    var cSave = document.getElementById('admpCoursesSave');
+    var cErr = document.getElementById('admpCoursesErr');
+    document.querySelectorAll('.admp-mng').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var tid = btn.getAttribute('data-tid');
+        cModal.setAttribute('data-tid', tid);
+        document.getElementById('admpCT').textContent = btn.getAttribute('data-tname') || '';
+        cErr.style.display = 'none';
+        document.querySelectorAll('#admpCoursesList .admp-crow').forEach(function (row) {
+          var rowTraj = row.getAttribute('data-traj') || '';
+          var inThis = rowTraj === tid;
+          var box = row.querySelector('.admp-ccheck');
+          var ord = row.querySelector('.admp-corder');
+          var tag = row.querySelector('.admp-ctag');
+          box.checked = inThis;
+          ord.style.display = inThis ? '' : 'none';
+          ord.value = inThis ? (parseInt(row.getAttribute('data-order')) || '') : '';
+          if (rowTraj && !inThis) { tag.style.display = ''; tag.textContent = 'в др. траектории'; } else { tag.style.display = 'none'; }
+        });
+        openModal('admpCoursesModal');
+      });
+    });
+    // тумблер порядка при отметке
+    document.querySelectorAll('#admpCoursesList .admp-ccheck').forEach(function (box) {
+      box.addEventListener('change', function () {
+        var ord = box.closest('.admp-crow').querySelector('.admp-corder');
+        ord.style.display = box.checked ? '' : 'none';
+        if (box.checked && !ord.value) ord.value = 1;
+      });
+    });
+
+    function patchBind(cid, tid, order, tok, nav) {
+      var body = {}; body[nav + '@odata.bind'] = '/new_trajectories(' + tid + ')'; body['new_trajectoryorder'] = order;
+      return fetch('/_api/msdynce_courses(' + cid + ')', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', '__RequestVerificationToken': tok }, body: JSON.stringify(body)
+      }).then(chk);
+    }
+    function bindCourse(cid, tid, order, tok) {
+      return patchBind(cid, tid, order, tok, 'new_trajectory').catch(function () { return patchBind(cid, tid, order, tok, 'new_Trajectory'); });
+    }
+    function unbindCourse(cid, tok) {
+      return fetch('/_api/msdynce_courses(' + cid + ')/new_trajectory/$ref', { method: 'DELETE', headers: { 'Accept': 'application/json', '__RequestVerificationToken': tok } })
+        .then(function (res) { if (res.ok) return true; return fetch('/_api/msdynce_courses(' + cid + ')/new_Trajectory/$ref', { method: 'DELETE', headers: { 'Accept': 'application/json', '__RequestVerificationToken': tok } }).then(chk); });
+    }
+
+    if (cSave) {
+      cSave.addEventListener('click', function () {
+        cErr.style.display = 'none';
+        var tid = cModal.getAttribute('data-tid');
+        if (!tid) return;
+        var ops = [];
+        document.querySelectorAll('#admpCoursesList .admp-crow').forEach(function (row) {
+          var cid = row.getAttribute('data-cid');
+          var wasTraj = row.getAttribute('data-traj') || '';
+          var wasOrder = parseInt(row.getAttribute('data-order')) || 0;
+          var checked = row.querySelector('.admp-ccheck').checked;
+          var order = parseInt(row.querySelector('.admp-corder').value) || 1;
+          if (checked) { if (wasTraj !== tid || wasOrder !== order) ops.push({ cid: cid, act: 'bind', order: order }); }
+          else { if (wasTraj === tid) ops.push({ cid: cid, act: 'unbind' }); }
+        });
+        if (!ops.length) { closeModal(cModal); return; }
+        cSave.disabled = true; cSave.textContent = 'Сохранение…';
+        getToken().then(function (tok) {
+          return Promise.all(ops.map(function (op) {
+            return op.act === 'bind' ? bindCourse(op.cid, tid, op.order, tok) : unbindCourse(op.cid, tok);
+          }));
+        }).then(function () { location.reload(); })
+          .catch(function (e) { cErr.textContent = 'Ошибка сохранения: ' + e.message; cErr.style.display = 'block'; cSave.disabled = false; cSave.textContent = 'Сохранить'; });
+      });
+    }
+  })();
+</script>
+
+{% endunless %}

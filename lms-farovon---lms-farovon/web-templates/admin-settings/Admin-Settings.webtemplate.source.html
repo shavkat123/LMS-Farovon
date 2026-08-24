@@ -1,0 +1,98 @@
+{% comment %}
+  Admin Settings — Настройки (/admin/settings). Примитивы .adm-* — customtheme.css.
+  РЕАЛЬНО: имя сайта из website, домен из location (JS), язык/пояс — фактические.
+  Политики — текущая конфигурация обучения (описание поведения). Расширенное управление — Power Platform.
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+<style>
+  .adms { padding: 24px 0 56px; }
+  .adms-head { margin-bottom: 20px; }
+  .adms-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .adms-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .adms-grid { display: grid; grid-template-columns: 200px 1fr; gap: 24px; }
+  @media (max-width: 820px) { .adms-grid { grid-template-columns: 1fr; } }
+  .adms-nav button { width: 100%; text-align: left; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; background: transparent; border: none; color: var(--adm-fg-2); cursor: default; display: block; margin-bottom: 2px; }
+  .adms-nav button.active { background: var(--adm-primary-50); color: var(--adm-primary); font-weight: 600; }
+  .adms-card { padding: 24px; }
+  .adms-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  @media (max-width: 560px) { .adms-fields { grid-template-columns: 1fr; } }
+  .adms-lbl { display: block; margin-bottom: 6px; }
+  .adms-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--adm-border-1); gap: 16px; }
+  .adms-row-t { font-size: 13.5px; font-weight: 600; color: var(--adm-fg-1); }
+  .adms-row-d { font-size: 12px; color: var(--adm-fg-3); margin-top: 2px; }
+  .adms-toggle { width: 38px; height: 22px; border-radius: 999px; position: relative; flex-shrink: 0; }
+  .adms-toggle span { position: absolute; top: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; }
+  .adms-toggle.on { background: var(--adm-primary); } .adms-toggle.on span { left: 18px; }
+  .adms-toggle.off { background: var(--adm-border-2); } .adms-toggle.off span { left: 2px; }
+  .adms-note { background: var(--adm-primary-50); border: 1px solid #DBEAFE; border-radius: 10px; padding: 10px 16px; font-size: 12px; color: var(--adm-primary); display: flex; align-items: flex-start; gap: 10px; }
+</style>
+
+<div class="container adm-scope adms">
+
+  <div class="adms-head">
+    <span class="adm-eyebrow">Система</span>
+    <h1>Настройки</h1>
+    <p>Основные параметры платформы и политики обучения.</p>
+  </div>
+
+  <div class="adms-grid">
+    <nav class="adms-nav">
+      <button type="button" class="active">Общие</button>
+      <button type="button">Брендинг</button>
+      <button type="button">Уведомления</button>
+      <button type="button">Геймификация</button>
+      <button type="button">Безопасность</button>
+      <button type="button">Локализация</button>
+    </nav>
+
+    <div style="display:flex;flex-direction:column;gap:20px;">
+      <div class="adm-card adms-card">
+        <div style="font-size:15px;font-weight:700;color:var(--adm-fg-1);margin-bottom:4px;">Общие настройки</div>
+        <span class="adm-eyebrow">Основные параметры платформы</span>
+        <div class="adms-fields">
+          <div><label class="adm-eyebrow adms-lbl">Название организации</label><input class="adm-input" value="{{ website.adx_name | default: 'Farovon' }}" readonly></div>
+          <div><label class="adm-eyebrow adms-lbl">Домен</label><input class="adm-input" id="admsDomain" value="—" readonly></div>
+          <div><label class="adm-eyebrow adms-lbl">Часовой пояс</label><input class="adm-input" value="(GMT+5) Ташкент" readonly></div>
+          <div><label class="adm-eyebrow adms-lbl">Язык по умолчанию</label><input class="adm-input" value="Русский" readonly></div>
+        </div>
+      </div>
+
+      <div class="adm-card adms-card">
+        <div style="font-size:15px;font-weight:700;color:var(--adm-fg-1);margin-bottom:2px;">Политики обучения</div>
+        <span class="adm-eyebrow">Текущая конфигурация платформы</span>
+        {% assign pols = 'Обязательный онбординг|Автоназначение welcome-курса новым сотрудникам|1;Дедлайны по умолчанию|30 дней на завершение обязательного курса|1;Автонапоминания|Уведомлять за 3 дня до дедлайна|1;Начисление баллов|За уроки, курсы и мероприятия — баллы в магазин наград|1;Сертификаты с QR|Генерировать QR-валидацию для сертификатов|0' | split: ';' %}
+        {% for p in pols %}
+          {% assign f = p | split: '|' %}
+        <div class="adms-row"{% if forloop.last %} style="border-bottom:none;"{% endif %}>
+          <div><div class="adms-row-t">{{ f[0] }}</div><div class="adms-row-d">{{ f[1] }}</div></div>
+          <span class="adms-toggle {% if f[2] == '1' %}on{% else %}off{% endif %}"><span></span></span>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="adms-note">
+        <i class="bi bi-info-circle-fill" style="flex-shrink:0;margin-top:1px;"></i>
+        <span>Параметры платформы и политики отражают текущую конфигурацию. Изменение доменов, языков и системных параметров выполняется в центре администрирования Power Platform / в настройках сайта (Site Settings). Переключатели политик — под интеграцию соответствующих механизмов (напоминания, сертификаты).</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  (function () {
+    var d = document.getElementById('admsDomain');
+    if (d) { d.value = location.host; }
+  })();
+</script>
+
+{% endunless %}

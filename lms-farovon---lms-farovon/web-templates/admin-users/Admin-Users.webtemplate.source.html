@@ -1,0 +1,196 @@
+{% comment %}
+  Admin Users — Сотрудники (/admin/users). Дизайн: Users.jsx. Примитивы .adm-* — customtheme.css.
+  РЕАЛЬНЫЕ данные: aggregate new_h5pprogress по new_user + contact (паттерн лидерборда — надёжно).
+  Показывает сотрудников с учебной активностью (завершённые уроки).
+  Баллы = completed*100 + round(sum(scorescaled)*50). Прогресс = completed / активные уроки каталога.
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+{% comment %}── Прогресс по пользователям (aggregate + contact link) ──{% endcomment %}
+{% fetchxml up %}
+<fetch aggregate="true">
+  <entity name="new_h5pprogress">
+    <attribute name="new_user" groupby="true" alias="uid" />
+    <attribute name="new_h5pprogressid" aggregate="count" alias="cnt" />
+    <attribute name="new_scorescaled" aggregate="sum" alias="ssum" />
+    <link-entity name="contact" from="contactid" to="new_user" alias="c" link-type="outer">
+      <attribute name="fullname" groupby="true" alias="fn" />
+      <attribute name="jobtitle" groupby="true" alias="jt" />
+      <attribute name="department" groupby="true" alias="dp" />
+      <attribute name="emailaddress1" groupby="true" alias="em" />
+    </link-entity>
+    <filter>
+      <condition attribute="new_completion" operator="eq" value="1" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Активных уроков каталога (знаменатель прогресса) ──{% endcomment %}
+{% fetchxml les_cnt %}
+<fetch aggregate="true">
+  <entity name="new_h5pcontent">
+    <attribute name="new_h5pcontentid" aggregate="count" alias="lc" />
+    <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign cat_total = 0 %}
+{% for r in les_cnt.results.entities %}{% assign cat_total = r.lc | plus: 0 %}{% endfor %}
+{% if cat_total == 0 %}{% assign cat_total = 1 %}{% endif %}
+
+{% comment %}── KPI ──{% endcomment %}
+{% assign g_users = 0 %}
+{% assign g_done = 0 %}
+{% for r in up.results.entities %}
+  {% assign uid = r.uid.id | default: r.uid %}
+  {% if uid == '' or uid == null %}{% continue %}{% endif %}
+  {% assign g_users = g_users | plus: 1 %}
+  {% assign g_done = g_done | plus: r.cnt %}
+{% endfor %}
+
+<style>
+  .admu { padding: 24px 0 56px; }
+  .admu-head { margin-bottom: 20px; }
+  .admu-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .admu-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .admu-search { position: relative; flex: 1 1 260px; min-width: 220px; }
+  .admu-search i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--adm-fg-3); font-size: 14px; pointer-events: none; }
+  .admu-search .adm-input { padding-left: 32px; }
+  .admu-tbl-wrap { overflow-x: auto; }
+  .admu-name { font-weight: 600; color: var(--adm-fg-1); }
+  .admu-mail { font-size: 11px; color: var(--adm-fg-3); }
+  .admu-foot { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--adm-border-1); }
+</style>
+
+<div class="container adm-scope admu">
+
+  <div class="admu-head">
+    <span class="adm-eyebrow">Люди</span>
+    <h1>Сотрудники</h1>
+    <p>Сотрудников с учебной активностью: <b class="adm-num">{{ g_users }}</b> · завершений уроков: <b class="adm-num">{{ g_done }}</b></p>
+  </div>
+
+  {% comment %}── Toolbar ──{% endcomment %}
+  <div class="adm-card adm-toolbar" style="margin-bottom:16px;">
+    <div class="admu-search">
+      <i class="bi bi-search"></i>
+      <input type="text" class="adm-input" id="admuSearch" placeholder="Имя, email, отдел…" autocomplete="off">
+    </div>
+    <div style="flex:1;"></div>
+    <button type="button" class="adm-btn adm-btn--ghost" id="admuExport"><i class="bi bi-download"></i> Экспорт CSV</button>
+    <a href="/add-attendee" class="adm-btn adm-btn--primary"><i class="bi bi-plus-lg"></i> Добавить</a>
+  </div>
+
+  {% comment %}── Table ──{% endcomment %}
+  <div class="adm-card" style="overflow:hidden;">
+    {% if g_users == 0 %}
+    <div style="padding:48px 24px;text-align:center;color:var(--adm-fg-3);">
+      <i class="bi bi-people" style="display:block;font-size:40px;color:#CBD5E1;margin-bottom:12px;"></i>
+      Пока нет сотрудников с завершёнными уроками.
+    </div>
+    {% else %}
+    <div class="admu-tbl-wrap">
+      <table class="adm-table" id="admuTable">
+        <thead>
+          <tr>
+            <th>Сотрудник</th>
+            <th style="width:150px;">Отдел</th>
+            <th style="width:170px;">Должность</th>
+            <th style="width:170px;">Прогресс</th>
+            <th class="adm-r" style="width:100px;">Ср. балл</th>
+            <th class="adm-r" style="width:90px;">Баллы</th>
+          </tr>
+        </thead>
+        <tbody id="admuBody">
+          {% for r in up.results.entities %}
+            {% assign uid = r.uid.id | default: r.uid %}
+            {% if uid == '' or uid == null %}{% continue %}{% endif %}
+            {% assign fn = r['c.fn'] | default: 'Без имени' %}
+            {% assign em = r['c.em'] | default: '' %}
+            {% assign jb = r['c.jt'] | default: '' %}
+            {% assign dp = r['c.dp'] | default: '' %}
+            {% assign cnt = r.cnt | plus: 0 %}
+            {% assign ssum = r.ssum | plus: 0 %}
+            {% assign bonus = ssum | times: 50 | round %}
+            {% assign pts = cnt | times: 100 | plus: bonus %}
+            {% assign avg = 0 %}{% if cnt > 0 %}{% assign avg = ssum | times: 100 | divided_by: cnt %}{% endif %}
+            {% assign pct = cnt | times: 100 | divided_by: cat_total %}
+            {% if pct > 100 %}{% assign pct = 100 %}{% endif %}
+            {% assign parts = fn | split: ' ' %}
+            {% assign in1 = parts[0] | slice: 0, 1 | upcase %}
+            {% assign in2 = '' %}
+            {% if parts.size > 1 %}{% assign in2 = parts[1] | slice: 0, 1 | upcase %}{% endif %}
+          <tr data-search="{{ fn | downcase }} {{ em | downcase }} {{ dp | downcase }} {{ jb | downcase }}"
+              data-row="{{ fn | escape }}|{{ em | escape }}|{{ dp | escape }}|{{ jb | escape }}|{{ cnt }}|{{ pts }}">
+            <td>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="adm-avatar">{{ in1 }}{{ in2 }}</span>
+                <div style="min-width:0;">
+                  <div class="admu-name">{{ fn }}</div>
+                  <div class="admu-mail">{{ em }}</div>
+                </div>
+              </div>
+            </td>
+            <td>{% if dp != '' %}{{ dp }}{% else %}<span style="color:var(--adm-fg-3);">—</span>{% endif %}</td>
+            <td>{% if jb != '' %}{{ jb }}{% else %}<span style="color:var(--adm-fg-3);">—</span>{% endif %}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div class="adm-bar" style="flex:1;"><div style="width:{{ pct }}%;background:{% if pct == 100 %}var(--adm-success){% else %}var(--adm-primary){% endif %};"></div></div>
+                <span class="adm-num" style="font-size:11px;font-weight:600;color:var(--adm-fg-2);min-width:36px;">{{ cnt }}/{{ cat_total }}</span>
+              </div>
+            </td>
+            <td class="adm-r adm-num">{{ avg }}%</td>
+            <td class="adm-r adm-num" style="font-weight:600;">{{ pts }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  (function () {
+    var search = document.getElementById('admuSearch');
+    var rows = function () { return document.querySelectorAll('#admuBody tr[data-search]'); };
+    if (search) {
+      search.addEventListener('input', function () {
+        var q = (search.value || '').toLowerCase();
+        rows().forEach(function (r) {
+          var m = !q || (r.getAttribute('data-search') || '').indexOf(q) !== -1;
+          r.style.display = m ? '' : 'none';
+        });
+      });
+    }
+    var exp = document.getElementById('admuExport');
+    if (exp) {
+      exp.addEventListener('click', function () {
+        var head = ['Имя', 'Email', 'Отдел', 'Должность', 'Завершено уроков', 'Баллы'];
+        var lines = [head.join(';')];
+        rows().forEach(function (r) {
+          if (r.style.display === 'none') return;
+          var d = (r.getAttribute('data-row') || '').split('|').map(function (c) { return '"' + c.replace(/"/g, '""') + '"'; });
+          lines.push(d.join(';'));
+        });
+        var blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'farovon-employees.csv';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      });
+    }
+  })();
+</script>
+
+{% endunless %}

@@ -1,0 +1,274 @@
+{% comment %}
+  Events — Мероприятия (handoff v2 design, user-facing)
+  РЕАЛЬНЫЕ данные: таблица new_event (активные, по дате начала).
+  Статус (Идёт сейчас / Открыта запись / прошло) вычисляется сравнением дат как чисел yyyyMMddHHmm.
+  Кнопка «Записаться» → new_registrationurl. Учёт «кто записан» — отдельный шаг (таблица-связка).
+{% endcomment %}
+
+{% unless user %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-calendar-event" style="font-size:52px;color:#64748B;display:block;margin-bottom:16px;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin-bottom:6px;">Войдите в систему</h2>
+  <p style="font-size:13px;color:#64748B;margin-bottom:20px;">Для просмотра мероприятий необходимо авторизоваться.</p>
+  <a href="/SignIn" class="btn btn-primary" style="border-radius:8px;">Войти</a>
+</div>
+{% else %}
+
+{% comment %}── Реальные события из new_event (активные, по дате начала).
+   ВАЖНО: имя фетча НЕ 'events' — это встроенный объект Power Pages (adx_event), конфликтует. ──{% endcomment %}
+{% fetchxml evt_list %}
+<fetch>
+  <entity name="new_event">
+    <attribute name="new_eventid" />
+    <attribute name="new_name" />
+    <attribute name="new_startdatetime" />
+    <attribute name="new_enddatetime" />
+    <attribute name="new_eventtype" />
+    <attribute name="new_location" />
+    <attribute name="new_points" />
+    <attribute name="new_capacity" />
+    <attribute name="new_registrationurl" />
+    <attribute name="new_description" />
+    <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
+    <order attribute="new_startdatetime" ascending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── now как число yyyyMMddHHmm для сравнения дат (DotLiquid не сравнивает даты напрямую) ──{% endcomment %}
+{% assign now_num   = 'now' | date: 'yyyyMMddHHmm' | plus: 0 %}
+{% assign ru_months = 'янв,фев,мар,апр,мая,июн,июл,авг,сен,окт,ноя,дек' | split: ',' %}
+
+{% comment %}── Первый проход: ближайшее не-прошедшее событие = featured; счётчик активных ──{% endcomment %}
+{% assign feat_id      = '' %}
+{% assign active_count = 0 %}
+{% for e in evt_list.results.entities %}
+  {% assign snum = e.new_startdatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+  {% assign enum = e.new_enddatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+  {% assign past = false %}
+  {% if enum > 0 %}{% if now_num > enum %}{% assign past = true %}{% endif %}{% else %}{% if now_num > snum %}{% assign past = true %}{% endif %}{% endif %}
+  {% unless past %}
+    {% assign active_count = active_count | plus: 1 %}
+    {% if feat_id == '' %}{% assign feat_id = e.new_eventid %}{% endif %}
+  {% endunless %}
+{% endfor %}
+
+<style>
+  .fv-ev { padding: 12px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
+
+  /* Header */
+  .fv-ev-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .fv-ev-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #1E3A8A; display: block; margin-bottom: 4px; }
+  .fv-ev-title { font-size: 28px; font-weight: 700; letter-spacing: -0.015em; color: #0B1220; margin: 0 0 4px; }
+  .fv-ev-sub { font-size: 14px; color: #475569; margin: 0; }
+  .fv-ev-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .fv-ev-btn-sec { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 12px; font-size: 13px; font-weight: 500; background: #fff; border: 1px solid #E5E7EB; color: #475569 !important; text-decoration: none; cursor: pointer; }
+  .fv-ev-btn-sec:hover { border-color: #D1D5DB; color: #0B1220 !important; }
+  .fv-ev-btn-pri { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 12px; font-size: 13px; font-weight: 600; background: #1E3A8A; border: 1px solid #1E3A8A; color: #fff; cursor: pointer; }
+  .fv-ev-btn-pri:hover { background: #15306E; color: #fff; }
+
+  .fv-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; box-shadow: 0 1px 2px rgba(11,18,32,.04), 0 1px 3px rgba(11,18,32,.04); }
+
+  /* Featured */
+  .fv-feat { overflow: hidden; margin-bottom: 24px; }
+  .fv-feat-grid { display: grid; grid-template-columns: 1.5fr 1fr; }
+  @media (max-width: 860px) { .fv-feat-grid { grid-template-columns: 1fr; } }
+  .fv-feat-body { padding: 28px; }
+  .fv-chip-live { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; background: #FBEAEA; color: #B91C1C; }
+  .fv-dot { display: inline-block; width: 6px; height: 6px; border-radius: 999px; background: #B91C1C; animation: fv-pulse 1.8s ease-in-out infinite; }
+  @keyframes fv-pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  .fv-feat-kind { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #94A3B8; }
+  .fv-feat-title { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; color: #0B1220; margin: 0; }
+  .fv-feat-meta { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; margin-top: 20px; }
+  .fv-feat-meta span { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #475569; }
+  .fv-feat-meta i { color: #94A3B8; font-size: 15px; }
+  .fv-feat-cta { display: flex; align-items: center; gap: 16px; margin-top: 24px; flex-wrap: wrap; }
+  .fv-feat-join { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 600; background: #1E3A8A; border: none; color: #fff !important; cursor: pointer; text-decoration: none !important; }
+  .fv-feat-join:hover { background: #15306E; color: #fff !important; }
+  .fv-feat-pts { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: #475569; }
+  .fv-feat-pts i { color: #B45309; font-size: 14px; }
+
+  .fv-feat-cover { position: relative; background: linear-gradient(135deg, #1E3A8A 0%, #15306E 100%); min-height: 220px; }
+  .fv-feat-cover-in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: 24px; }
+  .fv-seat-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,.12); color: #fff; }
+  .fv-seat-lbl { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.6); }
+  .fv-seat-num { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; margin-top: 2px; }
+
+  /* Tabs */
+  .fv-ev-tabs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .fv-ev-tab { padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; background: #fff; color: #475569; border: 1px solid #E5E7EB; transition: background .14s, color .14s, border-color .14s; }
+  .fv-ev-tab.active { background: #0B1220; color: #fff; border-color: #0B1220; }
+  .fv-ev-tab:hover:not(.active) { border-color: #D1D5DB; color: #0B1220; }
+
+  /* List */
+  .fv-ev-row { display: flex; align-items: center; gap: 20px; padding: 20px; border-bottom: 1px solid #E5E7EB; transition: background .14s; }
+  .fv-ev-row:last-child { border-bottom: none; }
+  .fv-ev-row:hover { background: #F0F2F5; }
+  .fv-ev-date { text-align: center; border-radius: 12px; padding: 10px 12px; min-width: 60px; background: #F0F2F5; flex-shrink: 0; }
+  .fv-ev-date .wd { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #94A3B8; }
+  .fv-ev-date .d { font-size: 22px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; color: #0B1220; }
+  .fv-ev-date .m { font-size: 10px; font-weight: 600; text-transform: uppercase; color: #94A3B8; }
+  .fv-ev-main { flex: 1; min-width: 0; }
+  .fv-ev-tags { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+  .fv-ev-kind { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #94A3B8; }
+  .fv-ev-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .fv-ev-name { font-size: 15px; font-weight: 600; color: #0B1220; }
+  .fv-ev-meta { display: flex; align-items: center; gap: 16px; margin-top: 6px; flex-wrap: wrap; }
+  .fv-ev-meta span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #94A3B8; }
+  .fv-ev-meta i.pts { color: #B45309; }
+  .fv-ev-reg { padding: 8px 16px; border-radius: 12px; font-size: 12px; font-weight: 600; flex-shrink: 0; cursor: pointer; background: #1E3A8A; color: #fff !important; border: 1px solid #1E3A8A; transition: background .14s, color .14s; text-decoration: none !important; display: inline-flex; align-items: center; gap: 6px; }
+  .fv-ev-reg:hover { background: #15306E; color: #fff !important; }
+
+  .fv-ev-empty { text-align: center; padding: 48px 24px; color: #94A3B8; font-size: 13px; }
+  .fv-ev-empty i { font-size: 40px; color: #CBD5E1; display: block; margin-bottom: 12px; }
+
+  @media (max-width: 576px) {
+    .fv-ev-title { font-size: 24px; }
+    .fv-ev-row { flex-wrap: wrap; }
+    .fv-ev-reg { width: 100%; justify-content: center; }
+  }
+</style>
+
+<div class="container fv-ev">
+
+  <div class="fv-ev-header">
+    <div>
+      <span class="fv-ev-eyebrow">Мероприятия</span>
+      <h1 class="fv-ev-title">Календарь событий</h1>
+      <p class="fv-ev-sub">Вебинары, встречи и офлайн-мероприятия. За участие начисляются баллы.</p>
+    </div>
+  </div>
+
+  {% comment %}── Featured — ближайшее не-прошедшее событие ──{% endcomment %}
+  {% if feat_id != '' %}
+  {% for e in evt_list.results.entities %}{% if e.new_eventid == feat_id %}
+    {% assign f_type   = e.new_eventtype.label | default: 'Событие' %}
+    {% assign f_snum   = e.new_startdatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+    {% assign f_enum   = e.new_enddatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+    {% assign f_live   = false %}{% if f_enum > 0 and now_num >= f_snum and now_num <= f_enum %}{% assign f_live = true %}{% endif %}
+    {% assign f_day    = e.new_startdatetime | date: 'dd' %}
+    {% assign f_mon_s  = e.new_startdatetime | date: 'MM' %}
+    {% case f_mon_s %}{% when '01' %}{% assign f_mon = 'янв' %}{% when '02' %}{% assign f_mon = 'фев' %}{% when '03' %}{% assign f_mon = 'мар' %}{% when '04' %}{% assign f_mon = 'апр' %}{% when '05' %}{% assign f_mon = 'мая' %}{% when '06' %}{% assign f_mon = 'июн' %}{% when '07' %}{% assign f_mon = 'июл' %}{% when '08' %}{% assign f_mon = 'авг' %}{% when '09' %}{% assign f_mon = 'сен' %}{% when '10' %}{% assign f_mon = 'окт' %}{% when '11' %}{% assign f_mon = 'ноя' %}{% else %}{% assign f_mon = 'дек' %}{% endcase %}
+    {% assign f_time   = e.new_startdatetime | date: 'HH:mm' %}
+    {% assign f_endt   = e.new_enddatetime | date: 'HH:mm' %}
+    {% assign f_pts    = e.new_points | plus: 0 %}
+    {% assign f_cap    = e.new_capacity | plus: 0 %}
+    {% assign f_url    = e.new_registrationurl %}
+  <div class="fv-card fv-feat">
+    <div class="fv-feat-grid">
+      <div class="fv-feat-body">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+          {% if f_live %}<span class="fv-chip-live"><span class="fv-dot"></span> Идёт сейчас</span>{% else %}<span class="fv-ev-chip" style="background:#ECF6EF;color:#15803D;">Открыта запись</span>{% endif %}
+          <span class="fv-feat-kind">{{ f_type }}</span>
+        </div>
+        <h2 class="fv-feat-title">{{ e.new_name | default: 'Событие' }}</h2>
+
+        <div class="fv-feat-meta">
+          <span><i class="bi bi-calendar-event"></i> {{ f_day }} {{ f_mon }}, {{ f_time }}{% if e.new_enddatetime %}–{{ f_endt }}{% endif %}</span>
+          {% if e.new_location %}<span><i class="bi bi-geo-alt"></i> {{ e.new_location }}</span>{% endif %}
+        </div>
+
+        {% if e.new_description %}<p style="font-size:14px;color:#475569;line-height:1.6;margin:16px 0 0;max-width:520px;">{{ e.new_description }}</p>{% endif %}
+
+        <div class="fv-feat-cta">
+          {% if f_url %}<a href="{{ f_url }}" target="_blank" rel="noopener" class="fv-feat-join">{% if f_live %}Подключиться{% else %}Записаться{% endif %} <i class="bi bi-arrow-right"></i></a>{% endif %}
+          {% if f_pts > 0 %}<span class="fv-feat-pts"><i class="bi bi-award"></i> +{{ f_pts }} баллов</span>{% endif %}
+        </div>
+      </div>
+
+      <div class="fv-feat-cover">
+        <div class="fv-feat-cover-in">
+          {% if f_cap > 0 %}<span class="fv-seat-chip"><i class="bi bi-people"></i> {{ f_cap }} мест</span>{% else %}<span></span>{% endif %}
+          <div>
+            <div class="fv-seat-lbl">Награда за участие</div>
+            <div class="fv-seat-num">+{{ f_pts }}</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:2px;">баллов в магазин наград</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}{% endfor %}
+  {% endif %}
+
+  {% comment %}── Filter tabs (data-kind = метка Choice new_eventtype) ──{% endcomment %}
+  <div class="fv-ev-tabs" role="group" aria-label="Фильтр событий">
+    <button type="button" class="fv-ev-tab active" data-kind="Все">Все</button>
+    <button type="button" class="fv-ev-tab" data-kind="Вебинар">Вебинары</button>
+    <button type="button" class="fv-ev-tab" data-kind="Встреча 1:1">Встречи 1:1</button>
+    <button type="button" class="fv-ev-tab" data-kind="Офлайн">Офлайн</button>
+    <button type="button" class="fv-ev-tab" data-kind="Запись">Записи</button>
+  </div>
+
+  {% comment %}── Event list (реальные, не-прошедшие) ──{% endcomment %}
+  <div class="fv-card" style="overflow:hidden;">
+    <div id="fv-ev-list">
+      {% for e in evt_list.results.entities %}
+        {% assign snum = e.new_startdatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+        {% assign enum = e.new_enddatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+        {% assign past = false %}
+        {% if enum > 0 %}{% if now_num > enum %}{% assign past = true %}{% endif %}{% else %}{% if now_num > snum %}{% assign past = true %}{% endif %}{% endif %}
+        {% unless past %}
+          {% assign r_type  = e.new_eventtype.label | default: 'Событие' %}
+          {% assign r_live  = false %}{% if enum > 0 and now_num >= snum and now_num <= enum %}{% assign r_live = true %}{% endif %}
+          {% assign r_day   = e.new_startdatetime | date: 'dd' %}
+          {% assign r_mon_s = e.new_startdatetime | date: 'MM' %}
+          {% case r_mon_s %}{% when '01' %}{% assign r_mon = 'янв' %}{% when '02' %}{% assign r_mon = 'фев' %}{% when '03' %}{% assign r_mon = 'мар' %}{% when '04' %}{% assign r_mon = 'апр' %}{% when '05' %}{% assign r_mon = 'мая' %}{% when '06' %}{% assign r_mon = 'июн' %}{% when '07' %}{% assign r_mon = 'июл' %}{% when '08' %}{% assign r_mon = 'авг' %}{% when '09' %}{% assign r_mon = 'сен' %}{% when '10' %}{% assign r_mon = 'окт' %}{% when '11' %}{% assign r_mon = 'ноя' %}{% else %}{% assign r_mon = 'дек' %}{% endcase %}
+          {% assign r_time  = e.new_startdatetime | date: 'HH:mm' %}
+          {% assign r_pts   = e.new_points | plus: 0 %}
+          {% assign r_url   = e.new_registrationurl %}
+      <div class="fv-ev-row" data-kind="{{ r_type }}">
+        <div class="fv-ev-date"><div class="d">{{ r_day }}</div><div class="m">{{ r_mon }}</div></div>
+        <div class="fv-ev-main">
+          <div class="fv-ev-tags">
+            <span class="fv-ev-kind">{{ r_type }}</span>
+            {% if r_live %}<span class="fv-ev-chip" style="background:#FBEAEA;color:#B91C1C;"><span class="fv-dot"></span> Идёт сейчас</span>{% else %}<span class="fv-ev-chip" style="background:#ECF6EF;color:#15803D;">Открыта запись</span>{% endif %}
+          </div>
+          <div class="fv-ev-name">{{ e.new_name | default: 'Событие' }}</div>
+          <div class="fv-ev-meta">
+            <span><i class="bi bi-clock"></i> {{ r_time }}</span>
+            {% if e.new_location %}<span><i class="bi bi-geo-alt"></i> {{ e.new_location }}</span>{% endif %}
+            {% if r_pts > 0 %}<span><i class="bi bi-award pts"></i> +{{ r_pts }}</span>{% endif %}
+          </div>
+        </div>
+        {% if r_url %}<a href="{{ r_url }}" target="_blank" rel="noopener" class="fv-ev-reg">{% if r_live %}Подключиться{% else %}Записаться{% endif %}</a>{% else %}<span class="fv-ev-reg" style="opacity:.55;cursor:default;background:#F0F2F5;color:#94A3B8;border-color:#F0F2F5;">Скоро</span>{% endif %}
+      </div>
+        {% endunless %}
+      {% endfor %}
+    </div>
+    {% if active_count == 0 %}
+    <div class="fv-ev-empty">
+      <i class="bi bi-calendar-x"></i>
+      Пока нет запланированных событий. Загляните позже.
+    </div>
+    {% endif %}
+    <div id="fv-ev-empty" class="fv-ev-empty" style="display:none;">
+      <i class="bi bi-calendar-x"></i>
+      Нет событий в этой категории.
+    </div>
+  </div>
+
+</div>
+
+<script>
+  (function () {
+    var tabs  = document.querySelectorAll('.fv-ev-tab');
+    var rows  = document.querySelectorAll('.fv-ev-row');
+    var empty = document.getElementById('fv-ev-empty');
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        var kind = tab.getAttribute('data-kind');
+        tabs.forEach(function (t) { t.classList.toggle('active', t === tab); });
+        var any = false;
+        rows.forEach(function (row) {
+          var show = (kind === 'Все') || (row.getAttribute('data-kind') === kind);
+          row.style.display = show ? '' : 'none';
+          if (show) { any = true; }
+        });
+        if (empty) { empty.style.display = any ? 'none' : 'block'; }
+      });
+    });
+  })();
+</script>
+
+{% endunless %}

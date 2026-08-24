@@ -1,0 +1,211 @@
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Эта страница доступна только администраторам.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+<style>
+  .fv-upload-page { padding: 12px 0 48px; }
+  .fv-upload-header { margin-bottom: 24px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .fv-upload-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #64748B; display: block; margin-bottom: 4px; }
+  .fv-upload-title { font-size: 22px; font-weight: 700; color: #0B1220; margin: 0 0 4px; }
+  .fv-upload-sub { font-size: 13px; color: #64748B; margin: 0; }
+  .fv-upload-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(11,18,32,0.04); margin-bottom: 16px; }
+  .fv-upload-hint { background: #EEF2F9; border: 1px solid #DBEAFE; border-radius: 10px; padding: 14px 18px; font-size: 13px; color: #1E40AF; display: flex; gap: 12px; align-items: flex-start; }
+  .fv-upload-hint i { flex-shrink: 0; font-size: 16px; margin-top: 1px; }
+</style>
+
+<div class="container fv-upload-page">
+  <div class="fv-upload-header">
+    <div>
+      <span class="fv-upload-eyebrow">Администрирование</span>
+      <h1 class="fv-upload-title">Загрузка H5P урока</h1>
+      <p class="fv-upload-sub">Создайте запись урока и загрузите .h5p файл</p>
+    </div>
+    <a href="/h5p-catalog" class="btn btn-outline-secondary btn-sm" style="border-radius:8px;font-size:13px;">
+      <i class="bi bi-arrow-left"></i> Назад к каталогу
+    </a>
+  </div>
+
+  <div class="fv-upload-hint mb-4">
+    <i class="bi bi-info-circle-fill"></i>
+    <div>
+      <strong>Как создать .h5p файл:</strong> скачайте
+      <a href="https://lumi.education" target="_blank" rel="noopener" style="color:#1E3A8A;font-weight:600;">Lumi Desktop</a>,
+      создайте Interactive Video и экспортируйте как <code>.h5p</code>.
+    </div>
+  </div>
+
+  <div class="fv-upload-card">
+    <div style="font-size:13px;font-weight:600;color:#0B1220;margin-bottom:4px;">Шаг 1 — Заполните данные урока</div>
+    <p style="font-size:12px;color:#64748B;margin-bottom:16px;">Введите название, описание и другие параметры. После сохранения откроется шаг 2 с загрузкой файла.</p>
+
+{% entityform name:'H5P Upload Form' %}
+
+  </div><!-- /fv-upload-card step 1 -->
+
+  <div id="h5p-file-upload-section" style="display:none" class="fv-upload-card mt-2">
+    <div style="font-size:13px;font-weight:600;color:#0B1220;margin-bottom:4px;"><i class="bi bi-file-earmark-zip" style="color:#1E3A8A;"></i> Шаг 2 — Загрузите .h5p файл</div>
+    <p style="font-size:12px;color:#64748B;margin-bottom:14px;">Запись создана. Выберите <code>.h5p</code> файл для загрузки.</p>
+    <div class="input-group">
+      <input type="file" id="h5p-file-input" class="form-control" accept=".h5p">
+      <button id="h5p-upload-btn" class="btn btn-primary" type="button">Загрузить файл</button>
+    </div>
+    <div id="h5p-upload-progress" class="mt-3" style="display:none">
+      <div class="progress"><div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width:100%"></div></div>
+      <small class="text-muted">Загрузка файла…</small>
+    </div>
+    <div id="h5p-upload-result" class="mt-2"></div>
+  </div>
+
+</div><!-- /fv-upload-page -->
+
+<script>
+(function () {
+  var recordId = null;
+
+  function revealStep2(rawId) {
+    if (recordId) return;
+    var id;
+    if (typeof rawId === 'string') {
+      id = rawId.replace(/[{}]/g, '').trim();
+    } else if (rawId && typeof rawId === 'object') {
+      var ref = rawId.entityReference || rawId;
+      id = String(ref.id || ref.Id || ref.entityId || '').replace(/[{}]/g, '').trim();
+    }
+    if (!id || id.length < 10) return;
+    recordId = id;
+    var sec = document.getElementById('h5p-file-upload-section');
+    if (sec) sec.style.display = '';
+  }
+
+  function checkSuccessState() {
+    var successEl = document.querySelector('.alert-success');
+    console.log('[H5P-upload] checkSuccessState, successEl:', successEl ? successEl.innerText.slice(0, 80) : 'none');
+    if (successEl) {
+      fetchLatestRecordId();
+    }
+  }
+
+  // Запускаем и через DOMContentLoaded, и сразу если DOM уже готов
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(checkSuccessState, 500); });
+  } else {
+    setTimeout(checkSuccessState, 500);
+  }
+
+  function fetchLatestRecordId() {
+    console.log('[H5P-upload] fetchLatestRecordId called');
+    fetch('/_api/new_h5pcontents?$orderby=createdon desc&$top=1&$select=new_h5pcontentid', {
+      headers: {
+        'Accept': 'application/json',
+        'OData-MaxVersion': '4.0',
+        'OData-Version': '4.0'
+      }
+    })
+    .then(function (r) {
+      console.log('[H5P-upload] API status:', r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      console.log('[H5P-upload] API data:', JSON.stringify(data).slice(0, 200));
+      var rec = data.value && data.value[0];
+      if (rec) revealStep2(rec.new_h5pcontentid);
+    })
+    .catch(function (e) { console.log('[H5P-upload] API error:', e); });
+  }
+
+  // Резервный вариант: стандартное событие Power Pages (на случай AJAX-версии)
+  $(document).on('saved saved.entityForm', function (e, data) {
+    revealStep2(data);
+  });
+
+  document.getElementById('h5p-upload-btn').addEventListener('click', function () {
+    var fileInput = document.getElementById('h5p-file-input');
+    if (!fileInput.files || !fileInput.files[0]) {
+      showResult('warning', 'Выберите .h5p файл');
+      return;
+    }
+    if (!recordId) {
+      showResult('danger', 'ID записи не получен — сохраните форму ещё раз');
+      return;
+    }
+
+    var file = fileInput.files[0];
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      uploadFile(file.name, ev.target.result);
+    };
+    reader.onerror = function () {
+      showResult('danger', 'Ошибка чтения файла');
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  function getToken() {
+    // Сначала пробуем токен из DOM (если форма ещё там)
+    var tok = document.querySelector('input[name="__RequestVerificationToken"]');
+    if (tok && tok.value) return Promise.resolve(tok.value);
+    // После перезагрузки страницы форма исчезает — берём токен с /_layout/tokenhtml
+    return fetch('/_layout/tokenhtml')
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        var m = html.match(/value="([^"]+)"/);
+        return m ? m[1] : null;
+      });
+  }
+
+  function uploadFile(filename, buffer) {
+    document.getElementById('h5p-upload-progress').style.display = '';
+    document.getElementById('h5p-upload-result').innerHTML = '';
+
+    getToken().then(function (token) {
+      var headers = {
+        'Content-Type': 'application/octet-stream',
+        'x-ms-file-name': encodeURIComponent(filename),
+        'OData-MaxVersion': '4.0',
+        'OData-Version': '4.0'
+      };
+      if (token) headers['__RequestVerificationToken'] = token;
+
+      return fetch('/_api/new_h5pcontents(' + recordId + ')/new_h5pfile', {
+        method: 'PATCH',
+        headers: headers,
+        body: buffer
+      });
+    })
+    .then(function (res) {
+      document.getElementById('h5p-upload-progress').style.display = 'none';
+      if (res.ok || res.status === 204) {
+        showResult('success',
+          'Файл <strong>' + escHtml(filename) + '</strong> успешно загружен. ' +
+          '<a href="/h5p-player?id=' + recordId + '" class="alert-link">Открыть плеер</a>');
+      } else {
+        return res.text().then(function (t) {
+          showResult('danger', 'Ошибка загрузки файла (HTTP ' + res.status + '): ' + escHtml(t.slice(0, 200)));
+        });
+      }
+    })
+    .catch(function (err) {
+      document.getElementById('h5p-upload-progress').style.display = 'none';
+      showResult('danger', 'Ошибка сети: ' + escHtml(err.message));
+    });
+  }
+
+  function showResult(type, html) {
+    document.getElementById('h5p-upload-result').innerHTML =
+      '<div class="alert alert-' + type + '">' + html + '</div>';
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+})();
+</script>
+
+{% endunless %}

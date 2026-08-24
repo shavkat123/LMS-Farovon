@@ -1,0 +1,97 @@
+{% comment %}
+  Admin Audit — Журнал аудита (/admin/audit). Дизайн: AdminAudit.jsx. Примитивы .adm-* — customtheme.css.
+  ДЕМО-данные: единого журнала аудита нет. Подключится позже.
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+<style>
+  .adma2 { padding: 24px 0 56px; }
+  .adma2-head { margin-bottom: 16px; }
+  .adma2-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .adma2-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .adma2-tbl-wrap { overflow-x: auto; }
+  .adma2-actor-ico { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--adm-bg-muted); color: var(--adm-fg-3); flex-shrink: 0; font-size: 12px; }
+</style>
+
+<div class="container adm-scope adma2">
+
+  <div class="adma2-head">
+    <div style="display:flex;align-items:center;gap:8px;"><span class="adm-eyebrow">Система</span><span class="adm-demo-chip">демо</span></div>
+    <h1>Журнал аудита</h1>
+    <p>Действия администраторов и системные события.</p>
+  </div>
+
+  <div class="adm-card adm-toolbar" style="margin-bottom:16px;">
+    <div style="position:relative;flex:1 1 260px;min-width:220px;">
+      <i class="bi bi-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--adm-fg-3);font-size:14px;"></i>
+      <input type="text" class="adm-input" style="padding-left:32px;" placeholder="Поиск по действиям, IP…" disabled>
+    </div>
+    <button type="button" class="adm-chip" disabled><span class="l">Тип:</span> Все <i class="bi bi-chevron-down" style="font-size:11px;color:var(--adm-fg-3);"></i></button>
+    <button type="button" class="adm-chip" disabled><span class="l">Период:</span> Сегодня <i class="bi bi-chevron-down" style="font-size:11px;color:var(--adm-fg-3);"></i></button>
+    <div style="flex:1;"></div>
+    <button type="button" class="adm-btn adm-btn--ghost" disabled><i class="bi bi-download"></i> Экспорт лога</button>
+  </div>
+
+  <div class="adm-card" style="overflow:hidden;">
+    <div style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--adm-border-1);background:#FAFBFC;">
+      <span class="adm-eyebrow">Демо · показано 8 событий</span>
+      <span class="adm-pill adm-pill--danger adm-pill--dot">1 событие безопасности</span>
+    </div>
+    <div class="adma2-tbl-wrap">
+      <table class="adm-table">
+        <thead>
+          <tr>
+            <th style="width:100px;">Время</th>
+            <th style="width:170px;">Пользователь</th>
+            <th style="width:180px;">Действие</th>
+            <th>Объект</th>
+            <th style="width:130px;">IP-адрес</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% comment %} время|актор|действие|объект|ip|тип {% endcomment %}
+          {% assign logs = '14:32:08|М. Саидова|Назначила курс|«Безопасность» → Группа «Новые»|10.0.4.12|assign;14:18:44|Р. Халилов|Изменил роль|Ф. Исмоилов → Наставник|10.0.4.31|role;13:52:10|Система|Синхронизация AD|312 пользователей обновлено|—|sync;13:40:22|М. Саидова|Опубликовала курс|«Кибергигиена 2026»|10.0.4.12|publish;12:15:03|А. Каримов|Вход в систему|Успешно|10.0.7.88|auth;11:58:47|Неизвестно|Неудачный вход|admin@farovon — 3 попытки|203.0.113.9|security;11:30:12|Р. Халилов|Изменил настройки|Политики обучения|10.0.4.31|settings;10:44:55|Система|Отправлена рассылка|Напоминание о дедлайне (24 чел.)|—|broadcast' | split: ';' %}
+          {% for l in logs %}
+            {% assign f = l | split: '|' %}
+            {% assign ty = f[5] %}
+            {% case ty %}
+              {% when 'assign' %}{% assign ac = 'var(--adm-primary)' %}{% assign ai = 'person-plus' %}
+              {% when 'role' %}{% assign ac = 'var(--adm-accent)' %}{% assign ai = 'shield' %}
+              {% when 'sync' %}{% assign ac = 'var(--adm-fg-2)' %}{% assign ai = 'arrow-repeat' %}
+              {% when 'publish' %}{% assign ac = 'var(--adm-success)' %}{% assign ai = 'upload' %}
+              {% when 'auth' %}{% assign ac = 'var(--adm-success)' %}{% assign ai = 'box-arrow-in-right' %}
+              {% when 'security' %}{% assign ac = 'var(--adm-danger)' %}{% assign ai = 'shield-exclamation' %}
+              {% when 'settings' %}{% assign ac = 'var(--adm-fg-2)' %}{% assign ai = 'gear' %}
+              {% else %}{% assign ac = 'var(--adm-primary)' %}{% assign ai = 'send' %}
+            {% endcase %}
+            {% assign isSys = false %}{% if f[1] == 'Система' or f[1] == 'Неизвестно' %}{% assign isSys = true %}{% endif %}
+          <tr{% if ty == 'security' %} style="background:var(--adm-danger-50);"{% endif %}>
+            <td class="adm-mono" style="font-size:12px;color:var(--adm-fg-2);">{{ f[0] }}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:8px;">
+                {% if isSys %}<span class="adma2-actor-ico"><i class="bi bi-{% if f[1] == 'Система' %}cpu{% else %}person-x{% endif %}"></i></span>
+                {% else %}<span class="adm-avatar" style="width:24px;height:24px;font-size:10px;">{{ f[1] | slice: 0, 1 }}{{ f[1] | split: ' ' | last | slice: 0, 1 }}</span>{% endif %}
+                <span style="font-size:12.5px;font-weight:500;">{{ f[1] }}</span>
+              </div>
+            </td>
+            <td><span style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:{{ ac }};"><i class="bi bi-{{ ai }}" style="font-size:13px;"></i> {{ f[2] }}</span></td>
+            <td style="font-size:12.5px;color:var(--adm-fg-2);">{{ f[3] }}</td>
+            <td class="adm-mono" style="font-size:12px;color:var(--adm-fg-3);">{{ f[4] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+{% endunless %}

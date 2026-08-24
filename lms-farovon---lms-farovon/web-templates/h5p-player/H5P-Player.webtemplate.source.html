@@ -1,0 +1,757 @@
+{% if request.params['id'] and request.IsPreview != true %}
+{% assign contentid = request.params['id'] | xml_escape %}
+
+{% fetchxml h5pcontent %}
+<fetch top="1">
+  <entity name="new_h5pcontent">
+    <attribute name="new_name" />
+    <attribute name="new_description" />
+    <attribute name="new_librarytype" />
+    <attribute name="new_durationseconds" />
+    <filter type="and">
+      <condition attribute="new_h5pcontentid" operator="eq" value="{{ contentid }}" />
+      <condition attribute="new_isactive" operator="eq" value="1" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}
+  IMPORTANT: sharepointdocumentlocation FetchXML in Power Pages crashes on ANY lookup/join
+  attribute. Only primitive fields work. Library name is parsed from the 'name' field
+  which follows the pattern "[library] on [site]" — e.g. "Documents on Default Site 1".
+{% endcomment %}
+{% fetchxml spdoc %}
+<fetch top="1">
+  <entity name="sharepointdocumentlocation">
+    <attribute name="sharepointdocumentlocationid" />
+    <attribute name="relativeurl" />
+    <attribute name="name" />
+    <filter>
+      <condition attribute="regardingobjectid" operator="eq" value="{{ contentid }}" uitype="new_h5pcontent" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign spdocurl = '' %}
+{% assign sprelurl = '' %}
+{% assign splocid  = '' %}
+{% assign splibname = 'Documents' %}
+
+{% if spdoc.results.entities.size > 0 %}
+  {% assign sprow    = spdoc.results.entities[0] %}
+  {% assign sprelurl = sprow.relativeurl %}
+  {% assign splocid  = sprow.sharepointdocumentlocationid %}
+  {% comment %}Parse library name from "Documents on Default Site 1" → "Documents"{% endcomment %}
+  {% assign nameparts = sprow.name | split: ' on ' %}
+  {% if nameparts[0] != blank %}
+    {% assign splibname = nameparts[0] %}
+  {% endif %}
+  {% if sprelurl != blank %}
+    {% assign spdocurl = 'https://farovon.sharepoint.com/sites/FarovonLMS/' | append: splibname | append: '/' | append: sprelurl %}
+  {% endif %}
+{% endif %}
+
+{% if h5pcontent.results.entities.size > 0 %}
+{% assign content = h5pcontent.results.entities[0] %}
+
+<style>
+  .fv-player-page { padding: 20px 0 48px; }
+  .fv-player-topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .fv-player-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: #475569; text-decoration: none !important; padding: 6px 12px; border-radius: 7px; border: 1px solid #E5E7EB; background: #fff; transition: all 0.14s; }
+  .fv-player-back:hover { background: #EEF2F9; border-color: #1E3A8A; color: #1E3A8A !important; }
+  .fv-player-header { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; box-shadow: 0 1px 3px rgba(11,18,32,0.04); flex-wrap: wrap; }
+  .fv-player-meta { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #64748B; margin-bottom: 6px; }
+  .fv-player-title { font-size: 20px; font-weight: 700; color: #0B1220; margin: 0 0 8px; line-height: 1.3; }
+  .fv-player-desc { font-size: 13px; color: #64748B; margin: 0; max-width: 600px; }
+  .fv-player-badges { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .fv-player-badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 20px; font-size: 11px; font-weight: 600; padding: 4px 10px; }
+  .fv-player-container { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(11,18,32,0.04); min-height: 400px; }
+  .h5p-container { min-height: 400px; }
+</style>
+
+<div class="container fv-player-page">
+  <div class="fv-player-topbar">
+    <a href="/h5p-catalog" class="fv-player-back"><i class="bi bi-arrow-left"></i> Назад к каталогу</a>
+  </div>
+
+  <div class="fv-player-header">
+    <div style="flex:1;min-width:0;">
+      <div class="fv-player-meta">{{ content.new_librarytype | default: 'H5P' }}</div>
+      <h1 class="fv-player-title">{{ content.new_name }}</h1>
+      {% if content.new_description %}
+        <p class="fv-player-desc">{{ content.new_description }}</p>
+      {% endif %}
+      <div class="fv-player-badges">
+        {% if content.new_durationseconds %}
+          <span class="fv-player-badge" style="background:#EEF2F9;color:#1E3A8A;">
+            <i class="bi bi-clock"></i> {{ content.new_durationseconds | divided_by: 60 }} мин
+          </span>
+        {% endif %}
+        <span class="fv-player-badge" style="background:#ECF6EF;color:#15803D;">
+          <i class="bi bi-bar-chart-line"></i> xAPI прогресс
+        </span>
+      </div>
+    </div>
+    <a href="/h5p-progress" style="font-size:12px;font-weight:600;color:#1E3A8A;text-decoration:none;white-space:nowrap;padding-top:4px;">
+      <i class="bi bi-graph-up"></i> Мой прогресс
+    </a>
+  </div>
+
+  <div class="fv-player-container">
+    <div id="h5p-container-{{ contentid }}" class="h5p-container"></div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="/h5p.css">
+<script src="/main.bundle.js"></script>
+<script src="/jszip.min.js"></script>
+<script>
+(function () {
+  var contentId = '{{ contentid }}';
+  var userId    = '{{ user.contactid }}';
+  var spUrl     = '{{ spdocurl }}';
+  var spLocId   = '{{ splocid }}';
+  var spRelUrl  = '{{ sprelurl }}';
+  var spLib     = '{{ splibname }}';
+  var container = document.getElementById('h5p-container-' + contentId);
+  var VBASE     = window.location.origin + '/h5p-content/' + contentId;
+  var blobs     = {};   // path → blob: URL (binary content, fetched via window.fetch)
+  var texts     = {};   // path → string (JS/CSS, inlined synchronously to avoid eval race)
+
+  console.log('[H5P] contentId:', contentId);
+  console.log('[H5P] spUrl:',    spUrl    || '(empty)');
+  console.log('[H5P] spLocId:',  spLocId  || '(empty)');
+  console.log('[H5P] spRelUrl:', spRelUrl || '(empty)');
+  console.log('[H5P] spLib:',    spLib    || '(empty)');
+
+  if (!window.H5PStandalone) {
+    container.innerHTML = '<div class="alert alert-danger">H5PStandalone не загружена (проверьте CDN)</div>';
+    return;
+  }
+  // Save reference — frame.bundle.js (loaded later) shares webpack runtime symbols
+  // and clobbers window.H5PStandalone.
+  var H5PS = window.H5PStandalone;
+
+  // ── xAPI state (IIFE-scope so saveXAPIProgress/saveXAPIWithToken can access) ─
+  var allStatements = [];
+  var progressId    = null;   // UUID assigned after first successful POST
+  var postPending   = false;  // true while POST is in-flight (no progressId yet)
+  var lastSaved     = 0;
+  var saveInFlight  = false;
+
+  container.innerHTML =
+    '<div class="text-center py-5">' +
+    '<div class="spinner-border text-primary" role="status"></div>' +
+    '<p class="mt-2 text-muted">Загрузка содержимого…</p></div>';
+
+  // ── Read CSP nonce from a nonce-bearing <script src> element ─────────────
+  // Power Pages adds nonce to external <script src> tags it renders.
+  // Inline scripts get sha256 hashes instead.
+  // The .nonce IDL property is not hidden by browsers (only getAttribute is).
+  var cspNonce = '';
+  try {
+    var _nscripts = document.querySelectorAll('script[src]');
+    for (var _ni = 0; _ni < _nscripts.length; _ni++) {
+      var _n = _nscripts[_ni].nonce;
+      if (_n) { cspNonce = _n; break; }
+    }
+  } catch (e) {}
+  console.log('[H5P] CSP nonce:', cspNonce ? 'found (len=' + cspNonce.length + ')' : 'NOT FOUND — frame.bundle.js may be blocked by CSP');
+
+  // ── MIME helper ──────────────────────────────────────────────────────────
+  function mime(path) {
+    var e = (path.split('.').pop() || '').toLowerCase();
+    return ({ json:'application/json', js:'application/javascript',
+      css:'text/css', html:'text/html',
+      png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg',
+      gif:'image/gif', svg:'image/svg+xml',
+      mp4:'video/mp4', webm:'video/webm', mp3:'audio/mpeg',
+      woff:'font/woff', woff2:'font/woff2', ttf:'font/ttf' })[e]
+      || 'application/octet-stream';
+  }
+
+  // ── Patch window.fetch ───────────────────────────────────────────────────
+  var _fetch = window.fetch;
+  window.fetch = function (input, init) {
+    var url = typeof input === 'string' ? input
+            : (input && input.url) ? input.url : String(input);
+    if (url.indexOf(VBASE + '/') === 0) {
+      var fp = url.slice(VBASE.length + 1).split('?')[0];
+      console.log('[H5P] fetch intercept:', fp, blobs[fp] ? 'HIT' : 'MISS');
+      return blobs[fp] ? _fetch(blobs[fp], init)
+                       : Promise.reject(new Error('H5P: file not in bundle: ' + fp));
+    }
+    if (url.indexOf('https://') === 0 && url.indexOf('.sharepoint.com') > -1) {
+      init = Object.assign({}, init || {});
+      if (!init.credentials) init.credentials = 'include';
+    }
+    return _fetch.apply(this, arguments);
+  };
+
+  // ── Patch DOM: iframe srcdoc nonce injection + blob URL rewriting ─────────
+  // Called immediately so patches are in place before h5p-standalone creates iframes.
+  (function patchDOM() {
+    // 1. Patch HTMLIFrameElement.prototype.srcdoc setter.
+    //    h5p-standalone creates iframe.srcdoc = '...<script src="frame.bundle.js">...'
+    //    That inner <script> has no nonce → CSP blocks it.
+    //    We inject the page nonce so it is allowed.
+    try {
+      var desc = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'srcdoc');
+      if (desc && desc.set) {
+        var _origSrcdocSet = desc.set;
+        Object.defineProperty(HTMLIFrameElement.prototype, 'srcdoc', {
+          configurable: true,
+          get: desc.get,
+          set: function (html) {
+            if (typeof html === 'string') {
+              // Inject blob-URL rewriter into iframe BEFORE frame.bundle.js loads.
+              // External <script src> passes CSP via 'self' (no nonce needed).
+              var injected = '<script src="/h5p-iframe-patch.js"><\/script>';
+              if (html.indexOf('<head>') >= 0) {
+                html = html.replace('<head>', '<head>' + injected);
+              } else if (/<html(\s[^>]*)?>/i.test(html)) {
+                html = html.replace(/<html(\s[^>]*)?>/i, function (m) { return m + injected; });
+              } else {
+                html = injected + html;
+              }
+              console.log('[H5P] iframe srcdoc: blob rewriter <script> injected');
+              if (cspNonce) {
+                html = html.replace(/<script(\s[^>]*)?>/g, function (m, attrs) {
+                  if ((attrs || '').indexOf('nonce') >= 0) return m;
+                  return '<script' + (attrs || '') + ' nonce="' + cspNonce + '">';
+                });
+                console.log('[H5P] iframe srcdoc: nonce injected into <script> tags');
+              }
+            }
+            _origSrcdocSet.call(this, html);
+          }
+        });
+        console.log('[H5P] iframe.srcdoc patch applied');
+      } else {
+        console.warn('[H5P] Could not patch iframe.srcdoc — no setter found');
+      }
+    } catch (e) { console.warn('[H5P] iframe.srcdoc patch error:', e); }
+
+    // 2. Patch document.createElement.
+    //    Strategy when h5p sets el.src/el.href to a VBASE URL:
+    //    - <script> with extracted text → eval synchronously (preserves load order, no race),
+    //      DON'T touch real src attribute (browser would block blob: via CSP).
+    //    - <link rel=stylesheet> with extracted text → inject <style>text</style>
+    //      with relative url(...) rewritten to blob: URLs (so fonts/images resolve).
+    //    Falls back to direct attribute set for other VBASE assets (img, video, etc.).
+    function rewriteCssUrls(cssText, baseFp) {
+      // baseFp is something like "H5P.X-1.0/styles/x.css" — directory is "H5P.X-1.0/styles/".
+      var slash = baseFp.lastIndexOf('/');
+      var baseDir = slash >= 0 ? baseFp.slice(0, slash + 1) : '';
+      return cssText.replace(/url\(\s*(['"]?)([^'")\s]+)\1\s*\)/g, function (m, q, ref) {
+        // Skip data:, blob:, http(s):, absolute paths.
+        if (/^(data:|blob:|https?:|\/)/i.test(ref)) return m;
+        // Resolve relative path: collapse ../ segments.
+        var parts = (baseDir + ref).split('/');
+        var stack = [];
+        for (var i = 0; i < parts.length; i++) {
+          var p = parts[i];
+          if (p === '' || p === '.') continue;
+          if (p === '..') stack.pop();
+          else stack.push(p);
+        }
+        var resolved = stack.join('/');
+        if (blobs[resolved]) return 'url(' + blobs[resolved] + ')';
+        // Try without query string
+        var noQ = resolved.split('?')[0];
+        if (blobs[noQ]) return 'url(' + blobs[noQ] + ')';
+        return m; // leave as-is if not in bundle
+      });
+    }
+    function fireEvent(el, type) {
+      // Trigger BOTH addEventListener listeners AND el.onXXX property handler.
+      try { el.dispatchEvent(new Event(type)); } catch (e) {}
+      var prop = el['on' + type];
+      if (typeof prop === 'function') {
+        try { prop.call(el, { target: el, type: type }); } catch (e) {}
+      }
+    }
+    function inlineScript(el, text) {
+      try {
+        (0, eval)(text);
+      } catch (e) {
+        console.error('[H5P] eval err in', el.__h5pFp || '?', ':', e.message);
+        setTimeout(function () { fireEvent(el, 'error'); }, 0);
+        return;
+      }
+      setTimeout(function () { fireEvent(el, 'load'); }, 0);
+    }
+    function inlineStyle(el, text, fp) {
+      var styleEl = _create('style');
+      styleEl.textContent = rewriteCssUrls(text, fp);
+      (document.head || document.documentElement).appendChild(styleEl);
+      setTimeout(function () { fireEvent(el, 'load'); }, 0);
+    }
+
+    var _create = document.createElement.bind(document);
+    document.createElement = function (tag) {
+      var el    = _create(tag);
+      var lower = (tag || '').toLowerCase();
+      if (lower === 'script' && cspNonce) {
+        try { el.nonce = cspNonce; } catch (e) {}
+      }
+      var attr = ({
+        script: 'src', link: 'href',
+        video : 'src', audio: 'src', source: 'src', track: 'src',
+        img   : 'src', iframe: 'src'
+      })[lower];
+      if (attr) {
+        var stored = '';
+        Object.defineProperty(el, attr, {
+          get: function () { return stored; },
+          set: function (val) {
+            if (typeof val === 'string' && val.indexOf(VBASE + '/') === 0) {
+              var fp = val.slice(VBASE.length + 1).split('?')[0];
+              el.__h5pFp = fp;
+              // Synchronous text inline — preferred path for JS/CSS.
+              if (texts[fp] !== undefined) {
+                stored = val;
+                if (lower === 'script') {
+                  console.log('[H5P] inline script:', fp);
+                  inlineScript(el, texts[fp]);
+                  return;
+                }
+                if (lower === 'link') {
+                  var rel = el.rel || el.getAttribute('rel') || '';
+                  if (rel === '' || rel === 'stylesheet') {
+                    console.log('[H5P] inline style:', fp);
+                    inlineStyle(el, texts[fp], fp);
+                    return;
+                  }
+                }
+              }
+              // Fallback: rewrite to blob: URL (binary assets like fonts/images via getAttribute paths).
+              if (blobs[fp]) { console.log('[H5P] blob rewrite:', fp); val = blobs[fp]; }
+            }
+            stored = val;
+            el.setAttribute(attr, val);
+          },
+          configurable: true
+        });
+      }
+      return el;
+    };
+
+    // 3. Universal interception — jQuery .attr('src'), innerHTML, прямые property-сеты.
+    //    Course Presentation/Image ставят <img> через $.attr → setAttribute, МИМО
+    //    instance-сеттера из createElement-патча → реальный запрос /h5p-content/... → 404.
+    //    Ловим на уровне Element.prototype.setAttribute + прототипных сеттеров + MutationObserver.
+    var VPATH = '/h5p-content/' + contentId + '/';
+    function mapUrl(u) {
+      if (typeof u !== 'string') return null;
+      var fp = null;
+      if (u.indexOf(VBASE + '/') === 0) fp = u.slice(VBASE.length + 1);
+      else if (u.indexOf(VPATH) === 0) fp = u.slice(VPATH.length);
+      if (fp === null) return null;
+      fp = fp.split('?')[0].split('#')[0];
+      try { fp = decodeURIComponent(fp); } catch (e) {}
+      if (blobs[fp]) return blobs[fp];
+      console.warn('[H5P] no blob for:', fp);
+      return null;
+    }
+    var _setAttribute = Element.prototype.setAttribute;
+    Element.prototype.setAttribute = function (name, value) {
+      if ((name === 'src' || name === 'href' || name === 'data') && typeof value === 'string') {
+        var b = mapUrl(value);
+        if (b) { console.log('[H5P] setAttribute rewrite:', value.slice(VBASE.length + 1, VBASE.length + 80)); value = b; }
+      }
+      return _setAttribute.call(this, name, value);
+    };
+    [[window.HTMLImageElement, 'src'], [window.HTMLMediaElement, 'src'], [window.HTMLSourceElement, 'src'], [window.HTMLTrackElement, 'src']].forEach(function (pair) {
+      try {
+        if (!pair[0]) return;
+        var proto = pair[0].prototype, attr = pair[1];
+        var d = Object.getOwnPropertyDescriptor(proto, attr);
+        if (!d || !d.set) return;
+        Object.defineProperty(proto, attr, {
+          configurable: true,
+          get: d.get,
+          set: function (v) { var b = mapUrl(v); d.set.call(this, b || v); }
+        });
+      } catch (e) {}
+    });
+    function rewriteTree(root) {
+      if (!root || root.nodeType !== 1) return;
+      var list = [root];
+      if (root.querySelectorAll) list = list.concat(Array.prototype.slice.call(root.querySelectorAll('img,source,video,audio,track,object')));
+      list.forEach(function (el) {
+        if (!el.getAttribute) return;
+        var cur = el.getAttribute('src');
+        var b = mapUrl(cur);
+        if (b) _setAttribute.call(el, 'src', b);
+      });
+    }
+    try {
+      new MutationObserver(function (muts) {
+        for (var i = 0; i < muts.length; i++) {
+          var m = muts[i];
+          if (m.type === 'attributes') rewriteTree(m.target);
+          else for (var j = 0; j < m.addedNodes.length; j++) rewriteTree(m.addedNodes[j]);
+        }
+      }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
+    } catch (e) { console.warn('[H5P] MutationObserver failed:', e); }
+
+    console.log('[H5P] DOM patches applied (+setAttribute/proto/observer)');
+  })();
+
+  // ── Power Automate flow proxy URL ───────────────────────────────────────
+  // Proxies SharePoint file download — no CORS issues since flow is server-side.
+  var FLOW_URL = 'https://defaultc50a298835254bd2aca8ff2e12cb2c.b8.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/89f3200e86c24eefb32ffad06d22d4ed/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=-Rgw9F0XSyFEGFR81jf1lmb2Xhmhu17VhF72DCvZqFY';
+
+  // ── Bootstrap H5P core into parent window ─────────────────────────────────
+  // In div-mode, h5p-standalone doesn't load frame.bundle.js — but library scripts
+  // (DragNBar, JoubelUI, Question, etc.) need H5P core globals (H5P.jQuery,
+  // H5P.EventDispatcher, H5P.Question, ...). frame.bundle.js bundles these.
+  // We pre-load it with a minimal H5PIntegration stub so it initialises silently.
+  window.H5PIntegration = window.H5PIntegration || {
+    baseUrl            : window.location.origin,
+    url                : window.location.origin + '/h5p',
+    siteUrl            : window.location.origin,
+    postUserStatistics : false,
+    saveFreq           : false,
+    fullscreenDisabled : 0,
+    hubIsEnabled       : false,
+    reportingIsEnabled : false,
+    ajax               : { setFinished: '', contentUserData: '' },
+    l10n               : { H5P: {} },
+    loadedJs           : [],
+    loadedCss          : [],
+    core               : { scripts: [], styles: [] },
+    contents           : {},
+    user               : { name: '', mail: '' }
+  };
+
+  var coreScript = document.createElement('script');
+  coreScript.src = '/frame.bundle.js';
+  coreScript.onload = function () {
+    console.log('[H5P] frame.bundle.js loaded — H5P core ready in parent. H5P:', !!window.H5P, ', $:', typeof window.jQuery);
+    loadViaFlow(contentId + '.h5p');
+  };
+  coreScript.onerror = function () {
+    console.error('[H5P] failed to load /frame.bundle.js');
+    showError('Не удалось загрузить H5P core');
+  };
+  document.head.appendChild(coreScript);
+
+  // ── Load .h5p via Power Automate proxy ───────────────────────────────────
+  // Запрос к Flow с ретраем на транзиентные ошибки шлюза (502/503/504 —
+  // часто «холодный старт» Power Automate) и понятными сообщениями.
+  async function flowFetch(fileName, attempt) {
+    attempt = attempt || 1;
+    var response = await _fetch(FLOW_URL, {
+      method : 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept'      : 'application/octet-stream, application/json, text/plain, */*'
+      },
+      body   : JSON.stringify({ fileName: fileName })
+    });
+    if (!response.ok) {
+      if ((response.status === 502 || response.status === 503 || response.status === 504) && attempt < 3) {
+        console.warn('[H5P] Flow ' + response.status + ' — повтор ' + (attempt + 1) + '/3 через 2с');
+        await new Promise(function (r) { setTimeout(r, 2000); });
+        return flowFetch(fileName, attempt + 1);
+      }
+      if (response.status === 502 || response.status === 503 || response.status === 504) {
+        throw new Error('Сервис загрузки уроков временно недоступен (Flow ' + response.status +
+          '). Обычно это значит, что файл этого урока не найден в хранилище или Power Automate не ответил. ' +
+          'Проверьте, что .h5p загружен для урока, и повторите позже.');
+      }
+      if (response.status === 404) {
+        throw new Error('Файл урока не найден в хранилище (404). Загрузите .h5p через раздел «Загрузка H5P».');
+      }
+      throw new Error('Flow HTTP ' + response.status + ' ' + response.statusText);
+    }
+    return response;
+  }
+
+  // Скачивание + чтение тела с ретраем на СЕТЕВЫЕ обрывы (ERR_HTTP2_PROTOCOL_ERROR,
+  // Failed to fetch): статус 200 может прийти, а стрим тела оборваться — ловим и повторяем.
+  async function fetchBuf(fileName, attempt) {
+    attempt = attempt || 1;
+    try {
+      var response = await flowFetch(fileName, 1);
+      var ct = (response.headers.get('Content-Type') || '').toLowerCase();
+      console.log('[H5P] Flow response Content-Type:', ct);
+
+      var buf;
+      // Power Automate may return raw binary or JSON with base64-encoded content
+      if (ct.indexOf('application/json') >= 0 || ct.indexOf('text/plain') >= 0) {
+        var txt = await response.text();
+        // Try JSON base64 first (PA default when body = file content expression)
+        var parsed = null;
+        try { parsed = JSON.parse(txt); } catch (e) { /* not JSON */ }
+        if (parsed) {
+          var b64 = parsed['$content'] || parsed.content || parsed.value || parsed.body || parsed.data;
+          if (!b64) throw new Error('Flow JSON missing content field. Keys: ' + Object.keys(parsed).join(','));
+          buf = base64ToBuffer(b64);
+        } else if (/^[A-Za-z0-9+/=\s]+$/.test(txt.trim())) {
+          buf = base64ToBuffer(txt.trim());
+        } else {
+          throw new Error('Flow: unexpected response format. Content-Type: ' + ct +
+            '. First 200 chars: ' + txt.slice(0, 200));
+        }
+      } else {
+        // Binary (application/octet-stream or similar)
+        buf = await response.arrayBuffer();
+      }
+      return buf;
+    } catch (err) {
+      var msg = String((err && err.message) || err);
+      var isNet = (err instanceof TypeError) || /Failed to fetch|NetworkError|network|HTTP2|load failed/i.test(msg);
+      if (isNet && attempt < 3) {
+        console.warn('[H5P] сеть оборвалась (' + msg + ') — повтор ' + (attempt + 1) + '/3 через 2с');
+        await new Promise(function (r) { setTimeout(r, 2000); });
+        return fetchBuf(fileName, attempt + 1);
+      }
+      if (isNet) {
+        throw new Error('Соединение оборвалось при загрузке файла урока. Обновите страницу (Ctrl+F5) и попробуйте ещё раз. Детали: ' + msg);
+      }
+      throw err;
+    }
+  }
+
+  async function loadViaFlow(fileName) {
+    try {
+      console.log('[H5P] Loading via Flow:', fileName);
+      var buf = await fetchBuf(fileName, 1);
+
+      console.log('[H5P] Flow returned', buf.byteLength, 'bytes — extracting ZIP');
+      // Понятная диагностика вместо криптичного «Corrupted zip»
+      if (!buf || buf.byteLength < 100) {
+        throw new Error('Файл урока пустой или не загружен (' + (buf ? buf.byteLength : 0) +
+          ' байт). Похоже, .h5p не сохранился в базе — переzагрузите урок через раздел «Загрузка H5P».');
+      }
+      var zip;
+      try {
+        zip = await JSZip.loadAsync(buf);
+      } catch (zipErr) {
+        throw new Error('Файл урока повреждён или это не .h5p-архив (получено ' + buf.byteLength +
+          ' байт). Переzагрузите урок. Детали: ' + zipErr.message);
+      }
+      var tasks = [];
+      zip.forEach(function (path, file) {
+        if (file.dir) return;
+        // Always extract as blob (for fetch interception of JSON / binary / fonts).
+        tasks.push(file.async('blob').then(function (b) {
+          blobs[path] = URL.createObjectURL(new Blob([b], { type: mime(path) }));
+        }));
+        // Additionally extract JS/CSS as text — used for synchronous inline injection
+        // (avoids blob: CSP issues and async eval ordering races).
+        var ext = (path.split('.').pop() || '').toLowerCase();
+        if (ext === 'js' || ext === 'css') {
+          tasks.push(file.async('text').then(function (t) { texts[path] = t; }));
+        }
+      });
+      await Promise.all(tasks);
+
+      // Expose to iframe patch (h5p-iframe-patch.js reads these via parent.*).
+      window.__h5pBlobs = blobs;
+      window.__h5pVBASE = VBASE;
+
+      var keys = Object.keys(blobs);
+      console.log('[H5P] ZIP extracted:', keys.length, 'files');
+      console.log('[H5P] ZIP keys (first 10):', keys.slice(0, 10));
+      console.log('[H5P] has h5p.json:', keys.indexOf('h5p.json') >= 0 ? 'YES' : 'NO (check ZIP structure!)');
+      console.log('[H5P] VBASE:', VBASE);
+      initH5P(VBASE);
+    } catch (err) {
+      console.error('[H5P] Flow error:', err);
+      showError(escHtml(err.message));
+    }
+  }
+
+  function base64ToBuffer(b64) {
+    // Защита от искажений при передаче: пробел ← '+' (URL-декод), URL-safe (-_ → +/),
+    // затем убрать только переносы строк. НЕ удалять пробелы вслепую (это стирало бы '+').
+    b64 = String(b64).replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/').replace(/[\r\n\t\f\v]/g, '');
+    // Дополнить паддингом '=' до кратности 4 (иначе atob обрежет хвост → битый zip)
+    while (b64.length % 4 !== 0) { b64 += '='; }
+    var binary = atob(b64);
+    var buf = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) buf[i] = binary.charCodeAt(i);
+    return buf.buffer;
+  }
+
+  // ── Init h5p-standalone ───────────────────────────────────────────────────
+  function initH5P(h5pJsonPath) {
+    console.log('[H5P] initH5P starting, path:', h5pJsonPath);
+    // Clear loading-spinner placeholder — h5p-standalone appends to container
+    // without clearing, so spinner would otherwise stay visible above the player.
+    container.innerHTML = '';
+
+    new H5PS.H5P(container, {
+      h5pJsonPath : h5pJsonPath,
+      embedType   : 'div',
+      frameJs     : '/frame.bundle.js',
+      frameCss    : '/h5p.css'
+    })
+    .then(function () {
+      console.log('[H5P] H5PStandalone initialized successfully');
+      if (window.H5P && window.H5P.externalDispatcher) {
+        window.H5P.externalDispatcher.on('xAPI', function (event) {
+          var stmt   = event.data.statement;
+          var verbId = (stmt.verb && stmt.verb.id) || '';
+          var verbShort = verbId.split('/').pop() || verbId;
+          console.log('[H5P xAPI] verb:', verbShort, '| success:', stmt.result && stmt.result.success, '| score:', stmt.result && stmt.result.score);
+
+          // Всегда добавляем в массив — не теряем ни одного стейтмента
+          allStatements.push(stmt);
+
+          var isCompleted = verbId.indexOf('completed') !== -1;
+          var now = Date.now();
+
+          // "completed" сохраняем немедленно; остальные — не чаще раз в 8 сек
+          if (isCompleted || now - lastSaved >= 8000) {
+            lastSaved = now;
+            saveXAPIProgress(stmt, isCompleted);
+          }
+        });
+      }
+    })
+    .catch(function (err) {
+      console.error('[H5P] init failed:', err);
+      showError('Ошибка инициализации H5P: ' + escHtml(err.message));
+    });
+  }
+
+  // ── xAPI → Dataverse ─────────────────────────────────────────────────────
+  // CSRF token cache — fetched once from Power Pages /_layout/tokenhtml endpoint.
+  var _csrfTokenPromise = null;
+  function getCsrfToken() {
+    if (_csrfTokenPromise) return _csrfTokenPromise;
+    _csrfTokenPromise = _fetch('/_layout/tokenhtml', { credentials: 'include' })
+      .then(function (r) { return r.ok ? r.text() : ''; })
+      .then(function (html) {
+        if (!html) return '';
+        var inputMatch = html.match(/<input[^>]+__RequestVerificationToken[^>]*>/i);
+        if (inputMatch) {
+          var valMatch = inputMatch[0].match(/value="([^"]+)"/);
+          if (valMatch) return valMatch[1];
+        }
+        var m = html.match(/value="([^"]{20,})"/);
+        return m ? m[1] : '';
+      })
+      .catch(function () { return ''; });
+    return _csrfTokenPromise;
+  }
+
+  function saveXAPIProgress(triggerStmt, isCompleted) {
+    // Не блокируем "completed" — он должен сохраниться в любом случае
+    if (saveInFlight && !isCompleted) return;
+
+    // POST ещё летит — progressId не известен. Completed ждёт и повторяет.
+    if (postPending) {
+      if (isCompleted) {
+        setTimeout(function () { saveXAPIProgress(triggerStmt, isCompleted); }, 800);
+      }
+      return;
+    }
+
+    saveInFlight = true;
+    getCsrfToken().then(function (tok) {
+      saveXAPIWithToken(triggerStmt, tok);
+    });
+  }
+
+  function saveXAPIWithToken(stmt, tok) {
+    var hdrs = { 'Content-Type': 'application/json' };
+    if (tok) hdrs['__RequestVerificationToken'] = tok;
+
+    var isFirstSave = !progressId;
+
+    var body = {
+      'new_xapistatements': JSON.stringify(allStatements),
+      'new_lastupdated'   : new Date().toISOString()
+    };
+    if (isFirstSave) {
+      // new_h5pprogressid не включён в Web API — ID присвоит сервер
+      body['new_user@odata.bind']         = '/contacts(' + userId + ')';
+      body['new_h5pcontent@odata.bind']   = '/new_h5pcontents(' + contentId + ')';
+      body['new_name']                    = 'xAPI ' + new Date().toISOString();
+      postPending = true;
+    }
+
+    // Scalar-поля из текущего стейтмента (score, completion, success, duration)
+    var r = stmt.result;
+    var decParts = [];
+    if (r) {
+      if (r.score) {
+        if (r.score.raw    != null) decParts.push('"new_scoreraw":'    + parseFloat((+r.score.raw).toFixed(4)));
+        if (r.score.max    != null) decParts.push('"new_scoremax":'    + parseFloat((+r.score.max).toFixed(4)));
+        if (r.score.scaled != null) decParts.push('"new_scorescaled":' + (+r.score.scaled).toFixed(4));
+      }
+      if (r.completion !== undefined) body.new_completion = !!r.completion;
+      if (r.success    !== undefined) body.new_success    = !!r.success;
+      if (r.duration) {
+        var durSec = parseISO(r.duration);
+        if (durSec != null) decParts.push('"new_lastposition":' + durSec.toFixed(4));
+      }
+    }
+
+    var bodyJson = JSON.stringify(body);
+    if (decParts.length) bodyJson = bodyJson.slice(0, -1) + ',' + decParts.join(',') + '}';
+
+    var method = isFirstSave ? 'POST' : 'PATCH';
+    var url    = isFirstSave
+      ? '/_api/new_h5pprogresses'
+      : '/_api/new_h5pprogresses(' + progressId + ')';
+
+    console.log('[H5P] xAPI save (' + method + ') id:', progressId, '| stmts:', allStatements.length);
+
+    _fetch(url, {
+      method: method, headers: hdrs, body: bodyJson, credentials: 'include'
+    }).then(function (res) {
+      saveInFlight = false;
+      if (res.ok) {
+        if (isFirstSave) {
+          // Извлекаем UUID из заголовка OData-EntityId: .../(UUID)
+          var entityHdr = res.headers.get('OData-EntityId') || res.headers.get('Location') || '';
+          var m = entityHdr.match(/\(([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\)/i);
+          if (m) progressId = m[1];
+          postPending = false;
+          console.log('[H5P] xAPI POST OK — progressId:', progressId || '(header missing)');
+        } else {
+          console.log('[H5P] xAPI PATCH OK — progressId:', progressId);
+        }
+      } else {
+        if (isFirstSave) postPending = false;
+        res.text().then(function (txt) {
+          console.warn('[H5P] xAPI save failed:', res.status, res.statusText, '—', txt.slice(0, 600));
+        });
+      }
+    }).catch(function (e) {
+      saveInFlight = false;
+      if (isFirstSave) postPending = false;
+      console.error('[H5P] xAPI save error:', e);
+    });
+  }
+
+  function parseISO(iso) {
+    var m = /PT(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?/.exec(iso || '');
+    if (!m) return null;
+    return Math.round(+(m[1]||0)*3600 + +(m[2]||0)*60 + +(m[3]||0));
+  }
+
+  function showError(html) {
+    container.innerHTML = '<div class="alert alert-danger">' + html + '</div>';
+  }
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+})();
+</script>
+{% else %}
+<div class="alert alert-warning">H5P контент не найден или не активен</div>
+{% endif %}
+{% else %}
+<div class="alert alert-info">Укажите id контента в URL: ?id=&lt;guid&gt;</div>
+{% endif %}

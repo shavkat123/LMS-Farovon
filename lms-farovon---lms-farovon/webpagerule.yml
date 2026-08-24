@@ -49,6 +49,10 @@
   adx_scope: 1
   adx_webpageaccesscontrolrule_webrole:
   - e330e0ff-a538-f111-88b5-7ced8d76b3cc
+  - 3b5fe5f3-a538-f111-88b5-7ced8d76b3cc
+  - a1b2c3d4-1111-2222-3333-000000000001
+  - a1b2c3d4-1111-2222-3333-000000000002
+  - a1b2c3d4-1111-2222-3333-000000000003
   adx_webpageaccesscontrolruleid: ec5ee5f3-a538-f111-88b5-7ced8d76b3cc
   adx_webpageid: 4a60e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_name: Restrict Read on Create Course
@@ -56,5 +60,9 @@
   adx_scope: 1
   adx_webpageaccesscontrolrule_webrole:
   - e330e0ff-a538-f111-88b5-7ced8d76b3cc
+  - 3b5fe5f3-a538-f111-88b5-7ced8d76b3cc
+  - a1b2c3d4-1111-2222-3333-000000000001
+  - a1b2c3d4-1111-2222-3333-000000000002
+  - a1b2c3d4-1111-2222-3333-000000000003
   adx_webpageaccesscontrolruleid: f35fe5f3-a538-f111-88b5-7ced8d76b3cc
   adx_webpageid: d805e5ed-a538-f111-88b5-7ced8d76b3cc

@@ -1,0 +1,251 @@
+{% comment %}
+  Admin Broadcasts — Рассылки (/admin/broadcasts). Примитивы .adm-* — customtheme.css.
+  РЕАЛЬНЫЕ данные: таблица new_broadcast (активные). KPI — по статусам.
+  Создание записей пока в Power Apps (форму/модал добавим позже). Движок доставки — отдельная интеграция.
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+{% fetchxml bcasts %}
+<fetch top="200">
+  <entity name="new_broadcast">
+    <attribute name="new_broadcastid" />
+    <attribute name="new_name" />
+    <attribute name="new_channel" />
+    <attribute name="new_audience" />
+    <attribute name="new_status" />
+    <attribute name="new_senddatetime" />
+    <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
+    <order attribute="new_senddatetime" descending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── KPI по статусам ──{% endcomment %}
+{% assign b_total = 0 %}{% assign b_sent = 0 %}{% assign b_sched = 0 %}{% assign b_draft = 0 %}
+{% for b in bcasts.results.entities %}
+  {% assign b_total = b_total | plus: 1 %}
+  {% assign st = b.new_status.label | default: 'Черновик' %}
+  {% if st == 'Отправлено' %}{% assign b_sent = b_sent | plus: 1 %}
+  {% elsif st == 'Запланировано' %}{% assign b_sched = b_sched | plus: 1 %}
+  {% else %}{% assign b_draft = b_draft | plus: 1 %}{% endif %}
+{% endfor %}
+
+<style>
+  .admb { padding: 24px 0 56px; }
+  .admb-head { margin-bottom: 20px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .admb-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .admb-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .admb-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 900px) { .admb-kpis { grid-template-columns: repeat(2, 1fr); } }
+  .admb-tbl-wrap { overflow-x: auto; }
+  .admb-search { position: relative; flex: 1 1 260px; min-width: 220px; }
+  .admb-search i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--adm-fg-3); font-size: 14px; pointer-events: none; }
+  .admb-search .adm-input { padding-left: 32px; }
+</style>
+
+<div class="container adm-scope admb">
+
+  <div class="admb-head">
+    <div>
+      <span class="adm-eyebrow">Коммуникации</span>
+      <h1>Рассылки</h1>
+      <p>Объявления и уведомления сотрудникам.</p>
+    </div>
+    <button type="button" class="adm-btn adm-btn--primary" id="admbNewBtn"><i class="bi bi-plus-lg"></i> Новая рассылка</button>
+  </div>
+
+  <div class="admb-kpis">
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Всего рассылок</span><i class="bi bi-megaphone"></i></div><div class="adm-stat-val">{{ b_total }}</div><div class="adm-stat-foot"><span class="adm-stat-sub">активных</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Отправлено</span><i class="bi bi-send-check"></i></div><div class="adm-stat-val">{{ b_sent }}</div><div class="adm-stat-foot"><span class="adm-stat-sub">доставлено</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Запланировано</span><i class="bi bi-calendar-event"></i></div><div class="adm-stat-val">{{ b_sched }}</div><div class="adm-stat-foot"><span class="adm-stat-sub">в очереди</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Черновиков</span><i class="bi bi-pencil-square"></i></div><div class="adm-stat-val">{{ b_draft }}</div><div class="adm-stat-foot"><span class="adm-stat-sub">не отправлены</span></div></div>
+  </div>
+
+  <div class="adm-card adm-toolbar" style="margin-bottom:16px;">
+    <div class="admb-search">
+      <i class="bi bi-search"></i>
+      <input type="text" class="adm-input" id="admbSearch" placeholder="Тема рассылки, аудитория…" autocomplete="off">
+    </div>
+  </div>
+
+  <div class="adm-card" style="overflow:hidden;">
+    {% if b_total == 0 %}
+    <div style="padding:48px 24px;text-align:center;color:var(--adm-fg-3);">
+      <i class="bi bi-megaphone" style="display:block;font-size:40px;color:#CBD5E1;margin-bottom:12px;"></i>
+      Рассылок пока нет. Создайте запись в таблице «Рассылка» (Power Apps).
+    </div>
+    {% else %}
+    <div class="admb-tbl-wrap">
+      <table class="adm-table" id="admbTable">
+        <thead>
+          <tr>
+            <th>Рассылка</th>
+            <th style="width:140px;">Канал</th>
+            <th style="width:180px;">Аудитория</th>
+            <th style="width:170px;">Отправка</th>
+            <th style="width:140px;">Статус</th>
+          </tr>
+        </thead>
+        <tbody id="admbBody">
+          {% for b in bcasts.results.entities %}
+            {% assign nm  = b.new_name | default: 'Без названия' %}
+            {% assign ch  = b.new_channel.label | default: '—' %}
+            {% assign aud = b.new_audience.label | default: 'Все' %}
+            {% assign st  = b.new_status.label | default: 'Черновик' %}
+          <tr data-search="{{ nm | downcase }} {{ aud | downcase }} {{ ch | downcase }}">
+            <td style="font-weight:600;">{{ nm }}</td>
+            <td style="color:var(--adm-fg-2);">{{ ch }}</td>
+            <td style="color:var(--adm-fg-2);">{{ aud }}</td>
+            <td style="font-size:12px;color:var(--adm-fg-3);">{% if b.new_senddatetime %}{{ b.new_senddatetime | date: 'dd.MM.yyyy HH:mm' }}{% else %}—{% endif %}</td>
+            <td>
+              {% if st == 'Отправлено' %}<span class="adm-pill adm-pill--success adm-pill--dot">Отправлено</span>
+              {% elsif st == 'Запланировано' %}<span class="adm-pill adm-pill--info adm-pill--dot">Запланировано</span>
+              {% else %}<span class="adm-pill adm-pill--neutral adm-pill--dot">Черновик</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+{% comment %}── Модалка создания рассылки (Web API POST в new_broadcast) ──{% endcomment %}
+<div id="admbModal" style="display:none;position:fixed;inset:0;z-index:1050;background:rgba(11,18,32,.5);align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;font-family:'Inter',ui-sans-serif,sans-serif;">
+  <div style="background:#fff;border-radius:16px;max-width:540px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+    <div style="padding:20px 24px;border-bottom:1px solid var(--adm-border);display:flex;align-items:center;justify-content:space-between;">
+      <h2 style="font-size:17px;font-weight:700;color:var(--adm-fg-1);margin:0;">Новая рассылка</h2>
+      <button type="button" id="admbClose" style="background:none;border:none;font-size:22px;color:var(--adm-fg-3);cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--adm-fg-2);margin-bottom:5px;">Тема *</label>
+        <input type="text" id="admbF_name" class="adm-input" placeholder="Заголовок рассылки" style="width:100%;">
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--adm-fg-2);margin-bottom:5px;">Текст сообщения</label>
+        <textarea id="admbF_body" class="adm-input" rows="3" style="width:100%;resize:vertical;"></textarea>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--adm-fg-2);margin-bottom:5px;">Канал</label>
+          <select id="admbF_channel" class="adm-input" style="width:100%;">
+            <option value="100000000">Email</option>
+            <option value="100000001">Push</option>
+            <option value="100000002">In-app</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--adm-fg-2);margin-bottom:5px;">Аудитория</label>
+          <select id="admbF_audience" class="adm-input" style="width:100%;">
+            <option value="100000000">Все</option>
+            <option value="100000001">Новые сотрудники</option>
+            <option value="100000002">Наставники</option>
+            <option value="100000003">Руководители</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--adm-fg-2);margin-bottom:5px;">Статус</label>
+          <select id="admbF_status" class="adm-input" style="width:100%;">
+            <option value="100000000">Черновик</option>
+            <option value="100000001">Запланировано</option>
+            <option value="100000002">Отправлено</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--adm-fg-2);margin-bottom:5px;">Дата отправки</label>
+          <input type="datetime-local" id="admbF_send" class="adm-input" style="width:100%;">
+        </div>
+      </div>
+      <div id="admbErr" style="display:none;font-size:12px;color:#DC2626;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px 12px;"></div>
+    </div>
+    <div style="padding:16px 24px;border-top:1px solid var(--adm-border);display:flex;justify-content:flex-end;gap:10px;">
+      <button type="button" id="admbCancel" class="adm-btn">Отмена</button>
+      <button type="button" id="admbSave" class="adm-btn adm-btn--primary">Создать</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    // ── Поиск ──
+    var s = document.getElementById('admbSearch');
+    if (s) {
+      s.addEventListener('input', function () {
+        var q = (s.value || '').toLowerCase();
+        document.querySelectorAll('#admbBody tr[data-search]').forEach(function (r) {
+          var m = !q || (r.getAttribute('data-search') || '').indexOf(q) !== -1;
+          r.style.display = m ? '' : 'none';
+        });
+      });
+    }
+
+    // ── Создание рассылки через Web API ──
+    var modal  = document.getElementById('admbModal');
+    var openBt = document.getElementById('admbNewBtn');
+    if (!modal || !openBt) return;
+    var errBox = document.getElementById('admbErr');
+    var saveBt = document.getElementById('admbSave');
+    function show() { modal.style.display = 'flex'; }
+    function hide() { modal.style.display = 'none'; }
+    openBt.addEventListener('click', show);
+    document.getElementById('admbClose').addEventListener('click', hide);
+    document.getElementById('admbCancel').addEventListener('click', hide);
+    modal.addEventListener('click', function (e) { if (e.target === modal) hide(); });
+
+    function getToken() {
+      return fetch('/_layout/tokenhtml', { credentials: 'include' })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          var m = html.match(/name="__RequestVerificationToken"[^>]*value="([^"]+)"/);
+          return m ? m[1] : '';
+        });
+    }
+
+    saveBt.addEventListener('click', function () {
+      errBox.style.display = 'none';
+      var name = document.getElementById('admbF_name').value.trim();
+      if (!name) { errBox.textContent = 'Укажите тему рассылки.'; errBox.style.display = 'block'; return; }
+      var payload = {
+        new_name:     name,
+        new_body:     document.getElementById('admbF_body').value,
+        new_channel:  parseInt(document.getElementById('admbF_channel').value, 10),
+        new_audience: parseInt(document.getElementById('admbF_audience').value, 10),
+        new_status:   parseInt(document.getElementById('admbF_status').value, 10),
+        new_isactive: true
+      };
+      var sd = document.getElementById('admbF_send').value;
+      if (sd) { payload.new_senddatetime = new Date(sd).toISOString(); }
+
+      saveBt.disabled = true; saveBt.textContent = 'Создание…';
+      getToken().then(function (tok) {
+        return fetch('/_api/new_broadcasts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', '__RequestVerificationToken': tok },
+          body: JSON.stringify(payload)
+        });
+      }).then(function (res) {
+        if (res.ok) { location.reload(); return; }
+        return res.text().then(function (t) { throw new Error('HTTP ' + res.status + ' — ' + t.slice(0, 200)); });
+      }).catch(function (e) {
+        errBox.textContent = 'Ошибка сохранения: ' + e.message;
+        errBox.style.display = 'block';
+        saveBt.disabled = false; saveBt.textContent = 'Создать';
+      });
+    });
+  })();
+</script>
+
+{% endunless %}

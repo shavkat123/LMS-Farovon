@@ -11,6 +11,10 @@
 - adx_name: Webapi/msdynce_course/fields
   adx_sitesettingid: 0fcfddf9-a538-f111-88b5-7ced8d76b3cc
   adx_value: '*'
+- adx_name: HTTP/Content-Security-Policy/Style-Src/Append
+  adx_sitesettingid: 11f425d5-1a45-f111-bec6-7ced8d76b3cc
+  adx_source: 0
+  adx_value: 'blob:'
 - adx_description: Setting controls whether attachments will be displayed on Knowledge articles
   adx_name: KnowledgeManagement/DisplayNotes
   adx_sitesettingid: 1906e5ed-a538-f111-88b5-7ced8d76b3cc
@@ -77,6 +81,10 @@
 - adx_name: ASP/Icon/Validation/Error
   adx_sitesettingid: 50cfddf9-a538-f111-88b5-7ced8d76b3cc
   adx_value: /validation-icon.svg
+- adx_name: HTTP/Content-Security-Policy/Script-Src/Append
+  adx_sitesettingid: 53bbc2bf-1a45-f111-bec6-7ced8d76b3cc
+  adx_source: 0
+  adx_value: 'blob:'
 - adx_name: OnlineDomains
   adx_sitesettingid: 565fe5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: sharepoint.com;microsoftonline.com
@@ -92,6 +100,9 @@
   adx_name: Authentication/LoginThrottling/IpAddressTimeoutTimeSpan
   adx_sitesettingid: 5860e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: 00:15:00
+- adx_name: HTTP/Content-Security-Policy
+  adx_sitesettingid: 5fc338c5-b58f-4195-8643-d03d9d7de019
+  adx_value: script-src * 'nonce'
 - adx_name: Authentication/Registration/ExternalLoginEnabled
   adx_sitesettingid: 645fe5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: true
@@ -106,6 +117,13 @@
 - adx_name: Search/IndexNotesAttachments
   adx_sitesettingid: 7660e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: false
+- adx_name: webfiles/blockedextensions
+  adx_sitesettingid: 76af91ba-9043-f111-88b4-7ced8d76b3cc
+  adx_source: 0
+  adx_value: .exe|.bat|.vbs|.cmd
+- adx_name: Webapi/new_h5pprogress/enabled
+  adx_sitesettingid: 77f5a26e-b202-4e0b-b0a3-61c524aea74c
+  adx_value: true
 - adx_name: Authentication/OpenAuth/Twitter/ConsumerKey
   adx_sitesettingid: 7dcfddf9-a538-f111-88b5-7ced8d76b3cc
 - adx_name: Webapi/msdynce_registration/enabled
@@ -145,6 +163,54 @@
 - adx_name: ASP/Course/Form/Validation/Field/Required
   adx_sitesettingid: a1cfddf9-a538-f111-88b5-7ced8d76b3cc
   adx_value: 'Missing required fields:'
+- adx_name: Webapi/new_rewardpurchase/enabled
+  adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000001
+  adx_value: true
+- adx_name: Webapi/new_rewardpurchase/fields
+  adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000002
+  adx_value: '*'
+- adx_name: Webapi/new_rewarditem/enabled
+  adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000003
+  adx_value: true
+- adx_name: Webapi/new_rewarditem/fields
+  adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000004
+  adx_value: '*'
+- adx_name: Webapi/new_task/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-400000000001
+  adx_value: true
+- adx_name: Webapi/new_task/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-400000000002
+  adx_value: '*'
+- adx_name: Webapi/new_broadcast/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000b1
+  adx_value: true
+- adx_name: Webapi/new_broadcast/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000b2
+  adx_value: '*'
+- adx_name: Webapi/new_trajectory/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000c1
+  adx_value: true
+- adx_name: Webapi/new_trajectory/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000c2
+  adx_value: '*'
+- adx_name: Webapi/new_forumthread/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000d1
+  adx_value: true
+- adx_name: Webapi/new_forumthread/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000d2
+  adx_value: '*'
+- adx_name: Webapi/new_forumreply/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000e1
+  adx_value: true
+- adx_name: Webapi/new_forumreply/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000e2
+  adx_value: '*'
+- adx_name: Webapi/contact/enabled
+  adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000005
+  adx_value: true
+- adx_name: Webapi/contact/fields
+  adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000006
+  adx_value: fullname,emailaddress1
 - adx_name: Profile/ShowMarketingOptionsPanel
   adx_sitesettingid: a65fe5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: True
@@ -197,14 +263,14 @@
 - adx_description: A date/time value in GMT format to represent the effective date of the current published terms and conditions. If the terms agreement is enabled, portal users that have not accepted the terms after this date will be asked to accept them the next time they sign in. If the date is not provided, and the terms agreement is enabled, the terms will be presented every time portal users sign in.
   adx_name: Authentication/Registration/TermsPublicationDate
   adx_sitesettingid: c060e5f3-a538-f111-88b5-7ced8d76b3cc
-- adx_name: Webapi/contact/enabled
-  adx_sitesettingid: c460e5f3-a538-f111-88b5-7ced8d76b3cc
-  adx_value: true
 - adx_name: Authentication/OpenIdConnect/AzureAD/Caption
   adx_sitesettingid: c63d4519-a638-f111-88b5-7ced8d76b3cc
   adx_value: Microsoft Entra ID
 - adx_name: Authentication/OpenAuth/Microsoft/ClientSecret
   adx_sitesettingid: c65fe5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_name: Webapi/new_h5pcontent/enabled
+  adx_sitesettingid: c7d8e9f0-1a2b-3c4d-5e6f-7890abcdef12
+  adx_value: true
 - adx_name: Authentication/OpenIdConnect/AzureAD/RebrandDisclaimerEnabled
   adx_sitesettingid: c83d4519-a638-f111-88b5-7ced8d76b3cc
   adx_value: false
@@ -228,6 +294,12 @@
   adx_name: Header/OutputCache/Enabled
   adx_sitesettingid: d530e0ff-a538-f111-88b5-7ced8d76b3cc
   adx_value: True
+- adx_name: Webapi/new_h5pprogress/fields
+  adx_sitesettingid: d693edf3-ff10-46e7-af6d-2f51450a778d
+  adx_value: new_user,new_h5pcontent,new_name,new_xapistatements,new_lastupdated,new_scoreraw,new_scoremax,new_scorescaled,new_completion,new_success,new_lastposition
+- adx_name: Webapi/new_h5pcontent/fields
+  adx_sitesettingid: d8e9f012-3a4b-5c6d-7e8f-90abcdef1234
+  adx_value: '*'
 - adx_name: ASP/Course/Form/Validation/Field/DescriptionToLong
   adx_sitesettingid: dd30e0ff-a538-f111-88b5-7ced8d76b3cc
   adx_value: Description can't be longer than 1000 characters.

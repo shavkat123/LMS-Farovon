@@ -1,0 +1,584 @@
+{% comment %}
+  Rewards Shop — Магазин наград
+  Entities required:
+    new_rewarditem   — fields: new_column_6348fe57 (primary, display name),
+                               new_description, new_pointscost (int),
+                               new_category (text), new_imageurl (text),
+                               new_emoji (text), new_stock (int, null=unlimited),
+                               new_isactive (bool)
+    new_rewardpurchase — fields: new_user (lookup contact), new_rewarditem (lookup),
+                                 new_pointsspent (int)
+  Points: 100 base + round(new_scorescaled * 50) per completed h5p lesson
+{% endcomment %}
+
+{% unless user %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shop" style="font-size:52px;color:#64748B;display:block;margin-bottom:16px;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin-bottom:6px;">Войдите в систему</h2>
+  <p style="font-size:13px;color:#64748B;margin-bottom:20px;">Для доступа к магазину наград необходимо авторизоваться.</p>
+  <a href="/SignIn" class="btn btn-primary" style="border-radius:8px;">Войти</a>
+</div>
+{% else %}
+
+{% comment %}── 1. Reward items ──{% endcomment %}
+{% fetchxml reward_items %}
+<fetch>
+  <entity name="new_rewarditem">
+    <attribute name="new_rewarditemid" />
+    <attribute name="new_column_6348fe57" />
+    <attribute name="new_description" />
+    <attribute name="new_pointscost" />
+    <attribute name="new_category" />
+    <attribute name="new_imageurl" />
+    <attribute name="new_emoji" />
+    <attribute name="new_stock" />
+    <filter>
+      <condition attribute="new_isactive" operator="eq" value="1" />
+    </filter>
+    <order attribute="new_pointscost" descending="false" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── 2. User's purchases ──{% endcomment %}
+{% fetchxml my_purchases %}
+<fetch top="20">
+  <entity name="new_rewardpurchase">
+    <attribute name="new_rewardpurchaseid" />
+    <attribute name="new_rewarditem" />
+    <attribute name="new_pointsspent" />
+    <attribute name="createdon" />
+    <filter>
+      <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
+    </filter>
+    <order attribute="createdon" descending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── 3. Earned points from H5P completions ──{% endcomment %}
+{% fetchxml completed_lessons_fetch %}
+<fetch>
+  <entity name="new_h5pprogress">
+    <attribute name="new_h5pprogressid" />
+    <attribute name="new_scorescaled" />
+    <filter>
+      <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
+      <condition attribute="new_completion" operator="eq" value="1" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign total_earned = 0 %}
+{% assign completed_count = 0 %}
+{% for p in completed_lessons_fetch.results.entities %}
+  {% assign completed_count = completed_count | plus: 1 %}
+  {% assign score_pts = 0 %}
+  {% if p.new_scorescaled %}
+    {% assign score_pts = p.new_scorescaled | times: 50 | round %}
+  {% endif %}
+  {% assign total_earned = total_earned | plus: 100 | plus: score_pts %}
+{% endfor %}
+
+{% assign total_spent = 0 %}
+{% assign purchase_count = 0 %}
+{% for pur in my_purchases.results.entities %}
+  {% assign total_spent = total_spent | plus: pur.new_pointsspent %}
+  {% assign purchase_count = purchase_count | plus: 1 %}
+{% endfor %}
+
+{% assign current_balance = total_earned | minus: total_spent %}
+
+{% assign is_admin = false %}
+{% if user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Administrators' %}
+  {% assign is_admin = true %}
+{% endif %}
+
+{% assign item_count = 0 %}
+{% for item in reward_items.results.entities %}
+  {% assign item_count = item_count | plus: 1 %}
+{% endfor %}
+
+<style>
+  .fv-shop { padding: 12px 0 56px; font-family: 'Inter', ui-sans-serif, sans-serif; }
+
+  /* ── Header ── */
+  .fv-shop-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 24px; flex-wrap: wrap; }
+  .fv-shop-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #64748B; display: block; margin-bottom: 4px; }
+  .fv-shop-title { font-size: 22px; font-weight: 700; color: #0B1220; margin: 0 0 3px; }
+  .fv-shop-sub { font-size: 13px; color: #64748B; margin: 0; }
+
+  /* ── Balance card ── */
+  .fv-balance-card {
+    background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+    border-radius: 14px; padding: 18px 22px; color: #fff; min-width: 210px;
+    box-shadow: 0 4px 18px rgba(245,158,11,.3); flex-shrink: 0;
+  }
+  .fv-balance-label { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; opacity: .8; margin-bottom: 6px; }
+  .fv-balance-amount { font-size: 32px; font-weight: 800; line-height: 1; display: flex; align-items: center; gap: 8px; }
+  .fv-coin-img { font-size: 30px; line-height: 1; vertical-align: middle; display: inline-block; }
+  .fv-coin-img-sm { font-size: 17px; line-height: 1; vertical-align: middle; display: inline-block; }
+  .fv-balance-sub { font-size: 11px; opacity: .72; margin-top: 5px; }
+
+  /* ── Stats ── */
+  .fv-shop-stats { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .fv-shop-stat { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 10px 16px; display: flex; align-items: center; gap: 10px; }
+  .fv-shop-stat-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .fv-shop-stat-val { font-size: 17px; font-weight: 700; color: #0B1220; line-height: 1; }
+  .fv-shop-stat-lbl { font-size: 11px; color: #64748B; margin-top: 1px; }
+
+  /* ── Earn tip ── */
+  .fv-earn-tip { background: #EFF6FF; border: 1px solid #DBEAFE; border-radius: 10px; padding: 12px 16px; font-size: 12px; color: #1E40AF; display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+  .fv-earn-tip i { font-size: 15px; flex-shrink: 0; }
+
+  /* ── Filter pills ── */
+  .fv-filter-row { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+  .fv-filter-pill { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1.5px solid #E5E7EB; background: #fff; color: #64748B; cursor: pointer; transition: all .15s; user-select: none; white-space: nowrap; }
+  .fv-filter-pill:hover { border-color: #CBD5E1; color: #0B1220; }
+  .fv-filter-pill.active { background: #1E3A8A; border-color: #1E3A8A; color: #fff; }
+
+  /* ── Grid ── */
+  .fv-shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+
+  /* ── Reward card ── */
+  .fv-reward-card { background: #fff; border: 1.5px solid #E5E7EB; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; transition: transform .16s, box-shadow .16s, border-color .16s; }
+  .fv-reward-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(11,18,32,.1); border-color: #CBD5E1; }
+  .fv-reward-card.affordable { border-color: #DBEAFE; }
+  .fv-reward-card.affordable:hover { border-color: #93C5FD; box-shadow: 0 8px 24px rgba(30,58,138,.1); }
+  .fv-reward-card.sold-out { opacity: .55; }
+  .fv-reward-card[style*="display:none"] { display: none !important; }
+
+  .fv-reward-img { height: 130px; display: flex; align-items: center; justify-content: center; font-size: 52px; position: relative; background: linear-gradient(135deg, #F8FAFF 0%, #EEF2FF 100%); overflow: hidden; }
+  .fv-reward-img img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
+  .fv-cat-badge { position: absolute; top: 8px; left: 8px; background: rgba(255,255,255,.92); border: 1px solid #E5E7EB; border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 600; color: #64748B; backdrop-filter: blur(4px); }
+  .fv-stock-low { position: absolute; top: 8px; right: 8px; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 600; color: #DC2626; }
+  .fv-stock-out { position: absolute; top: 8px; right: 8px; background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 600; color: #64748B; }
+
+  .fv-reward-body { padding: 14px 16px; flex: 1; display: flex; flex-direction: column; }
+  .fv-reward-name { font-size: 14px; font-weight: 700; color: #0B1220; margin: 0 0 5px; line-height: 1.35; }
+  .fv-reward-desc { font-size: 12px; color: #64748B; margin: 0 0 14px; flex: 1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.45; }
+
+  .fv-reward-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; }
+  .fv-coin-cost { display: flex; align-items: center; gap: 5px; font-size: 15px; font-weight: 800; color: #D97706; }
+  .fv-buy-btn { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; transition: all .14s; white-space: nowrap; }
+  .fv-buy-btn-can { background: linear-gradient(135deg, #F59E0B, #D97706); color: #fff; }
+  .fv-buy-btn-can:hover { opacity: .88; }
+  .fv-buy-btn-no { background: #F1F5F9; color: #64748B; cursor: not-allowed; }
+  .fv-buy-btn-out { background: #F1F5F9; color: #64748B; cursor: not-allowed; }
+
+  /* ── Empty state ── */
+  .fv-shop-empty { text-align: center; padding: 56px 24px; background: #fff; border: 1.5px dashed #E5E7EB; border-radius: 14px; }
+  .fv-shop-empty i { font-size: 48px; color: #CBD5E1; display: block; margin-bottom: 14px; }
+  .fv-shop-empty h3 { font-size: 15px; font-weight: 700; color: #64748B; margin: 0 0 6px; }
+  .fv-shop-empty p { font-size: 13px; color: #64748B; margin: 0; }
+
+  /* ── Purchase history ── */
+  .fv-history { background: #fff; border: 1px solid #E5E7EB; border-radius: 14px; padding: 20px 24px; margin-top: 32px; }
+  .fv-history-head { font-size: 15px; font-weight: 700; color: #0B1220; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .fv-history-empty { text-align: center; padding: 24px; color: #64748B; font-size: 13px; }
+  .fv-history-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid #F1F5F9; }
+  .fv-history-row:last-child { border-bottom: none; }
+  .fv-history-ico { width: 36px; height: 36px; background: #FEF3C7; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .fv-history-info { flex: 1; min-width: 0; }
+  .fv-history-name { font-size: 13px; font-weight: 600; color: #0B1220; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fv-history-date { font-size: 11px; color: #64748B; margin-top: 1px; }
+  .fv-history-cost { font-size: 13px; font-weight: 700; color: #D97706; white-space: nowrap; }
+
+  /* ── Modal ── */
+  .fv-overlay { position: fixed; inset: 0; background: rgba(11,18,32,.55); z-index: 9990; display: none; align-items: center; justify-content: center; padding: 16px; }
+  .fv-overlay.open { display: flex; }
+  .fv-modal { background: #fff; border-radius: 16px; padding: 28px 24px; width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(11,18,32,.25); animation: fvSlideUp .2s ease; }
+  @keyframes fvSlideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .fv-modal-emoji { font-size: 44px; text-align: center; margin-bottom: 12px; }
+  .fv-modal-title { font-size: 17px; font-weight: 700; color: #0B1220; text-align: center; margin-bottom: 6px; }
+  .fv-modal-desc { font-size: 13px; color: #64748B; text-align: center; margin-bottom: 18px; line-height: 1.55; }
+  .fv-modal-cost-box { background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px; padding: 14px; text-align: center; margin-bottom: 20px; }
+  .fv-modal-cost-num { font-size: 24px; font-weight: 800; color: #D97706; }
+  .fv-modal-cost-after { font-size: 12px; color: #92400E; margin-top: 3px; }
+  .fv-modal-btns { display: flex; gap: 10px; }
+  .fv-modal-btns button { flex: 1; padding: 11px; border-radius: 9px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; transition: all .14s; }
+  .fv-modal-cancel { background: #F1F5F9; color: #64748B; }
+  .fv-modal-cancel:hover { background: #E2E8F0; }
+  .fv-modal-confirm { background: linear-gradient(135deg, #F59E0B, #D97706); color: #fff; }
+  .fv-modal-confirm:hover:not(:disabled) { opacity: .9; }
+  .fv-modal-confirm:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* ── Notification toast ── */
+  .fv-toast { position: fixed; bottom: 24px; right: 24px; z-index: 9999; background: #0F172A; color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 13px; font-weight: 500; display: none; align-items: center; gap: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.2); max-width: 320px; }
+  .fv-toast.show { display: flex; animation: fvFadeIn .2s ease; }
+  .fv-toast.success .fv-toast-icon { color: #34D399; }
+  .fv-toast.error .fv-toast-icon { color: #F87171; }
+  @keyframes fvFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  @media (max-width: 576px) {
+    .fv-shop-header { flex-direction: column; }
+    .fv-balance-card { width: 100%; }
+    .fv-shop-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  }
+  @media (max-width: 400px) {
+    .fv-shop-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="container fv-shop">
+
+  <!-- Header -->
+  <div class="fv-shop-header">
+    <div>
+      <span class="fv-shop-eyebrow"><i class="bi bi-trophy"></i> Gamification</span>
+      <h1 class="fv-shop-title">Магазин наград</h1>
+      <p class="fv-shop-sub">Тратьте монеты, заработанные за прохождение уроков</p>
+    </div>
+    <div class="fv-balance-card">
+      <div class="fv-balance-label">Ваш баланс</div>
+      <div class="fv-balance-amount"><i class="bi bi-award-fill fv-coin-img" aria-hidden="true"></i> <span id="fv-balance-val">{{ current_balance }}</span></div>
+      <div class="fv-balance-sub">
+        Заработано: {{ total_earned }} · Потрачено: {{ total_spent }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="fv-shop-stats">
+    <div class="fv-shop-stat">
+      <div class="fv-shop-stat-icon" style="background:#EFF6FF;">📚</div>
+      <div>
+        <div class="fv-shop-stat-val">{{ completed_count }}</div>
+        <div class="fv-shop-stat-lbl">Уроков пройдено</div>
+      </div>
+    </div>
+    <div class="fv-shop-stat">
+      <div class="fv-shop-stat-icon" style="background:#FFFBEB;">🛍️</div>
+      <div>
+        <div class="fv-shop-stat-val">{{ purchase_count }}</div>
+        <div class="fv-shop-stat-lbl">Покупок совершено</div>
+      </div>
+    </div>
+    <div class="fv-shop-stat">
+      <div class="fv-shop-stat-icon" style="background:#F0FDF4;">🎁</div>
+      <div>
+        <div class="fv-shop-stat-val">{{ item_count }}</div>
+        <div class="fv-shop-stat-lbl">Наград в каталоге</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Earn tip -->
+  <div class="fv-earn-tip">
+    <i class="bi bi-info-circle-fill"></i>
+    <span>За каждый пройденный урок вы получаете <strong>100 монет</strong> + до <strong>50 бонусных монет</strong> в зависимости от результата. Проходите уроки в <a href="/h5p-catalog" style="color:#1E3A8A;font-weight:600;">каталоге</a>.</span>
+  </div>
+
+  <!-- Category filter (populated by JS from card data) -->
+  <div class="fv-filter-row" id="fvCatFilters">
+    <span class="fv-filter-pill active" data-cat="all">Все</span>
+  </div>
+
+  <!-- Reward grid -->
+  {% if item_count == 0 %}
+  <div class="fv-shop-empty">
+    <i class="bi bi-shop"></i>
+    <h3>Магазин пока пуст</h3>
+    <p>Администратор ещё не добавил товары. Загляните позже!</p>
+  </div>
+  {% else %}
+  <div class="fv-shop-grid" id="fvShopGrid">
+    {% for item in reward_items.results.entities %}
+    {% assign item_cost = item.new_pointscost | plus: 0 %}
+    {% assign can_afford = false %}
+    {% if current_balance >= item_cost %}{% assign can_afford = true %}{% endif %}
+    {% assign in_stock = true %}
+    {% if item.new_stock != null and item.new_stock != '' %}
+      {% assign stock_num = item.new_stock | plus: 0 %}
+      {% if stock_num <= 0 %}{% assign in_stock = false %}{% endif %}
+    {% endif %}
+    {% assign item_emoji = item.new_emoji | default: '🎁' %}
+    {% assign item_cat = item.new_category | default: 'Награда' %}
+
+    <div class="fv-reward-card{% if can_afford and in_stock %} affordable{% endif %}{% unless in_stock %} sold-out{% endunless %}"
+         data-cat="{{ item_cat | downcase }}"
+         data-item-id="{{ item.id }}"
+         data-item-name="{{ item.new_column_6348fe57 | escape }}"
+         data-item-cost="{{ item_cost }}"
+         data-item-emoji="{{ item_emoji }}"
+         data-in-stock="{{ in_stock }}">
+      <div class="fv-reward-img">
+        {% if item.new_imageurl and item.new_imageurl != '' %}
+        <img src="{{ item.new_imageurl }}" alt="{{ item.new_column_6348fe57 }}" onerror="this.style.display='none'">
+        {% endif %}
+        <span style="z-index:1;">{{ item_emoji }}</span>
+        <span class="fv-cat-badge">{{ item_cat }}</span>
+        {% if in_stock == false %}
+        <span class="fv-stock-out">Нет в наличии</span>
+        {% elsif item.new_stock != null and item.new_stock != '' %}
+          {% assign stock_num = item.new_stock | plus: 0 %}
+          {% if stock_num <= 5 %}
+          <span class="fv-stock-low">Осталось: {{ stock_num }}</span>
+          {% endif %}
+        {% endif %}
+      </div>
+      <div class="fv-reward-body">
+        <div class="fv-reward-name">{{ item.new_column_6348fe57 }}</div>
+        {% if item.new_description and item.new_description != '' %}
+        <div class="fv-reward-desc">{{ item.new_description }}</div>
+        {% else %}
+        <div class="fv-reward-desc" style="color:#CBD5E1;font-style:italic;">Описание отсутствует</div>
+        {% endif %}
+        <div class="fv-reward-foot">
+          <div class="fv-coin-cost"><i class="bi bi-award-fill fv-coin-img-sm" aria-hidden="true"></i> {{ item_cost }}</div>
+          {% if in_stock == false %}
+          <button class="fv-buy-btn fv-buy-btn-out" disabled>Нет в наличии</button>
+          {% elsif can_afford %}
+          <button class="fv-buy-btn fv-buy-btn-can">Купить</button>
+          {% else %}
+          <button class="fv-buy-btn fv-buy-btn-no" disabled title="Недостаточно монет">Не хватает</button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Purchase history -->
+  <div class="fv-history">
+    <div class="fv-history-head"><i class="bi bi-clock-history" style="color:#F59E0B;"></i> История покупок</div>
+    {% if purchase_count == 0 %}
+    <div class="fv-history-empty">
+      <i class="bi bi-bag" style="font-size:28px;color:#CBD5E1;display:block;margin-bottom:8px;"></i>
+      Вы ещё ничего не покупали
+    </div>
+    {% else %}
+    {% for pur in my_purchases.results.entities %}
+    <div class="fv-history-row">
+      <div class="fv-history-ico">🎁</div>
+      <div class="fv-history-info">
+        <div class="fv-history-name">{{ pur.new_rewarditem.name | default: 'Награда' }}</div>
+        <div class="fv-history-date">{{ pur.createdon | date: 'dd.MM.yyyy, HH:mm' }}</div>
+      </div>
+      <div class="fv-history-cost">-<i class="bi bi-award-fill fv-coin-img-sm" aria-hidden="true"></i> {{ pur.new_pointsspent }}</div>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+
+  {% if is_admin %}
+  <div style="margin-top:20px;padding:14px 18px;background:#F8FAFF;border:1px solid #DBEAFE;border-radius:10px;font-size:12px;color:#1E40AF;display:flex;align-items:center;gap:10px;">
+    <i class="bi bi-shield-check" style="font-size:15px;"></i>
+    <span><strong>Режим администратора.</strong> Управляйте товарами в каталоге через Power Apps / Dataverse (таблица <code>new_rewarditem</code>).</span>
+  </div>
+  {% endif %}
+
+</div><!-- /fv-shop -->
+
+<!-- Purchase confirmation modal -->
+<div class="fv-overlay" id="fvBuyOverlay">
+  <div class="fv-modal" id="fvBuyModal">
+    <div class="fv-modal-emoji" id="fvModalEmoji">🎁</div>
+    <div class="fv-modal-title" id="fvModalTitle">Подтвердите покупку</div>
+    <div class="fv-modal-desc" id="fvModalDesc">Вы уверены, что хотите приобрести эту награду?</div>
+    <div class="fv-modal-cost-box">
+      <div class="fv-modal-cost-num"><i class="bi bi-award-fill fv-coin-img-sm" aria-hidden="true"></i> <span id="fvModalCost">0</span></div>
+      <div class="fv-modal-cost-after">Баланс после покупки: <i class="bi bi-award-fill fv-coin-img-sm" aria-hidden="true"></i> <span id="fvModalAfter">0</span></div>
+    </div>
+    <div class="fv-modal-btns">
+      <button class="fv-modal-cancel">Отмена</button>
+      <button class="fv-modal-confirm" id="fvModalConfirm">Подтвердить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div class="fv-toast" id="fvToast">
+  <i class="bi fv-toast-icon" id="fvToastIcon"></i>
+  <span id="fvToastMsg"></span>
+</div>
+
+<script>
+(function () {
+  var balance = {{ current_balance }};
+  var userId = '{{ user.id }}';
+  var pendingItemId = null;
+  var pendingItemCost = 0;
+  var pendingItemName = '';
+  var pendingCard = null;
+
+  /* ── Category filters ── */
+  var grid = document.getElementById('fvShopGrid');
+  var filtersRow = document.getElementById('fvCatFilters');
+
+  if (grid) {
+    var cats = {};
+    var cards = grid.querySelectorAll('.fv-reward-card');
+    cards.forEach(function (c) {
+      var cat = c.getAttribute('data-cat');
+      if (cat) cats[cat] = true;
+    });
+    Object.keys(cats).sort().forEach(function (cat) {
+      var pill = document.createElement('span');
+      pill.className = 'fv-filter-pill';
+      pill.setAttribute('data-cat', cat);
+      pill.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+      filtersRow.appendChild(pill);
+    });
+
+    filtersRow.addEventListener('click', function (e) {
+      var pill = e.target.closest('.fv-filter-pill');
+      if (!pill) return;
+      filtersRow.querySelectorAll('.fv-filter-pill').forEach(function (p) { p.classList.remove('active'); });
+      pill.classList.add('active');
+      var chosen = pill.getAttribute('data-cat');
+      cards.forEach(function (c) {
+        if (chosen === 'all' || c.getAttribute('data-cat') === chosen) {
+          c.style.display = '';
+        } else {
+          c.style.display = 'none';
+        }
+      });
+    });
+  }
+
+  /* ── Modal open/close ── */
+  window.fvOpenModal = function (btn) {
+    var card = btn.closest('.fv-reward-card');
+    pendingItemId   = card.getAttribute('data-item-id');
+    pendingItemCost = parseInt(card.getAttribute('data-item-cost'), 10) || 0;
+    pendingItemName = card.getAttribute('data-item-name') || 'Награда';
+    pendingCard     = card;
+    var name  = pendingItemName;
+    var emoji = card.getAttribute('data-item-emoji') || '🎁';
+    var after = balance - pendingItemCost;
+
+    document.getElementById('fvModalEmoji').textContent = emoji;
+    document.getElementById('fvModalTitle').textContent = name;
+    document.getElementById('fvModalDesc').textContent = 'Вы уверены, что хотите приобрести эту награду?';
+    document.getElementById('fvModalCost').textContent = pendingItemCost;
+    document.getElementById('fvModalAfter').textContent = after >= 0 ? after : 0;
+    document.getElementById('fvModalConfirm').disabled = false;
+    document.getElementById('fvBuyOverlay').classList.add('open');
+  };
+
+  window.fvCloseModal = function () {
+    document.getElementById('fvBuyOverlay').classList.remove('open');
+    pendingItemId = null;
+    pendingCard = null;
+  };
+
+  document.getElementById('fvBuyOverlay').addEventListener('click', function (e) {
+    if (e.target === this) fvCloseModal();
+  });
+
+  /* Кнопки покупки и модалки — слушатели вместо inline onclick (CSP) */
+  document.querySelectorAll('.fv-buy-btn-can').forEach(function (b) {
+    b.addEventListener('click', function () { window.fvOpenModal(b); });
+  });
+  document.querySelectorAll('.fv-modal-cancel').forEach(function (b) {
+    b.addEventListener('click', function () { window.fvCloseModal(); });
+  });
+  document.getElementById('fvModalConfirm').addEventListener('click', function () { window.fvConfirmPurchase(); });
+
+  /* ── Get CSRF token ── */
+  function getToken() {
+    var tok = document.querySelector('input[name="__RequestVerificationToken"]');
+    if (tok && tok.value) return Promise.resolve(tok.value);
+    return fetch('/_layout/tokenhtml')
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        var m = html.match(/value="([^"]+)"/);
+        return m ? m[1] : null;
+      });
+  }
+
+  /* ── Confirm purchase ── */
+  window.fvConfirmPurchase = function () {
+    if (!pendingItemId) return;
+    var btn = document.getElementById('fvModalConfirm');
+    btn.disabled = true;
+    btn.textContent = 'Оформление…';
+
+    getToken().then(function (token) {
+      var body = {
+        'new_pointsspent': pendingItemCost,
+        'new_name': pendingItemName,
+        'new_rewarditem@odata.bind': '/new_rewarditems(' + pendingItemId + ')',
+        'new_user@odata.bind': '/contacts(' + userId + ')'
+      };
+      var headers = {
+        'Content-Type': 'application/json',
+        'OData-MaxVersion': '4.0',
+        'OData-Version': '4.0',
+        'Accept': 'application/json'
+      };
+      if (token) headers['__RequestVerificationToken'] = token;
+
+      return fetch('/_api/new_rewardpurchases', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(body)
+      });
+    })
+    .then(function (res) {
+      fvCloseModal();
+      if (res.ok || res.status === 204 || res.status === 201) {
+        balance -= pendingItemCost;
+        document.getElementById('fv-balance-val').textContent = balance;
+            document.getElementById('fvModalCost').textContent = pendingItemCost;
+            document.getElementById('fvModalAfter').textContent = balance >= 0 ? balance : 0;
+        fvToast('success', 'bi-check-circle-fill', 'Награда успешно приобретена! 🎉');
+        /* Disable the buy button on this card if balance now too low */
+        if (pendingCard) {
+          var allCards = document.querySelectorAll('.fv-reward-card');
+          allCards.forEach(function (c) {
+            var cost = parseInt(c.getAttribute('data-item-cost'), 10) || 0;
+            var btns = c.querySelectorAll('.fv-buy-btn-can, .fv-buy-btn-no');
+            btns.forEach(function (b) {
+              if (balance < cost) {
+                b.className = 'fv-buy-btn fv-buy-btn-no';
+                b.disabled = true;
+                b.textContent = 'Не хватает';
+                b.onclick = null;
+                c.classList.remove('affordable');
+              }
+            });
+          });
+          /* Mark purchased card button */
+          var pb = pendingCard.querySelector('.fv-buy-btn');
+          if (pb) {
+            pb.className = 'fv-buy-btn fv-buy-btn-out';
+            pb.disabled = true;
+            pb.textContent = 'Куплено ✓';
+            pb.onclick = null;
+          }
+        }
+        /* Reload history after 1.5s */
+        setTimeout(function () { location.reload(); }, 2200);
+      } else {
+        return res.text().then(function (t) {
+          fvToast('error', 'bi-exclamation-circle-fill', 'Ошибка при покупке (HTTP ' + res.status + ')');
+          console.error('[fv-shop] purchase error:', t.slice(0, 300));
+          document.getElementById('fvModalConfirm').disabled = false;
+          document.getElementById('fvModalConfirm').textContent = 'Подтвердить';
+        });
+      }
+    })
+    .catch(function (err) {
+      fvCloseModal();
+      fvToast('error', 'bi-exclamation-circle-fill', 'Ошибка сети: ' + err.message);
+    });
+  };
+
+  /* ── Toast helper ── */
+  function fvToast(type, icon, msg) {
+    var el  = document.getElementById('fvToast');
+    var ico = document.getElementById('fvToastIcon');
+    var txt = document.getElementById('fvToastMsg');
+    el.className  = 'fv-toast show ' + type;
+    ico.className = 'bi ' + icon + ' fv-toast-icon';
+    txt.textContent = msg;
+    setTimeout(function () { el.className = 'fv-toast'; }, 3500);
+  }
+})();
+</script>
+
+{% endunless %}

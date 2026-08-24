@@ -1,0 +1,144 @@
+{% comment %}
+  Admin Tests — Тесты (/admin/tests). Дизайн: AdminTests.jsx. Примитивы .adm-* — customtheme.css.
+  РЕАЛЬНЫЕ данные: агрегат new_h5pprogress по H5P-контенту (попытки, средний балл, сдачи).
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+{% comment %}── Агрегат прогресса по контенту (groupby main lookup + link, как лидерборд) ──{% endcomment %}
+{% fetchxml tst %}
+<fetch aggregate="true">
+  <entity name="new_h5pprogress">
+    <attribute name="new_h5pcontent" groupby="true" alias="cid" />
+    <attribute name="new_h5pprogressid" aggregate="count" alias="att" />
+    <attribute name="new_completion" aggregate="sum" alias="passed" />
+    <attribute name="new_scorescaled" aggregate="sum" alias="ssum" />
+    <link-entity name="new_h5pcontent" from="new_h5pcontentid" to="new_h5pcontent" alias="hc" link-type="outer">
+      <attribute name="new_name" groupby="true" alias="cname" />
+    </link-entity>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign t_count = 0 %}
+{% assign t_att = 0 %}
+{% assign t_passed = 0 %}
+{% for r in tst.results.entities %}
+  {% assign t_count = t_count | plus: 1 %}
+  {% assign t_att = t_att | plus: r.att %}
+  {% assign t_passed = t_passed | plus: r.passed %}
+{% endfor %}
+{% assign t_rate = 0 %}
+{% if t_att > 0 %}{% assign t_rate = t_passed | times: 100 | divided_by: t_att %}{% endif %}
+
+<style>
+  .admt { padding: 24px 0 56px; }
+  .admt-head { margin-bottom: 20px; }
+  .admt-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .admt-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .admt-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 900px) { .admt-kpis { grid-template-columns: repeat(2, 1fr); } }
+  .admt-search { position: relative; flex: 1 1 260px; min-width: 220px; }
+  .admt-search i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--adm-fg-3); font-size: 14px; pointer-events: none; }
+  .admt-search .adm-input { padding-left: 32px; }
+  .admt-tbl-wrap { overflow-x: auto; }
+  .admt-ico { width: 30px; height: 30px; border-radius: var(--adm-radius-sm); display: inline-flex; align-items: center; justify-content: center; background: var(--adm-accent-50); color: var(--adm-accent); flex-shrink: 0; }
+</style>
+
+<div class="container adm-scope admt">
+
+  <div class="admt-head">
+    <span class="adm-eyebrow">Контент</span>
+    <h1>Тесты</h1>
+    <p>Результаты проверок по H5P-контенту: попытки, средний балл, процент сдачи.</p>
+  </div>
+
+  <div class="admt-kpis">
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Тестов с попытками</span><i class="bi bi-clipboard-check"></i></div><div class="adm-stat-val">{{ t_count }}</div><div class="adm-stat-foot"><span class="adm-stat-sub">единиц контента</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Всего попыток</span><i class="bi bi-pencil"></i></div><div class="adm-stat-val">{{ t_att }}</div><div class="adm-stat-foot"><span class="adm-stat-sub">записей прогресса</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Сдач</span><i class="bi bi-check2-all"></i></div><div class="adm-stat-val">{{ t_passed }}</div><div class="adm-stat-foot"><span class="adm-stat-sub">завершений</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Средняя сдача</span><i class="bi bi-graph-up"></i></div><div class="adm-stat-val">{{ t_rate }}%</div><div class="adm-stat-foot"><span class="adm-stat-sub">сдач из попыток</span></div></div>
+  </div>
+
+  <div class="adm-card adm-toolbar" style="margin-bottom:16px;">
+    <div class="admt-search">
+      <i class="bi bi-search"></i>
+      <input type="text" class="adm-input" id="admtSearch" placeholder="Название теста…" autocomplete="off">
+    </div>
+  </div>
+
+  <div class="adm-card" style="overflow:hidden;">
+    {% if t_count == 0 %}
+    <div style="padding:48px 24px;text-align:center;color:var(--adm-fg-3);">
+      <i class="bi bi-clipboard" style="display:block;font-size:40px;color:#CBD5E1;margin-bottom:12px;"></i>
+      Пока нет данных по прохождению тестов.
+    </div>
+    {% else %}
+    <div class="admt-tbl-wrap">
+      <table class="adm-table" id="admtTable">
+        <thead>
+          <tr>
+            <th>Тест / контент</th>
+            <th class="adm-r" style="width:100px;">Попыток</th>
+            <th class="adm-r" style="width:110px;">Средний балл</th>
+            <th class="adm-r" style="width:90px;">Сдач</th>
+            <th style="width:170px;">Процент сдачи</th>
+          </tr>
+        </thead>
+        <tbody id="admtBody">
+          {% for r in tst.results.entities %}
+            {% assign cname = r['hc.cname'] | default: 'Без названия' %}
+            {% assign att = r.att | plus: 0 %}
+            {% assign passed = r.passed | plus: 0 %}
+            {% assign ssum = r.ssum | plus: 0 %}
+            {% assign avg = 0 %}{% if att > 0 %}{% assign avg = ssum | times: 100 | divided_by: att %}{% endif %}
+            {% assign rate = 0 %}{% if att > 0 %}{% assign rate = passed | times: 100 | divided_by: att %}{% endif %}
+            {% if rate >= 75 %}{% assign rc = 'var(--adm-success)' %}{% elsif rate < 50 %}{% assign rc = 'var(--adm-danger)' %}{% else %}{% assign rc = 'var(--adm-accent)' %}{% endif %}
+          <tr data-search="{{ cname | downcase }}">
+            <td>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="admt-ico"><i class="bi bi-card-checklist"></i></span>
+                <span style="font-weight:600;">{{ cname }}</span>
+              </div>
+            </td>
+            <td class="adm-r adm-num">{{ att }}</td>
+            <td class="adm-r adm-num">{{ avg }}%</td>
+            <td class="adm-r adm-num">{{ passed }}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div class="adm-bar" style="flex:1;"><div style="width:{{ rate }}%;background:{{ rc }};"></div></div>
+                <span class="adm-num" style="font-size:11px;font-weight:600;color:var(--adm-fg-2);min-width:30px;">{{ rate }}%</span>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  (function () {
+    var s = document.getElementById('admtSearch');
+    if (!s) return;
+    s.addEventListener('input', function () {
+      var q = (s.value || '').toLowerCase();
+      document.querySelectorAll('#admtBody tr[data-search]').forEach(function (r) {
+        var m = !q || (r.getAttribute('data-search') || '').indexOf(q) !== -1;
+        r.style.display = m ? '' : 'none';
+      });
+    });
+  })();
+</script>
+
+{% endunless %}

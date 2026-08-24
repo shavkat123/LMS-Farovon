@@ -1,0 +1,186 @@
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Страница доступна только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+<style>
+  .fv-ac { padding: 12px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
+  .fv-ac-breadcrumb { margin-bottom: 18px; }
+  .fv-ac-breadcrumb ol { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .fv-ac-breadcrumb li { font-size: 12px; color: #64748B; display: flex; align-items: center; gap: 6px; }
+  .fv-ac-breadcrumb li::after { content: '/'; color: #CBD5E1; }
+  .fv-ac-breadcrumb li:last-child::after { display: none; }
+  .fv-ac-breadcrumb a { color: #64748B; text-decoration: none; }
+  .fv-ac-breadcrumb a:hover { color: #15803D; }
+  .fv-ac-breadcrumb li:last-child { color: #0B1220; font-weight: 600; }
+
+  .fv-ac-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+  .fv-ac-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #15803D; display: block; margin-bottom: 5px; }
+  .fv-ac-title { font-size: 26px; font-weight: 800; color: #0B1220; margin: 0 0 5px; }
+  .fv-ac-sub { font-size: 13px; color: #64748B; margin: 0; }
+  .fv-ac-newbtn { background: #1E3A8A; color: #fff; border: none; padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .fv-ac-newbtn:hover { background: #15306E; color: #fff; }
+
+  .fv-ac-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+  @media (max-width: 900px) { .fv-ac-stats { grid-template-columns: repeat(2, 1fr); } }
+  .fv-ac-stat { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px 20px; display: flex; gap: 14px; align-items: center; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+  .fv-ac-stat-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .fv-ac-stat-val { font-size: 22px; font-weight: 800; color: #0B1220; line-height: 1; }
+  .fv-ac-stat-lbl { font-size: 11px; color: #64748B; margin-top: 4px; }
+
+  .fv-ac-section-title { font-size: 16px; font-weight: 700; color: #0B1220; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+
+  .fv-ac-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 36px; }
+  @media (max-width: 900px) { .fv-ac-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 576px) { .fv-ac-grid { grid-template-columns: 1fr; } }
+  .fv-ac-prog { background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.04); transition: box-shadow .18s, transform .18s; }
+  .fv-ac-prog:hover { box-shadow: 0 6px 24px rgba(0,0,0,.08); transform: translateY(-2px); }
+  .fv-ac-prog-tag { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; align-self: flex-start; }
+  .fv-ac-prog-name { font-size: 16px; font-weight: 700; color: #0B1220; margin: 0; line-height: 1.3; }
+  .fv-ac-prog-desc { font-size: 12px; color: #64748B; margin: 0; line-height: 1.5; }
+  .fv-ac-prog-meta { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748B; padding-top: 10px; border-top: 1px solid #F1F5F9; }
+  .fv-ac-prog-meta strong { color: #0B1220; font-weight: 700; }
+  .fv-ac-prog-bar { height: 6px; border-radius: 3px; background: #F1F5F9; overflow: hidden; }
+  .fv-ac-prog-bar-fill { height: 100%; border-radius: 3px; transition: width .4s; }
+
+  .fv-ac-mentors { background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; padding: 22px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+  .fv-ac-mentor-row { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid #F1F5F9; }
+  .fv-ac-mentor-row:last-child { border-bottom: none; }
+  .fv-ac-mentor-rank { width: 28px; height: 28px; border-radius: 50%; background: #F8FAFC; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #64748B; flex-shrink: 0; }
+  .fv-ac-mentor-rank.gold { background: #FEF3C7; color: #92400E; }
+  .fv-ac-mentor-rank.silver { background: #E5E7EB; color: #374151; }
+  .fv-ac-mentor-rank.bronze { background: #FED7AA; color: #9A3412; }
+  .fv-ac-mentor-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #6366F1, #1E3A8A); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .fv-ac-mentor-info { flex: 1; min-width: 0; }
+  .fv-ac-mentor-name { font-size: 13px; font-weight: 600; color: #0B1220; margin: 0 0 2px; }
+  .fv-ac-mentor-stat { font-size: 11px; color: #64748B; }
+  .fv-ac-mentor-score { font-size: 14px; font-weight: 700; color: #15803D; }
+</style>
+
+<div class="fv-ac container-fluid px-3 px-md-4">
+
+  <nav class="fv-ac-breadcrumb" aria-label="breadcrumb">
+    <ol>
+      <li><a href="/">Главная</a></li>
+      <li aria-current="page">Центр адаптации</li>
+    </ol>
+  </nav>
+
+  <div class="fv-ac-header">
+    <div>
+      <span class="fv-ac-eyebrow">Администрирование</span>
+      <h1 class="fv-ac-title">Центр адаптации</h1>
+      <p class="fv-ac-sub">Программы адаптации, наставники, прогресс стажёров.</p>
+    </div>
+    <button class="fv-ac-newbtn" type="button" disabled title="Появится после создания таблицы программ"><i class="bi bi-plus-lg"></i> Новая программа</button>
+  </div>
+
+  <div class="fv-ac-stats">
+    <div class="fv-ac-stat">
+      <div class="fv-ac-stat-icon" style="background:#ECF6EF;color:#15803D;"><i class="bi bi-collection"></i></div>
+      <div><div class="fv-ac-stat-val">6</div><div class="fv-ac-stat-lbl">Активных программ</div></div>
+    </div>
+    <div class="fv-ac-stat">
+      <div class="fv-ac-stat-icon" style="background:#EFF6FF;color:#2563EB;"><i class="bi bi-people"></i></div>
+      <div><div class="fv-ac-stat-val">24</div><div class="fv-ac-stat-lbl">Стажёров</div></div>
+    </div>
+    <div class="fv-ac-stat">
+      <div class="fv-ac-stat-icon" style="background:#FEF3C7;color:#D97706;"><i class="bi bi-mortarboard"></i></div>
+      <div><div class="fv-ac-stat-val">9</div><div class="fv-ac-stat-lbl">Наставников</div></div>
+    </div>
+    <div class="fv-ac-stat">
+      <div class="fv-ac-stat-icon" style="background:#F0FDF4;color:#22C55E;"><i class="bi bi-check2-circle"></i></div>
+      <div><div class="fv-ac-stat-val">68%</div><div class="fv-ac-stat-lbl">Средний прогресс</div></div>
+    </div>
+  </div>
+
+  {% comment %}── Programs ──{% endcomment %}
+  <h2 class="fv-ac-section-title"><i class="bi bi-diagram-3" style="color:#15803D;"></i> Программы адаптации</h2>
+
+  <div class="fv-ac-grid">
+    {% assign p_names = 'Базовая адаптация,Менеджер по продажам,IT-стажировка,Производство,Финансы,HR-департамент' | split: ',' %}
+    {% assign p_tags  = 'Все отделы,Продажи,IT,Производство,Финансы,HR' | split: ',' %}
+    {% assign p_colors_bg = '#ECF6EF,#EFF6FF,#EEF2F9,#FFF7ED,#F0FDF4,#F0F2F5' | split: ',' %}
+    {% assign p_colors_fg = '#15803D,#2563EB,#1E3A8A,#EA580C,#22C55E,#334155' | split: ',' %}
+    {% for n in p_names %}
+      {% assign i = forloop.index0 %}
+      {% assign tag = p_tags[i] %}
+      {% assign bg  = p_colors_bg[i] %}
+      {% assign fg  = p_colors_fg[i] %}
+      {% assign trainees = 0 %}{% assign pct = 0 %}{% assign duration = 0 %}
+      {% case i %}
+        {% when 0 %}{% assign trainees = 8 %}{% assign pct = 75 %}{% assign duration = 30 %}
+        {% when 1 %}{% assign trainees = 5 %}{% assign pct = 60 %}{% assign duration = 45 %}
+        {% when 2 %}{% assign trainees = 4 %}{% assign pct = 85 %}{% assign duration = 60 %}
+        {% when 3 %}{% assign trainees = 3 %}{% assign pct = 40 %}{% assign duration = 30 %}
+        {% when 4 %}{% assign trainees = 2 %}{% assign pct = 50 %}{% assign duration = 45 %}
+        {% when 5 %}{% assign trainees = 2 %}{% assign pct = 90 %}{% assign duration = 30 %}
+      {% endcase %}
+      <div class="fv-ac-prog">
+        <span class="fv-ac-prog-tag" style="background:{{ bg }};color:{{ fg }};">{{ tag }}</span>
+        <h3 class="fv-ac-prog-name">{{ n }}</h3>
+        <p class="fv-ac-prog-desc">Программа длительностью {{ duration }} дней. Включает онбординг, тесты, наставничество.</p>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748B;margin-bottom:6px;">
+            <span>Прогресс группы</span>
+            <strong style="color:{{ fg }};">{{ pct }}%</strong>
+          </div>
+          <div class="fv-ac-prog-bar"><div class="fv-ac-prog-bar-fill" style="width:{{ pct }}%;background:{{ fg }};"></div></div>
+        </div>
+        <div class="fv-ac-prog-meta">
+          <span><i class="bi bi-people"></i> <strong>{{ trainees }}</strong> стажёров</span>
+          <span><i class="bi bi-clock"></i> {{ duration }} дней</span>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  {% comment %}── Top mentors ──{% endcomment %}
+  <h2 class="fv-ac-section-title"><i class="bi bi-trophy" style="color:#D97706;"></i> Рейтинг наставников</h2>
+  <div class="fv-ac-mentors">
+    {% assign m_names = 'Сергей Иванов,Анна Петрова,Дмитрий Козлов,Елена Соколова,Максим Орлов' | split: ',' %}
+    {% assign m_dept  = 'IT,Продажи,Производство,HR,IT' | split: ',' %}
+    {% for n in m_names %}
+      {% assign i = forloop.index0 %}
+      {% assign rank_class = '' %}
+      {% case i %}
+        {% when 0 %}{% assign rank_class = 'gold' %}
+        {% when 1 %}{% assign rank_class = 'silver' %}
+        {% when 2 %}{% assign rank_class = 'bronze' %}
+      {% endcase %}
+      {% assign mentees = 0 %}{% assign score = 0 %}
+      {% case i %}
+        {% when 0 %}{% assign mentees = 6 %}{% assign score = 49 %}
+        {% when 1 %}{% assign mentees = 5 %}{% assign score = 47 %}
+        {% when 2 %}{% assign mentees = 4 %}{% assign score = 46 %}
+        {% when 3 %}{% assign mentees = 4 %}{% assign score = 44 %}
+        {% when 4 %}{% assign mentees = 3 %}{% assign score = 42 %}
+      {% endcase %}
+      {% assign initials = n | split: ' ' %}
+      {% assign ini1 = initials[0] | slice: 0, 1 %}
+      {% assign ini2 = '' %}
+      {% if initials.size > 1 %}{% assign ini2 = initials[1] | slice: 0, 1 %}{% endif %}
+      <div class="fv-ac-mentor-row">
+        <div class="fv-ac-mentor-rank {{ rank_class }}">{{ forloop.index }}</div>
+        <div class="fv-ac-mentor-avatar">{{ ini1 }}{{ ini2 }}</div>
+        <div class="fv-ac-mentor-info">
+          <p class="fv-ac-mentor-name">{{ n }}</p>
+          <span class="fv-ac-mentor-stat">{{ m_dept[i] }} · <strong>{{ mentees }}</strong> стажёров</span>
+        </div>
+        <div class="fv-ac-mentor-score">{{ score }} / 50</div>
+      </div>
+    {% endfor %}
+  </div>
+
+</div>
+
+<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 16px;margin:20px auto 0;max-width:1200px;font-size:12px;color:#92400E;display:flex;align-items:center;gap:10px;">
+  <i class="bi bi-info-circle-fill" style="color:#F59E0B;flex-shrink:0;"></i>
+  <span>Демо-данные. Подключение к Dataverse-таблицам (программы, стажёры, наставники) — после их создания.</span>
+</div>
+
+{% endunless %}

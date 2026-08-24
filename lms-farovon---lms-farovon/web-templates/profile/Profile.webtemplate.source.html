@@ -1,0 +1,332 @@
+{% comment %}
+  Profile — Профиль пользователя
+  Entities:
+    new_h5pprogress  — new_user, new_scorescaled, new_completion, new_lastupdated, new_h5pcontent (lookup)
+    new_h5pcontent   — new_h5pcontentid, new_name
+    new_rewardpurchase — new_user, new_rewarditem (lookup), new_pointsspent, createdon
+    new_rewarditem   — new_rewarditemid, new_name, new_emoji
+{% endcomment %}
+
+{% unless user %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-person-circle" style="font-size:52px;color:#64748B;display:block;margin-bottom:16px;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin-bottom:6px;">Войдите в систему</h2>
+  <p style="font-size:13px;color:#64748B;margin-bottom:20px;">Для просмотра профиля необходимо авторизоваться.</p>
+  <a href="/SignIn" class="btn btn-primary" style="border-radius:8px;">Войти</a>
+</div>
+{% else %}
+
+{% comment %}── 1. Completed lessons (for coins + activity) ──{% endcomment %}
+{% fetchxml completed_lessons %}
+<fetch>
+  <entity name="new_h5pprogress">
+    <attribute name="new_h5pprogressid" />
+    <attribute name="new_scorescaled" />
+    <attribute name="new_lastupdated" />
+    <attribute name="new_h5pcontent" />
+    <link-entity name="new_h5pcontent" from="new_h5pcontentid" to="new_h5pcontent" alias="lc">
+      <attribute name="new_name" />
+    </link-entity>
+    <filter>
+      <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
+      <condition attribute="new_completion" operator="eq" value="1" />
+    </filter>
+    <order attribute="new_lastupdated" descending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── 2. Purchases ──{% endcomment %}
+{% fetchxml my_purchases %}
+<fetch top="10">
+  <entity name="new_rewardpurchase">
+    <attribute name="new_rewardpurchaseid" />
+    <attribute name="new_pointsspent" />
+    <attribute name="createdon" />
+    <link-entity name="new_rewarditem" from="new_rewarditemid" to="new_rewarditem" alias="ri" link-type="outer">
+      <attribute name="new_column_6348fe57" />
+      <attribute name="new_emoji" />
+    </link-entity>
+    <filter>
+      <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
+    </filter>
+    <order attribute="createdon" descending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Calculate coins ──{% endcomment %}
+{% assign total_earned = 0 %}
+{% assign completed_count = 0 %}
+{% for p in completed_lessons.results.entities %}
+  {% assign completed_count = completed_count | plus: 1 %}
+  {% assign score_pts = 0 %}
+  {% if p.new_scorescaled %}
+    {% assign score_pts = p.new_scorescaled | times: 50 | round %}
+  {% endif %}
+  {% assign total_earned = total_earned | plus: 100 | plus: score_pts %}
+{% endfor %}
+
+{% assign total_spent = 0 %}
+{% assign purchase_count = 0 %}
+{% for pur in my_purchases.results.entities %}
+  {% assign total_spent = total_spent | plus: pur.new_pointsspent %}
+  {% assign purchase_count = purchase_count | plus: 1 %}
+{% endfor %}
+
+{% assign coin_balance = total_earned | minus: total_spent %}
+
+{% comment %}── Avatar initials ──{% endcomment %}
+{% assign fullname = user.fullname | default: user.username | default: 'User' %}
+{% assign name_parts = fullname | split: ' ' %}
+{% assign initials = '' %}
+{% if name_parts.size >= 2 %}
+  {% assign initials = name_parts[0] | slice: 0 | append: name_parts[1] | slice: 0 | upcase %}
+{% else %}
+  {% assign initials = fullname | slice: 0, 2 | upcase %}
+{% endif %}
+
+<style>
+  .fv-profile { padding: 12px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
+
+  /* ── Hero card ── */
+  .fv-profile-hero {
+    background: linear-gradient(135deg, #1E3A8A 0%, #15306E 100%);
+    border-radius: 18px; padding: 28px 28px; color: #fff; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    box-shadow: 0 8px 32px rgba(11,18,32,.18);
+  }
+  .fv-avatar {
+    width: 72px; height: 72px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; font-weight: 800; color: #fff; letter-spacing: .02em;
+    border: 3px solid rgba(255,255,255,.2);
+  }
+  .fv-profile-info { flex: 1; min-width: 0; }
+  .fv-profile-name { font-size: 20px; font-weight: 700; margin: 0 0 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff !important; }
+  .fv-profile-title { font-size: 12px; opacity: .8; margin: 0 0 8px; color: #fff; }
+  .fv-profile-hero .fv-profile-meta-item { color: #fff; }
+  .fv-profile-meta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .fv-profile-meta-item { font-size: 11px; opacity: .6; display: flex; align-items: center; gap: 4px; }
+  .fv-hero-balance { flex-shrink: 0; text-align: right; }
+  @media (max-width: 480px) {
+    .fv-profile-hero { flex-direction: column; align-items: flex-start; padding: 20px; }
+    .fv-hero-balance { width: 100%; display: flex; align-items: center; gap: 10px; border-top: 1px solid rgba(255,255,255,.12); padding-top: 14px; margin-top: 4px; }
+    .fv-hero-balance > div:first-child { display: none; }
+    .fv-hero-balance > div:last-child { font-size: 24px !important; }
+  }
+
+  /* ── Stats row ── */
+  .fv-profile-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+  @media (max-width: 576px) { .fv-profile-stats { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 360px) { .fv-profile-stats { grid-template-columns: 1fr; } }
+  .fv-stat-card {
+    background: #fff; border: 1px solid #E5E7EB; border-radius: 12px;
+    padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  }
+  .fv-stat-icon {
+    width: 38px; height: 38px; border-radius: 10px; display: flex;
+    align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
+  }
+  .fv-stat-val { font-size: 20px; font-weight: 800; color: #0B1220; line-height: 1; }
+  .fv-stat-lbl { font-size: 11px; color: #64748B; margin-top: 2px; font-weight: 500; }
+
+  /* ── Sections ── */
+  .fv-profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 768px) { .fv-profile-grid { grid-template-columns: 1fr; } }
+  .fv-section-card {
+    background: #fff; border: 1px solid #E5E7EB; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  }
+  .fv-section-head {
+    padding: 16px 20px; border-bottom: 1px solid #F1F5F9;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .fv-section-title { font-size: 14px; font-weight: 700; color: #0B1220; margin: 0; display: flex; align-items: center; gap: 8px; }
+  .fv-section-badge { font-size: 11px; font-weight: 600; background: #EFF6FF; color: #3B82F6; border-radius: 20px; padding: 2px 8px; }
+
+  /* ── Activity list ── */
+  .fv-activity-item {
+    padding: 12px 20px; display: flex; align-items: flex-start; gap: 12px;
+    border-bottom: 1px solid #F8FAFC; transition: background .15s;
+  }
+  .fv-activity-item:last-child { border-bottom: none; }
+  .fv-activity-item:hover { background: #F8FAFC; }
+  .fv-activity-dot {
+    width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+    background: #EFF6FF; color: #3B82F6; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; margin-top: 1px;
+  }
+  .fv-activity-name { font-size: 13px; font-weight: 600; color: #0B1220; margin: 0 0 3px; line-height: 1.3; }
+  .fv-activity-meta { font-size: 11px; color: #64748B; display: flex; align-items: center; gap: 6px; }
+  .fv-activity-pts { font-size: 11px; font-weight: 700; color: #F59E0B; background: #FEF9EE; border-radius: 6px; padding: 1px 6px; margin-left: auto; flex-shrink: 0; }
+
+  /* ── Purchase list ── */
+  .fv-purchase-item {
+    padding: 12px 20px; display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid #F8FAFC; transition: background .15s;
+  }
+  .fv-purchase-item:last-child { border-bottom: none; }
+  .fv-purchase-item:hover { background: #F8FAFC; }
+  .fv-purchase-emoji { font-size: 22px; width: 38px; text-align: center; flex-shrink: 0; }
+  .fv-purchase-name { font-size: 13px; font-weight: 600; color: #0B1220; margin: 0 0 2px; }
+  .fv-purchase-date { font-size: 11px; color: #64748B; }
+  .fv-purchase-cost { font-size: 12px; font-weight: 700; color: #64748B; margin-left: auto; flex-shrink: 0; display: flex; align-items: center; gap: 4px; }
+  .fv-coin-img-xs { font-size: 15px; line-height: 1; vertical-align: middle; display: inline-block; }
+
+  /* ── Empty state ── */
+  .fv-empty { padding: 32px 20px; text-align: center; color: #64748B; }
+  .fv-empty i { font-size: 32px; display: block; margin-bottom: 8px; }
+  .fv-empty p { font-size: 12px; margin: 0; }
+</style>
+
+<div class="fv-profile container-fluid px-3 px-md-4">
+
+  {% comment %}── Hero ──{% endcomment %}
+  <div class="fv-profile-hero">
+    <div class="fv-avatar">{{ initials }}</div>
+    <div style="flex:1;min-width:0;">
+      <h1 class="fv-profile-name">{{ fullname }}</h1>
+      {% if user.jobtitle %}
+        <p class="fv-profile-title">{{ user.jobtitle }}</p>
+      {% else %}
+        <p class="fv-profile-title">Сотрудник</p>
+      {% endif %}
+      <div class="fv-profile-meta">
+        {% if user.emailaddress1 %}
+          <span class="fv-profile-meta-item"><i class="bi bi-envelope"></i>{{ user.emailaddress1 }}</span>
+        {% endif %}
+        <span class="fv-profile-meta-item"><i class="bi bi-calendar3"></i>Участник LMS</span>
+      </div>
+    </div>
+    <div style="text-align:right;flex-shrink:0;">
+      <div style="font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;opacity:.6;margin-bottom:6px;">Баланс монет</div>
+      <div style="font-size:34px;font-weight:800;line-height:1;display:flex;align-items:center;gap:8px;justify-content:flex-end;">
+        <i class="bi bi-award-fill" style="font-size:30px;line-height:1;vertical-align:middle;" aria-hidden="true"></i>
+        {{ coin_balance }}
+      </div>
+    </div>
+  </div>
+
+  {% comment %}── Stats ──{% endcomment %}
+  <div class="fv-profile-stats">
+    <div class="fv-stat-card">
+      <div class="fv-stat-icon" style="background:#EFF6FF;color:#3B82F6;">
+        <i class="bi bi-trophy"></i>
+      </div>
+      <div>
+        <div class="fv-stat-val">{{ total_earned }}</div>
+        <div class="fv-stat-lbl">Монет заработано</div>
+      </div>
+    </div>
+    <div class="fv-stat-card">
+      <div class="fv-stat-icon" style="background:#F0FDF4;color:#22C55E;">
+        <i class="bi bi-check2-circle"></i>
+      </div>
+      <div>
+        <div class="fv-stat-val">{{ completed_count }}</div>
+        <div class="fv-stat-lbl">Уроков пройдено</div>
+      </div>
+    </div>
+    <div class="fv-stat-card">
+      <div class="fv-stat-icon" style="background:#FEF9EE;color:#F59E0B;">
+        <i class="bi bi-bag-check"></i>
+      </div>
+      <div>
+        <div class="fv-stat-val">{{ purchase_count }}</div>
+        <div class="fv-stat-lbl">Покупок совершено</div>
+      </div>
+    </div>
+  </div>
+
+  {% comment %}── Activity + Purchases grid ──{% endcomment %}
+  <div class="fv-profile-grid">
+
+    {% comment %}── Recent lessons ──{% endcomment %}
+    <div class="fv-section-card">
+      <div class="fv-section-head">
+        <h2 class="fv-section-title">
+          <i class="bi bi-play-circle" style="color:#3B82F6;"></i>
+          Последние уроки
+        </h2>
+        {% if completed_count > 5 %}
+          <span class="fv-section-badge">{{ completed_count }} всего</span>
+        {% endif %}
+      </div>
+      {% assign lesson_shown = 0 %}
+      {% for p in completed_lessons.results.entities %}
+        {% if lesson_shown < 5 %}
+          {% assign lesson_shown = lesson_shown | plus: 1 %}
+          {% assign lscore = 0 %}
+          {% if p.new_scorescaled %}
+            {% assign lscore = p.new_scorescaled | times: 50 | round %}
+          {% endif %}
+          {% assign lesson_pts = 100 | plus: lscore %}
+          <div class="fv-activity-item">
+            <div class="fv-activity-dot"><i class="bi bi-play-fill"></i></div>
+            <div style="flex:1;min-width:0;">
+              <p class="fv-activity-name">{{ p['lc.new_name'] | default: 'Урок' }}</p>
+              <div class="fv-activity-meta">
+                <i class="bi bi-check-circle-fill" style="color:#22C55E;font-size:10px;"></i>
+                Пройдено
+                {% if p.new_scorescaled %}
+                  · {{ p.new_scorescaled | times: 100 | round }}%
+                {% endif %}
+              </div>
+            </div>
+            <span class="fv-activity-pts">+{{ lesson_pts }}</span>
+          </div>
+        {% endif %}
+      {% endfor %}
+      {% if completed_count == 0 %}
+        <div class="fv-empty">
+          <i class="bi bi-play-circle"></i>
+          <p>Вы ещё не прошли ни одного урока</p>
+        </div>
+      {% endif %}
+    </div>
+
+    {% comment %}── Purchase history ──{% endcomment %}
+    <div class="fv-section-card">
+      <div class="fv-section-head">
+        <h2 class="fv-section-title">
+          <i class="bi bi-bag" style="color:#F59E0B;"></i>
+          История покупок
+        </h2>
+        {% if purchase_count > 5 %}
+          <span class="fv-section-badge">{{ purchase_count }} всего</span>
+        {% endif %}
+      </div>
+      {% assign purchase_shown = 0 %}
+      {% for pur in my_purchases.results.entities %}
+        {% if purchase_shown < 5 %}
+          {% assign purchase_shown = purchase_shown | plus: 1 %}
+          {% assign ri_emoji = pur['ri.new_emoji'] | default: '🎁' %}
+          {% assign ri_name = pur['ri.new_column_6348fe57'] | default: 'Награда' %}
+          <div class="fv-purchase-item">
+            <div class="fv-purchase-emoji">{{ ri_emoji }}</div>
+            <div style="flex:1;min-width:0;">
+              <p class="fv-purchase-name">{{ ri_name }}</p>
+              <div class="fv-purchase-date">{{ pur.createdon }}</div>
+            </div>
+            <div class="fv-purchase-cost">
+              <i class="bi bi-award-fill fv-coin-img-xs" aria-hidden="true"></i>
+              {{ pur.new_pointsspent }}
+            </div>
+          </div>
+        {% endif %}
+      {% endfor %}
+      {% if purchase_count == 0 %}
+        <div class="fv-empty">
+          <i class="bi bi-bag"></i>
+          <p>Покупок пока нет. <a href="/rewards-shop">Перейти в магазин</a></p>
+        </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+{% endunless %}

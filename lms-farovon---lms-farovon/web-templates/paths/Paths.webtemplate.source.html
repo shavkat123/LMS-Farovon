@@ -1,0 +1,238 @@
+{% comment %}
+  Paths — Карьерные траектории. РЕАЛЬНЫЕ данные (new_trajectory).
+  Модель: траектория → курсы (msdynce_course.new_trajectory + new_trajectoryorder) → уроки H5P
+  (new_relatedcourse) → прогресс пользователя (new_h5pprogress, completion=1, дедуп в done_ids).
+{% endcomment %}
+
+{% unless user %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-signpost-split" style="font-size:52px;color:#64748B;display:block;margin-bottom:16px;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin-bottom:6px;">Войдите в систему</h2>
+  <p style="font-size:13px;color:#64748B;margin-bottom:20px;">Для просмотра траекторий необходимо авторизоваться.</p>
+  <a href="/SignIn" class="btn btn-primary" style="border-radius:8px;">Войти</a>
+</div>
+{% else %}
+
+{% comment %}── Активные траектории ──{% endcomment %}
+{% fetchxml trajs %}
+<fetch>
+  <entity name="new_trajectory">
+    <attribute name="new_trajectoryid" />
+    <attribute name="new_name" />
+    <attribute name="new_description" />
+    <attribute name="new_department" />
+    <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
+    <order attribute="new_name" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Активные курсы с траекторией и порядком ──{% endcomment %}
+{% fetchxml courses %}
+<fetch>
+  <entity name="msdynce_course">
+    <attribute name="msdynce_courseid" />
+    <attribute name="msdynce_coursename" />
+    <attribute name="new_trajectory" />
+    <attribute name="new_trajectoryorder" />
+    <filter><condition attribute="statuscode" operator="eq" value="1" /></filter>
+    <order attribute="new_trajectoryorder" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Активные H5P с привязкой к курсу ──{% endcomment %}
+{% fetchxml linked_h5p %}
+<fetch>
+  <entity name="new_h5pcontent">
+    <attribute name="new_h5pcontentid" />
+    <attribute name="new_relatedcourse" />
+    <filter type="and">
+      <condition attribute="new_isactive" operator="eq" value="1" />
+      <condition attribute="new_relatedcourse" operator="not-null" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Завершённые уроки пользователя (уникальные) ──{% endcomment %}
+{% fetchxml my_done %}
+<fetch>
+  <entity name="new_h5pprogress">
+    <attribute name="new_h5pcontent" />
+    <filter>
+      <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
+      <condition attribute="new_completion" operator="eq" value="1" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign done_ids = '|' %}
+{% assign total_done = 0 %}
+{% for p in my_done.results.entities %}
+  {% if p.new_h5pcontent %}
+    {% assign pcid = p.new_h5pcontent.id %}
+    {% unless done_ids contains pcid %}{% assign done_ids = done_ids | append: pcid | append: '|' %}{% assign total_done = total_done | plus: 1 %}{% endunless %}
+  {% endif %}
+{% endfor %}
+
+{% comment %}── Статистика ──{% endcomment %}
+{% assign n_traj = trajs.results.entities.size %}
+{% assign stat_courses = 0 %}
+{% for c in courses.results.entities %}{% if c.new_trajectory %}{% assign stat_courses = stat_courses | plus: 1 %}{% endif %}{% endfor %}
+
+<style>
+  .fv-paths { padding: 12px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
+  .fv-breadcrumb { margin-bottom: 18px; }
+  .fv-breadcrumb ol { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .fv-breadcrumb li { font-size: 12px; color: #64748B; display: flex; align-items: center; gap: 6px; }
+  .fv-breadcrumb li::after { content: '/'; color: #CBD5E1; }
+  .fv-breadcrumb li:last-child::after { display: none; }
+  .fv-breadcrumb a { color: #64748B; text-decoration: none; }
+  .fv-breadcrumb a:hover { color: #15803D; }
+  .fv-breadcrumb li:last-child { color: #0B1220; font-weight: 600; }
+
+  .fv-paths-header { margin-bottom: 22px; }
+  .fv-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #15803D; display: block; margin-bottom: 5px; }
+  .fv-paths-title { font-size: 26px; font-weight: 800; color: #0B1220; margin: 0 0 5px; }
+  .fv-paths-sub { font-size: 13px; color: #64748B; margin: 0; }
+
+  .fv-paths-stats { display: flex; gap: 14px; margin-bottom: 26px; flex-wrap: wrap; }
+  .fv-pstat { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 14px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+  .fv-pstat-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+  .fv-pstat-val { font-size: 20px; font-weight: 800; color: #0B1220; line-height: 1; }
+  .fv-pstat-lbl { font-size: 11px; color: #64748B; margin-top: 2px; }
+
+  /* ── Trajectory card ── */
+  .fv-traj { background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; padding: 22px 24px; box-shadow: 0 1px 4px rgba(0,0,0,.04); margin-bottom: 18px; }
+  .fv-traj-head { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .fv-traj-icon { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+  .fv-traj-info { flex: 1; min-width: 200px; }
+  .fv-traj-name { font-size: 17px; font-weight: 800; color: #0B1220; margin: 0; letter-spacing: -0.01em; }
+  .fv-traj-meta { font-size: 12px; color: #64748B; margin-top: 3px; }
+  .fv-traj-desc { font-size: 13px; color: #475569; margin: 8px 0 0; line-height: 1.5; max-width: 640px; }
+  .fv-traj-prog-box { text-align: right; flex-shrink: 0; }
+  .fv-traj-pct { font-size: 24px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  .fv-traj-frac { font-size: 11px; color: #94A3B8; margin-top: 3px; }
+  .fv-traj-bar { height: 8px; border-radius: 999px; background: #F1F5F9; overflow: hidden; margin: 16px 0; }
+  .fv-traj-bar-fill { height: 100%; border-radius: 999px; transition: width .4s; }
+  .fv-traj-steps { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+  .fv-traj-step { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 12px; border: 1px solid #E5E7EB; background: #fff; text-decoration: none !important; transition: border-color .14s, box-shadow .14s, transform .14s; }
+  .fv-traj-step:hover { border-color: #15803D; box-shadow: 0 3px 12px rgba(0,0,0,.07); transform: translateY(-1px); text-decoration: none !important; }
+  .fv-traj-num { width: 30px; height: 30px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; flex-shrink: 0; }
+  .fv-traj-step--done .fv-traj-num { background: #15803D; color: #fff; }
+  .fv-traj-step--prog .fv-traj-num { background: #FEF3C7; color: #B45309; }
+  .fv-traj-step--new  .fv-traj-num { background: #F0F2F5; color: #64748B; }
+  .fv-traj-step-body { min-width: 0; }
+  .fv-traj-step-name { display: block; font-size: 13px; font-weight: 600; color: #0B1220; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fv-traj-step-prog { display: block; font-size: 11px; color: #94A3B8; margin-top: 2px; }
+  .fv-traj-empty { font-size: 12px; color: #94A3B8; padding: 6px 0; }
+
+  .fv-paths-blank { text-align: center; padding: 56px 24px; background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; }
+  .fv-paths-blank i { font-size: 44px; color: #CBD5E1; display: block; margin-bottom: 14px; }
+  .fv-paths-blank h3 { font-size: 16px; font-weight: 700; color: #0B1220; margin: 0 0 6px; }
+  .fv-paths-blank p { font-size: 13px; color: #64748B; margin: 0 auto; max-width: 460px; }
+</style>
+
+<div class="fv-paths">
+
+  <nav class="fv-breadcrumb" aria-label="breadcrumb">
+    <ol><li><a href="/">Главная</a></li><li>Траектории</li></ol>
+  </nav>
+
+  <div class="fv-paths-header">
+    <span class="fv-eyebrow">Карьерные траектории</span>
+    <h1 class="fv-paths-title">Ваши пути развития</h1>
+    <p class="fv-paths-sub">Структурированные программы роста — курсы и уроки по порядку, с отслеживанием прогресса.</p>
+  </div>
+
+  <div class="fv-paths-stats">
+    <div class="fv-pstat">
+      <div class="fv-pstat-icon" style="background:#ECF6EF;color:#15803D;"><i class="bi bi-signpost-split"></i></div>
+      <div><div class="fv-pstat-val">{{ n_traj }}</div><div class="fv-pstat-lbl">Траекторий</div></div>
+    </div>
+    <div class="fv-pstat">
+      <div class="fv-pstat-icon" style="background:#EEF2F9;color:#1E3A8A;"><i class="bi bi-mortarboard"></i></div>
+      <div><div class="fv-pstat-val">{{ stat_courses }}</div><div class="fv-pstat-lbl">Курсов в траекториях</div></div>
+    </div>
+    <div class="fv-pstat">
+      <div class="fv-pstat-icon" style="background:#F0FDF4;color:#22C55E;"><i class="bi bi-check2-all"></i></div>
+      <div><div class="fv-pstat-val">{{ total_done }}</div><div class="fv-pstat-lbl">Уроков завершено</div></div>
+    </div>
+  </div>
+
+  {% if n_traj == 0 %}
+  <div class="fv-paths-blank">
+    <i class="bi bi-signpost-2"></i>
+    <h3>Траекторий пока нет</h3>
+    <p>Создайте траектории в админке (или Power Apps), привяжите к ним курсы через поле «Траектория» — и здесь появятся пути развития с прогрессом.</p>
+  </div>
+  {% else %}
+
+  {% for tj in trajs.results.entities %}
+    {% assign tjid = tj.new_trajectoryid %}
+    {% assign tj_idx = forloop.index0 | modulo: 6 %}
+    {% case tj_idx %}
+      {% when 0 %}{% assign tcol = '#15803D' %}{% assign ttint = '#ECF6EF' %}{% assign tico = 'bi-signpost-2' %}
+      {% when 1 %}{% assign tcol = '#1E3A8A' %}{% assign ttint = '#EEF2F9' %}{% assign tico = 'bi-graph-up-arrow' %}
+      {% when 2 %}{% assign tcol = '#B45309' %}{% assign ttint = '#FAF3E8' %}{% assign tico = 'bi-people' %}
+      {% when 3 %}{% assign tcol = '#7C3AED' %}{% assign ttint = '#F3F0FF' %}{% assign tico = 'bi-lightbulb' %}
+      {% when 4 %}{% assign tcol = '#0369A1' %}{% assign ttint = '#E0F2FE' %}{% assign tico = 'bi-bar-chart-line' %}
+      {% else %}{% assign tcol = '#334155' %}{% assign ttint = '#F0F2F5' %}{% assign tico = 'bi-mortarboard' %}
+    {% endcase %}
+
+    {% assign tj_total = 0 %}{% assign tj_done = 0 %}{% assign tj_courses = 0 %}
+    {% capture steps_html %}
+      {% for c in courses.results.entities %}
+        {% if c.new_trajectory and c.new_trajectory.id == tjid %}
+          {% assign tj_courses = tj_courses | plus: 1 %}
+          {% assign cid = c.msdynce_courseid %}
+          {% assign cname = c.msdynce_coursename | default: 'Курс' %}
+          {% assign ctotal = 0 %}{% assign cdone = 0 %}
+          {% for h in linked_h5p.results.entities %}
+            {% if h.new_relatedcourse.id == cid %}
+              {% assign ctotal = ctotal | plus: 1 %}
+              {% if done_ids contains h.new_h5pcontentid %}{% assign cdone = cdone | plus: 1 %}{% endif %}
+            {% endif %}
+          {% endfor %}
+          {% assign tj_total = tj_total | plus: ctotal %}
+          {% assign tj_done = tj_done | plus: cdone %}
+          {% assign cpct = 0 %}{% if ctotal > 0 %}{% assign cpct = cdone | times: 100 | divided_by: ctotal %}{% endif %}
+          {% assign cstatus = 'new' %}{% if cpct == 100 and ctotal > 0 %}{% assign cstatus = 'done' %}{% elsif cdone > 0 %}{% assign cstatus = 'prog' %}{% endif %}
+      <a href="/course-details?id={{ cid }}" class="fv-traj-step fv-traj-step--{{ cstatus }}">
+        <span class="fv-traj-num">{% if cstatus == 'done' %}<i class="bi bi-check-lg"></i>{% else %}{{ tj_courses }}{% endif %}</span>
+        <span class="fv-traj-step-body">
+          <span class="fv-traj-step-name">{{ cname }}</span>
+          <span class="fv-traj-step-prog">{% if ctotal > 0 %}{{ cdone }}/{{ ctotal }} уроков · {{ cpct }}%{% else %}уроки не привязаны{% endif %}</span>
+        </span>
+      </a>
+        {% endif %}
+      {% endfor %}
+    {% endcapture %}
+    {% assign tj_pct = 0 %}{% if tj_total > 0 %}{% assign tj_pct = tj_done | times: 100 | divided_by: tj_total %}{% endif %}
+
+    <div class="fv-traj">
+      <div class="fv-traj-head">
+        <span class="fv-traj-icon" style="background:{{ ttint }};color:{{ tcol }};"><i class="bi {{ tico }}"></i></span>
+        <div class="fv-traj-info">
+          <h3 class="fv-traj-name">{{ tj.new_name | default: 'Траектория' }}</h3>
+          <div class="fv-traj-meta">{% if tj.new_department %}{{ tj.new_department }} · {% endif %}{{ tj_courses }} курс{% if tj_courses == 1 %}{% elsif tj_courses >= 2 and tj_courses < 5 %}а{% else %}ов{% endif %}</div>
+          {% if tj.new_description %}<p class="fv-traj-desc">{{ tj.new_description }}</p>{% endif %}
+        </div>
+        <div class="fv-traj-prog-box">
+          <div class="fv-traj-pct" style="color:{{ tcol }};">{{ tj_pct }}%</div>
+          <div class="fv-traj-frac">{{ tj_done }}/{{ tj_total }} уроков</div>
+        </div>
+      </div>
+      <div class="fv-traj-bar"><div class="fv-traj-bar-fill" style="width:{{ tj_pct }}%;background:{{ tcol }};"></div></div>
+      <div class="fv-traj-steps">
+        {% if tj_courses == 0 %}<div class="fv-traj-empty">Курсы к этой траектории ещё не привязаны.</div>{% else %}{{ steps_html }}{% endif %}
+      </div>
+    </div>
+  {% endfor %}
+
+  {% endif %}
+
+</div>
+
+{% endunless %}

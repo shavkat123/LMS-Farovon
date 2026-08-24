@@ -1,0 +1,188 @@
+/* Farovon LMS — Corporate tokens (Navy + warm accent, Inter, line icons) */
+:root {
+  /* Primary — navy enterprise */
+  --v2-primary:        #1E3A8A;
+  --v2-primary-hover:  #15306E;
+  --v2-primary-50:     #EEF2F9;
+  --v2-primary-100:    #D8DFEF;
+  --v2-primary-600:    #1A337A;
+  --v2-primary-800:    #102255;
+
+  /* Single warm accent — used ONLY for status/urgency/streaks */
+  --v2-accent:         #B45309;     /* warm amber-brown */
+  --v2-accent-50:      #FAF3E8;
+  --v2-accent-100:     #F4E5C9;
+
+  /* Status — muted enterprise tones (not candy) */
+  --v2-success:        #15803D;
+  --v2-success-50:     #ECF6EF;
+  --v2-warning:        #B45309;
+  --v2-warning-50:     #FAF3E8;
+  --v2-danger:         #B91C1C;
+  --v2-danger-50:      #FBEAEA;
+  --v2-info:           #1E3A8A;
+
+  /* Neutrals — cool slate, very low saturation */
+  --v2-bg-app:         #F6F7F9;
+  --v2-bg-surface:     #FFFFFF;
+  --v2-bg-muted:       #F0F2F5;
+  --v2-fg-1:           #0B1220;
+  --v2-fg-2:           #475569;
+  --v2-fg-3:           #94A3B8;
+  --v2-border-1:       #E5E7EB;
+  --v2-border-2:       #D1D5DB;
+
+  /* Subtle tints — for category chips & accent cards (low chroma) */
+  --v2-tint-blue:      #EEF2F9;
+  --v2-tint-warm:      #FAF3E8;
+  --v2-tint-grey:      #F0F2F5;
+  --v2-tint-success:   #ECF6EF;
+  --v2-tint-danger:    #FBEAEA;
+
+  /* Legacy aliases mapped to neutral palette so old colour vars stay calm */
+  --v2-accent-orange:  var(--v2-accent);
+  --v2-accent-amber:   var(--v2-accent);
+  --v2-accent-teal:    var(--v2-success);
+  --v2-accent-pink:    var(--v2-fg-2);
+  --v2-accent-violet:  var(--v2-primary);
+  --v2-tint-orange:    var(--v2-tint-warm);
+  --v2-tint-teal:      var(--v2-tint-success);
+  --v2-tint-pink:      var(--v2-tint-grey);
+  --v2-tint-violet:    var(--v2-tint-blue);
+  --v2-tint-amber:     var(--v2-tint-warm);
+
+  --v2-radius-md: 10px;
+  --v2-radius-lg: 14px;
+  --v2-radius-xl: 16px;
+
+  --v2-shadow-card:  0 1px 2px rgba(11, 18, 32, 0.04), 0 1px 3px rgba(11, 18, 32, 0.04);
+  --v2-shadow-hover: 0 4px 12px rgba(11, 18, 32, 0.08), 0 1px 3px rgba(11, 18, 32, 0.04);
+}
+
+/* Inter — corporate SaaS standard */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
+
+.v2-body {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  background: var(--v2-bg-app);
+  color: var(--v2-fg-1);
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  -webkit-font-smoothing: antialiased;
+}
+
+.v2-num { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+
+.v2-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--v2-fg-3);
+}
+
+/* Lucide — make strokes thinner for corporate feel */
+.v2-body [data-lucide],
+.v2-body svg.lucide { stroke-width: 1.5 !important; }
+
+/* Hero — calm navy gradient, no warm radial */
+.v2-hero-grad {
+  background:
+    linear-gradient(135deg, #1E3A8A 0%, #15306E 100%);
+}
+
+/* Course cover — neutral, category-as-typography */
+.v2-cover {
+  position: relative;
+  background: linear-gradient(135deg, #F0F2F5 0%, #E5E7EB 100%);
+  overflow: hidden;
+}
+.v2-cover::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(0deg, transparent 23px, rgba(11,18,32,0.04) 24px),
+    linear-gradient(90deg, transparent 23px, rgba(11,18,32,0.04) 24px);
+  background-size: 24px 24px;
+  opacity: 0.6;
+}
+.v2-cover--navy { background: linear-gradient(135deg, #1E3A8A 0%, #15306E 100%); }
+.v2-cover--warm { background: linear-gradient(135deg, #FAF3E8 0%, #F4E5C9 100%); }
+.v2-cover--slate { background: linear-gradient(135deg, #475569 0%, #334155 100%); }
+.v2-cover--paper { background: linear-gradient(135deg, #F6F7F9 0%, #E5E7EB 100%); }
+
+.v2-cover-label {
+  position: absolute; left: 16px; top: 16px; right: 16px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+}
+.v2-cover-title {
+  position: absolute; left: 16px; bottom: 14px; right: 16px;
+  font-weight: 700; line-height: 1.05; letter-spacing: -0.01em;
+  font-size: 22px;
+}
+
+/* ─── Corporate motion ─────────────────────────────────────────
+   Subtle, restrained — fade+rise on enter, soft hover lift,
+   skeleton-style shimmer on progress. No bouncy, no playful.   */
+@keyframes v2-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes v2-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes v2-progress-shimmer {
+  0%   { background-position: -200px 0; }
+  100% { background-position: 200px 0; }
+}
+@keyframes v2-pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+.v2-body main > * { animation: v2-rise 0.32s cubic-bezier(0.2, 0, 0.2, 1) both; }
+.v2-body main > *:nth-child(2) { animation-delay: 0.04s; }
+.v2-body main > *:nth-child(3) { animation-delay: 0.08s; }
+.v2-body main > *:nth-child(4) { animation-delay: 0.12s; }
+
+/* Card hover — tiny lift, never bouncy */
+.v2-body .rounded-2xl,
+.v2-body .rounded-xl {
+  transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+.v2-body .cursor-pointer:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--v2-shadow-hover);
+}
+
+/* Buttons */
+.v2-body button {
+  transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease, transform 0.1s ease;
+}
+.v2-body button:active { transform: translateY(0.5px); }
+
+/* Sidebar links — quick fade on active state shift */
+.v2-body nav a, .v2-body nav button { transition: background-color 0.14s ease, color 0.14s ease; }
+
+/* Progress bars get a calm shimmer to feel alive */
+.v2-progress-active {
+  background-image: linear-gradient(90deg,
+    rgba(255,255,255,0) 0%,
+    rgba(255,255,255,0.35) 50%,
+    rgba(255,255,255,0) 100%);
+  background-size: 200px 100%;
+  background-repeat: no-repeat;
+  animation: v2-progress-shimmer 1.8s linear infinite;
+}
+
+/* Live status dot */
+.v2-live-dot { animation: v2-pulse-dot 1.8s ease-in-out infinite; }
+
+/* Icon micro-rotation for arrow CTAs on hover */
+.v2-cta-arrow { transition: transform 0.18s ease; }
+.v2-body button:hover .v2-cta-arrow,
+.v2-body a:hover .v2-cta-arrow { transform: translateX(2px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-body * { animation: none !important; transition: none !important; }
+}

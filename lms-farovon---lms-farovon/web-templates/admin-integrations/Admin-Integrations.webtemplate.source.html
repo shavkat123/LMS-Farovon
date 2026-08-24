@@ -1,0 +1,77 @@
+{% comment %}
+  Admin Integrations — Интеграции (/admin/integrations). Дизайн: AdminIntegrations.jsx. Примитивы .adm-* — customtheme.css.
+  ДЕМО-данные.
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+<style>
+  .admi { padding: 24px 0 56px; }
+  .admi-head { margin-bottom: 20px; }
+  .admi-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .admi-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .admi-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+  .admi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  @media (max-width: 800px) { .admi-kpis { grid-template-columns: 1fr; } .admi-grid { grid-template-columns: 1fr; } }
+  .admi-card { padding: 20px; display: flex; align-items: center; gap: 16px; }
+  .admi-ico { width: 44px; height: 44px; border-radius: var(--adm-radius-md); display: inline-flex; align-items: center; justify-content: center; background: var(--adm-bg-muted); font-size: 22px; flex-shrink: 0; }
+  .admi-name { font-size: 14px; font-weight: 700; color: var(--adm-fg-1); }
+  .admi-desc { font-size: 12px; color: var(--adm-fg-3); margin-top: 2px; }
+  .admi-by { font-size: 11px; color: var(--adm-fg-3); margin-top: 4px; }
+</style>
+
+<div class="container adm-scope admi">
+
+  <div class="admi-head">
+    <div style="display:flex;align-items:center;gap:8px;"><span class="adm-eyebrow">Система</span><span class="adm-demo-chip">демо</span></div>
+    <h1>Интеграции</h1>
+    <p>Подключения к внешним системам и сервисам.</p>
+  </div>
+
+  <div class="admi-kpis">
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Подключено</span><i class="bi bi-plug"></i></div><div class="adm-stat-val" style="color:var(--adm-success);">4</div><div class="adm-stat-foot"><span class="adm-stat-sub">активных</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Требуют внимания</span><i class="bi bi-exclamation-triangle"></i></div><div class="adm-stat-val" style="color:var(--adm-danger);">1</div><div class="adm-stat-foot"><span class="adm-stat-sub">с ошибкой</span></div></div>
+    <div class="adm-card adm-stat"><div class="adm-stat-top"><span class="adm-eyebrow">Доступно</span><i class="bi bi-box-seam"></i></div><div class="adm-stat-val">12</div><div class="adm-stat-foot"><span class="adm-stat-sub">для подключения</span></div></div>
+  </div>
+
+  <div class="admi-grid">
+    {% comment %} имя|описание|иконка|статус|настроил {% endcomment %}
+    {% assign ints = 'Active Directory|Синхронизация пользователей и групп|people|connected|IT-отдел;MS Teams|Уведомления и вебинары|camera-video|connected|М. Саидова;1С:Зарплата|Импорт оргструктуры|building|connected|HR;Telegram Bot|Push-уведомления в мессенджер|send|connected|IT-отдел;Slack|Оповещения о курсах|hash|available|;Google Calendar|Синхронизация событий|calendar3|available|;Zoom|Вебинары и записи|camera-video|error|IT-отдел;SCORM / xAPI|Импорт внешних курсов|box-seam|available|' | split: ';' %}
+    {% for it in ints %}
+      {% assign f = it | split: '|' %}
+      {% assign stt = f[3] %}
+    <div class="adm-card admi-card">
+      <span class="admi-ico" style="color:{% if stt == 'error' %}var(--adm-danger){% else %}var(--adm-primary){% endif %};"><i class="bi bi-{{ f[2] }}"></i></span>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="admi-name">{{ f[0] }}</span>
+          {% if stt == 'connected' %}<span class="adm-pill adm-pill--success adm-pill--dot">Подключено</span>
+          {% elsif stt == 'error' %}<span class="adm-pill adm-pill--danger adm-pill--dot">Ошибка</span>
+          {% else %}<span class="adm-pill adm-pill--neutral">Доступно</span>{% endif %}
+        </div>
+        <div class="admi-desc">{{ f[1] }}</div>
+        {% assign by = f[4] | default: '' %}
+        {% if by != '' %}<div class="admi-by">Настроил: {{ by }}</div>{% endif %}
+      </div>
+      <button type="button" class="adm-btn {% if stt == 'available' %}adm-btn--primary{% else %}adm-btn--ghost{% endif %}" style="flex-shrink:0;" disabled>
+        {% if stt == 'available' %}Подключить{% elsif stt == 'error' %}Исправить{% else %}Настроить{% endif %}
+      </button>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div style="background:var(--adm-accent-50);border:1px solid #F4E5C9;border-radius:10px;padding:10px 16px;margin-top:16px;font-size:12px;color:var(--adm-accent);display:flex;align-items:center;gap:10px;">
+    <i class="bi bi-info-circle-fill" style="flex-shrink:0;"></i>
+    <span>Демо-данные. Список интеграций иллюстративный.</span>
+  </div>
+
+</div>
+
+{% endunless %}

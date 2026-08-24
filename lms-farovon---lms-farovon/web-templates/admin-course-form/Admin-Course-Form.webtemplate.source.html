@@ -1,0 +1,525 @@
+{% comment %}
+  Admin Course Form — новый редактор курса (/admin/course-form, ?id= → редактирование).
+  Дизайн: ui_kits/admin/CourseEditor.jsx (Equeo-стиль), adm-* примитивы из customtheme.
+  Заменяет legacy ASP entity-формы (create-course/edit-course). Сохранение: Web API
+  POST/PATCH /_api/msdynce_courses (+ обложка msdynce_entityimage base64). Опции Choice — из stringmap.
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+{% assign is_edit = false %}
+{% if request.params['id'] %}{% assign is_edit = true %}{% assign courseid = request.params['id'] | xml_escape %}{% endif %}
+
+{% comment %}── Опции Choice-полей из stringmap ──{% endcomment %}
+{% fetchxml sm_cat %}
+<fetch distinct='true'><entity name='stringmap'><attribute name='attributevalue' /><attribute name='value' /><attribute name='displayorder' />
+  <filter><condition attribute='attributename' operator='eq' value='msdynce_coursecategory' /></filter>
+  <order attribute='displayorder' /></entity></fetch>
+{% endfetchxml %}
+{% fetchxml sm_type %}
+<fetch distinct='true'><entity name='stringmap'><attribute name='attributevalue' /><attribute name='value' /><attribute name='displayorder' />
+  <filter><condition attribute='attributename' operator='eq' value='msdynce_coursetype' /></filter>
+  <order attribute='displayorder' /></entity></fetch>
+{% endfetchxml %}
+{% fetchxml sm_grade %}
+<fetch distinct='true'><entity name='stringmap'><attribute name='attributevalue' /><attribute name='value' /><attribute name='displayorder' />
+  <filter><condition attribute='attributename' operator='eq' value='msdynce_coursegradelevel' /></filter>
+  <order attribute='displayorder' /></entity></fetch>
+{% endfetchxml %}
+{% fetchxml sm_days %}
+<fetch distinct='true'><entity name='stringmap'><attribute name='attributevalue' /><attribute name='value' /><attribute name='displayorder' />
+  <filter><condition attribute='attributename' operator='eq' value='msdynce_coursedays' /></filter>
+  <order attribute='displayorder' /></entity></fetch>
+{% endfetchxml %}
+{% fetchxml sm_freq %}
+<fetch distinct='true'><entity name='stringmap'><attribute name='attributevalue' /><attribute name='value' /><attribute name='displayorder' />
+  <filter><condition attribute='attributename' operator='eq' value='msdynce_frequency' /></filter>
+  <order attribute='displayorder' /></entity></fetch>
+{% endfetchxml %}
+
+{% comment %}── Траектории (для привязки) ──{% endcomment %}
+{% fetchxml tr_list %}
+<fetch><entity name="new_trajectory"><attribute name="new_trajectoryid" /><attribute name="new_name" />
+  <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter><order attribute="new_name" /></entity></fetch>
+{% endfetchxml %}
+
+{% comment %}── Данные курса (режим редактирования) ──{% endcomment %}
+{% assign has_c = false %}
+{% if is_edit %}
+{% fetchxml crs_one %}
+<fetch top="1">
+  <entity name="msdynce_course">
+    <attribute name="msdynce_courseid" />
+    <attribute name="msdynce_coursename" />
+    <attribute name="msdynce_coursedescription" />
+    <attribute name="msdynce_coursecategory" />
+    <attribute name="msdynce_coursetype" />
+    <attribute name="msdynce_coursegradelevel" />
+    <attribute name="msdynce_coursedays" />
+    <attribute name="msdynce_frequency" />
+    <attribute name="msdynce_registerationmaxcapacity" />
+    <attribute name="msdynce_coursestartdateandtime" />
+    <attribute name="msdynce_courseenddateandtime" />
+    <attribute name="msdynce_registerationdeadline" />
+    <attribute name="msdynce_instructorname" />
+    <attribute name="new_trajectory" />
+    <attribute name="new_trajectoryorder" />
+    <attribute name="statuscode" />
+    <filter><condition attribute="msdynce_courseid" operator="eq" value="{{ courseid }}" /></filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% if crs_one.results.entities.size > 0 %}{% assign c = crs_one.results.entities[0] %}{% assign has_c = true %}{% endif %}
+{% endif %}
+
+{% comment %}── Выбранные multi-значения → строки '|v|' ──{% endcomment %}
+{% assign sel_types = '|' %}{% assign sel_grades = '|' %}{% assign sel_days = '|' %}
+{% if has_c %}
+  {% if c.msdynce_coursetype %}{% for o in c.msdynce_coursetype %}{% assign sel_types = sel_types | append: o.value | append: '|' %}{% endfor %}{% endif %}
+  {% if c.msdynce_coursegradelevel %}{% for o in c.msdynce_coursegradelevel %}{% assign sel_grades = sel_grades | append: o.value | append: '|' %}{% endfor %}{% endif %}
+  {% if c.msdynce_coursedays %}{% for o in c.msdynce_coursedays %}{% assign sel_days = sel_days | append: o.value | append: '|' %}{% endfor %}{% endif %}
+{% endif %}
+
+{% comment %}── Привязанные уроки H5P (правая панель, read-only) ──{% endcomment %}
+{% if is_edit %}
+{% fetchxml crs_lessons %}
+<fetch><entity name="new_h5pcontent"><attribute name="new_h5pcontentid" /><attribute name="new_name" /><attribute name="new_librarytype" />
+  <filter type="and"><condition attribute="new_relatedcourse" operator="eq" value="{{ courseid }}" /><condition attribute="new_isactive" operator="eq" value="1" /></filter>
+  <order attribute="new_name" /></entity></fetch>
+{% endfetchxml %}
+{% endif %}
+
+<style>
+  .acf { padding: 24px 0 56px; }
+  .acf, .acf input, .acf select, .acf textarea, .acf button { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+  .acf-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--adm-fg-2) !important; text-decoration: none !important; margin-bottom: 14px; }
+  .acf-back:hover { color: var(--adm-primary) !important; }
+  /* Шапка */
+  .acf-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; flex-wrap: wrap; margin-bottom: 16px; }
+  .acf-head-l { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 260px; }
+  .acf-head-ico { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--adm-bg-muted); color: var(--adm-primary); font-size: 20px; flex-shrink: 0; }
+  .acf-title-input { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); background: transparent; border: none; outline: none; width: 100%; min-width: 200px; padding: 2px 0; border-bottom: 1px dashed transparent; }
+  .acf-title-input:focus { border-bottom-color: var(--adm-border-2); }
+  .acf-title-input::placeholder { color: var(--adm-fg-3); font-weight: 500; }
+  .acf-head-sub { font-size: 11px; color: var(--adm-fg-3); margin-top: 2px; }
+  .acf-head-r { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  /* Grid */
+  .acf-grid { display: grid; grid-template-columns: 1fr 320px; gap: 18px; align-items: start; }
+  @media (max-width: 960px) { .acf-grid { grid-template-columns: 1fr; } }
+  .acf-col { display: flex; flex-direction: column; gap: 18px; }
+  .acf-card { padding: 20px 22px 22px; border-radius: 14px !important; box-shadow: 0 1px 3px rgba(11,18,32,.07), 0 6px 20px rgba(11,18,32,.05) !important; }
+  /* Заголовок секции — выраженный, с разделителем */
+  .acf-sec { display: block; padding-bottom: 10px; margin-bottom: 6px; border-bottom: 1px solid var(--adm-border-1); font-size: 12px !important; }
+  /* Поля */
+  .acf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .acf-row { grid-template-columns: 1fr; } }
+  .acf-field { margin-top: 14px; }
+  .acf-lbl { display: block; font-size: 12.5px; font-weight: 600; color: var(--adm-fg-1); margin-bottom: 6px; }
+  .acf-lbl .req { color: #DC2626; }
+  /* Инпуты — явные границы, фон, тень: сразу видно, что это редактируемое поле */
+  .acf-in {
+    width: 100%; border: 1.5px solid #CBD5E1; border-radius: 10px;
+    font-size: 14px; padding: 9px 12px; background: #FBFCFE; color: var(--adm-fg-1);
+    min-height: 40px; box-shadow: inset 0 1px 2px rgba(11,18,32,.04);
+    transition: border-color .14s, box-shadow .14s, background .14s;
+  }
+  .acf-in:hover { border-color: #94A3B8; background: #fff; }
+  .acf-in:focus { border-color: var(--adm-primary); outline: none; background: #fff; box-shadow: 0 0 0 3px rgba(30,58,138,.12); }
+  .acf-in::placeholder { color: #94A3B8; }
+  select.acf-in { cursor: pointer; }
+  input[type="datetime-local"].acf-in, input[type="number"].acf-in { font-variant-numeric: tabular-nums; }
+  textarea.acf-in { resize: vertical; min-height: 92px; }
+  /* Чипы multi-select — вид «нажимаемых» */
+  .acf-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .acf-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px;
+    border: 1.5px solid #CBD5E1; background: #fff; font-size: 12.5px; font-weight: 600;
+    color: var(--adm-fg-2); cursor: pointer; -webkit-user-select: none; user-select: none; transition: all .13s;
+    box-shadow: 0 1px 2px rgba(11,18,32,.05);
+  }
+  .acf-chip:hover { border-color: var(--adm-primary); color: var(--adm-primary); }
+  .acf-chip input { display: none; }
+  .acf-chip.on { background: var(--adm-primary); border-color: var(--adm-primary); color: #fff; box-shadow: 0 2px 6px rgba(30,58,138,.25); }
+  .acf-chip.on::before { content: '✓'; font-size: 11px; }
+  /* Обложка */
+  .acf-cover { aspect-ratio: 4/3; border-radius: 10px; border: 1px dashed var(--adm-border-2); background: var(--adm-bg-muted); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--adm-fg-3); cursor: pointer; overflow: hidden; position: relative; margin-top: 8px; }
+  .acf-cover img { width: 100%; height: 100%; object-fit: cover; display: none; }
+  .acf-cover.has img { display: block; }
+  .acf-cover.has .acf-cover-ph { display: none; }
+  .acf-cover-actions { display: flex; gap: 8px; margin-top: 10px; }
+  /* Уроки */
+  .acf-lesson { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--adm-border-1); font-size: 13px; color: var(--adm-fg-1); }
+  .acf-lesson:last-child { border-bottom: none; }
+  .acf-lesson i { color: var(--adm-primary); flex-shrink: 0; }
+  .acf-lesson .t { font-size: 10.5px; color: var(--adm-fg-3); }
+  .acf-err { display: none; font-size: 12.5px; color: #DC2626; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; }
+  .acf-danger { border: 1px solid #FECACA !important; }
+  .acf-del { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: #DC2626 !important; text-decoration: none !important; }
+</style>
+
+<div class="container adm-scope acf">
+  <a href="/admin/courses" class="acf-back"><i class="bi bi-arrow-left"></i> Назад к курсам</a>
+
+  <div class="adm-card acf-head">
+    <div class="acf-head-l">
+      <span class="acf-head-ico"><i class="bi bi-mortarboard"></i></span>
+      <div style="flex:1;min-width:0;">
+        <input type="text" id="f_name" class="acf-title-input" placeholder="Название курса…" value="{% if has_c %}{{ c.msdynce_coursename | escape }}{% endif %}">
+        <div class="acf-head-sub">{% if is_edit %}Редактирование курса{% if has_c and c.statuscode %} · {{ c.statuscode.label }}{% endif %}{% else %}Новый курс{% endif %}</div>
+      </div>
+    </div>
+    <div class="acf-head-r">
+      <a href="/admin/courses" class="adm-btn adm-btn--ghost">Отмена</a>
+      <button type="button" class="adm-btn adm-btn--primary" id="acfSave"><i class="bi bi-check-lg"></i> Сохранить</button>
+    </div>
+  </div>
+
+  <div class="acf-err" id="acfErr"></div>
+
+  <div class="acf-grid">
+    <div class="acf-col">
+
+      <div class="adm-card acf-card">
+        <span class="adm-eyebrow acf-sec">Основное</span>
+        <div class="acf-row">
+          <div class="acf-field">
+            <label class="acf-lbl">Категория <span class="req">*</span></label>
+            <select id="f_category" class="acf-in" title="Категория">
+              <option value="">— выберите —</option>
+              {% assign seen_cat = '|' %}
+              {% for o in sm_cat.results.entities %}
+              {% capture cv %}|{{ o.attributevalue }}|{% endcapture %}
+              {% unless seen_cat contains cv %}{% assign seen_cat = seen_cat | append: o.attributevalue | append: '|' %}
+              <option value="{{ o.attributevalue }}"{% if has_c and c.msdynce_coursecategory and c.msdynce_coursecategory.value == o.attributevalue %} selected{% endif %}>{{ o.value }}</option>
+              {% endunless %}
+              {% endfor %}
+            </select>
+          </div>
+          <div class="acf-field">
+            <label class="acf-lbl">Периодичность</label>
+            <select id="f_frequency" class="acf-in" title="Периодичность">
+              <option value="">— выберите —</option>
+              {% assign seen_fr = '|' %}
+              {% for o in sm_freq.results.entities %}
+              {% capture fv %}|{{ o.attributevalue }}|{% endcapture %}
+              {% unless seen_fr contains fv %}{% assign seen_fr = seen_fr | append: o.attributevalue | append: '|' %}
+              <option value="{{ o.attributevalue }}"{% if has_c and c.msdynce_frequency and c.msdynce_frequency.value == o.attributevalue %} selected{% endif %}>{{ o.value }}</option>
+              {% endunless %}
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="acf-field">
+          <label class="acf-lbl">Формат курса</label>
+          <div class="acf-chips" id="f_types">
+            {% assign seen_ty = '|' %}
+            {% for o in sm_type.results.entities %}
+            {% capture ov %}|{{ o.attributevalue }}|{% endcapture %}
+            {% unless seen_ty contains ov %}{% assign seen_ty = seen_ty | append: o.attributevalue | append: '|' %}
+            <label class="acf-chip{% if sel_types contains ov %} on{% endif %}"><input type="checkbox" value="{{ o.attributevalue }}"{% if sel_types contains ov %} checked{% endif %}>{{ o.value }}</label>
+            {% endunless %}
+            {% endfor %}
+          </div>
+        </div>
+        <div class="acf-field">
+          <label class="acf-lbl">Описание</label>
+          <textarea id="f_desc" class="acf-in" rows="3" placeholder="Чему научит курс, для кого он…">{% if has_c %}{{ c.msdynce_coursedescription }}{% endif %}</textarea>
+        </div>
+      </div>
+
+      <div class="adm-card acf-card">
+        <span class="adm-eyebrow acf-sec">Расписание</span>
+        <div class="acf-row">
+          <div class="acf-field">
+            <label class="acf-lbl">Дата начала <span class="req">*</span></label>
+            <input type="datetime-local" id="f_start" class="acf-in" title="Дата начала" value="{% if has_c and c.msdynce_coursestartdateandtime %}{{ c.msdynce_coursestartdateandtime | date: 'yyyy-MM-ddTHH:mm' }}{% endif %}">
+          </div>
+          <div class="acf-field">
+            <label class="acf-lbl">Дата окончания <span class="req">*</span></label>
+            <input type="datetime-local" id="f_end" class="acf-in" title="Дата окончания" value="{% if has_c and c.msdynce_courseenddateandtime %}{{ c.msdynce_courseenddateandtime | date: 'yyyy-MM-ddTHH:mm' }}{% endif %}">
+          </div>
+        </div>
+        <div class="acf-row">
+          <div class="acf-field">
+            <label class="acf-lbl">Дедлайн регистрации <span class="req">*</span></label>
+            <input type="datetime-local" id="f_deadline" class="acf-in" title="Дедлайн регистрации" value="{% if has_c and c.msdynce_registerationdeadline %}{{ c.msdynce_registerationdeadline | date: 'yyyy-MM-ddTHH:mm' }}{% endif %}">
+          </div>
+          <div class="acf-field">
+            <label class="acf-lbl">Вместимость <span class="req">*</span></label>
+            <input type="number" id="f_capacity" class="acf-in" title="Вместимость" placeholder="25" min="1" value="{% if has_c %}{{ c.msdynce_registerationmaxcapacity }}{% endif %}">
+          </div>
+        </div>
+        <div class="acf-field">
+          <label class="acf-lbl">Дни проведения</label>
+          <div class="acf-chips" id="f_days">
+            {% assign seen_dy = '|' %}
+            {% for o in sm_days.results.entities %}
+            {% capture ov %}|{{ o.attributevalue }}|{% endcapture %}
+            {% unless seen_dy contains ov %}{% assign seen_dy = seen_dy | append: o.attributevalue | append: '|' %}
+            <label class="acf-chip{% if sel_days contains ov %} on{% endif %}"><input type="checkbox" value="{{ o.attributevalue }}"{% if sel_days contains ov %} checked{% endif %}>{{ o.value }}</label>
+            {% endunless %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="adm-card acf-card">
+        <span class="adm-eyebrow acf-sec">Аудитория</span>
+        <div class="acf-field">
+          <label class="acf-lbl">Уровень</label>
+          <div class="acf-chips" id="f_grades">
+            {% assign seen_gr = '|' %}
+            {% for o in sm_grade.results.entities %}
+            {% capture ov %}|{{ o.attributevalue }}|{% endcapture %}
+            {% unless seen_gr contains ov %}{% assign seen_gr = seen_gr | append: o.attributevalue | append: '|' %}
+            <label class="acf-chip{% if sel_grades contains ov %} on{% endif %}"><input type="checkbox" value="{{ o.attributevalue }}"{% if sel_grades contains ov %} checked{% endif %}>{{ o.value }}</label>
+            {% endunless %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="adm-card acf-card">
+        <span class="adm-eyebrow acf-sec">Траектория</span>
+        <div class="acf-row">
+          <div class="acf-field">
+            <label class="acf-lbl">Траектория развития</label>
+            <select id="f_traj" class="acf-in" title="Траектория развития">
+              <option value="">— не входит —</option>
+              {% for t in tr_list.results.entities %}
+              <option value="{{ t.new_trajectoryid }}"{% if has_c and c.new_trajectory and c.new_trajectory.id == t.new_trajectoryid %} selected{% endif %}>{{ t.new_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="acf-field">
+            <label class="acf-lbl">Порядок в траектории</label>
+            <input type="number" id="f_trajorder" class="acf-in" title="Порядок в траектории" placeholder="1" min="1" value="{% if has_c and c.new_trajectoryorder %}{{ c.new_trajectoryorder }}{% endif %}">
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="acf-col">
+      <div class="adm-card acf-card">
+        <span class="adm-eyebrow">Обложка</span>
+        <div class="acf-cover" id="acfCover">
+          <div class="acf-cover-ph"><i class="bi bi-image" style="font-size:26px;"></i><div style="font-size:11px;margin-top:6px;">Нажмите, чтобы загрузить<br>jpg / png</div></div>
+          <img id="acfCoverImg" alt="Обложка курса">
+        </div>
+        <input type="file" id="acfCoverFile" accept="image/*" style="display:none;">
+        <div class="acf-cover-actions">
+          <button type="button" class="adm-btn adm-btn--ghost" id="acfCoverPick"><i class="bi bi-upload"></i> Загрузить</button>
+          <button type="button" class="adm-btn adm-btn--ghost" id="acfCoverClear" style="display:none;color:#DC2626;"><i class="bi bi-trash"></i> Убрать</button>
+        </div>
+      </div>
+
+      <div class="adm-card acf-card">
+        <span class="adm-eyebrow">Преподаватель</span>
+        <div class="acf-field" style="margin-top:8px;">
+          <input type="text" id="f_instructor" class="acf-in" placeholder="Имя преподавателя" value="{% if has_c and c.msdynce_instructorname %}{{ c.msdynce_instructorname.name | escape }}{% endif %}" readonly title="Назначение преподавателя — в Power Apps (лукап). Отображается текущий.">
+          <div style="font-size:11px;color:var(--adm-fg-3);margin-top:6px;">Назначение преподавателя-контакта — в Power Apps.</div>
+        </div>
+      </div>
+
+      {% if is_edit %}
+      <div class="adm-card acf-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span class="adm-eyebrow">Уроки курса</span>
+          <a href="/admin/library" style="font-size:11px;font-weight:600;color:var(--adm-primary) !important;text-decoration:none !important;">Библиотека →</a>
+        </div>
+        <div style="margin-top:8px;">
+          {% assign lcount = crs_lessons.results.entities.size %}
+          {% if lcount == 0 %}
+          <div style="font-size:12px;color:var(--adm-fg-3);padding:6px 0;">Уроки не привязаны. Привяжите H5P-уроки к курсу в Библиотеке (поле «Связанный курс»).</div>
+          {% else %}
+          {% for l in crs_lessons.results.entities %}
+          <div class="acf-lesson">
+            <i class="bi bi-play-circle"></i>
+            <div style="flex:1;min-width:0;">
+              <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ l.new_name }}</div>
+              <div class="t">{{ l.new_librarytype | default: 'H5P' }}</div>
+            </div>
+          </div>
+          {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="adm-card acf-card acf-danger">
+        <span class="adm-eyebrow" style="color:#DC2626;">Опасная зона</span>
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+          <button type="button" id="acfDelete" class="adm-btn" style="border-color:#FECACA;color:#DC2626;justify-content:center;"><i class="bi bi-trash"></i> Удалить курс</button>
+          <div style="font-size:11px;color:var(--adm-fg-3);">Удаление безвозвратно. Если у курса есть регистрации/уроки — будет предложена деактивация (курс скроется с портала).</div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var IS_EDIT = {% if is_edit %}true{% else %}false{% endif %};
+  var COURSE_ID = '{% if is_edit %}{{ courseid }}{% endif %}';
+  var err = document.getElementById('acfErr');
+
+  // ── Чипы: тумблер класса on ──
+  document.querySelectorAll('.acf-chip input').forEach(function (cb) {
+    cb.addEventListener('change', function () { cb.closest('.acf-chip').classList.toggle('on', cb.checked); });
+  });
+
+  // ── Обложка ──
+  var coverB64 = null, coverName = '', coverType = '', coverCleared = false;
+  var coverBox = document.getElementById('acfCover');
+  var coverImg = document.getElementById('acfCoverImg');
+  var fileInp  = document.getElementById('acfCoverFile');
+  var clearBtn = document.getElementById('acfCoverClear');
+  function pick() { fileInp.click(); }
+  coverBox.addEventListener('click', pick);
+  document.getElementById('acfCoverPick').addEventListener('click', pick);
+  fileInp.addEventListener('change', function () {
+    var f = fileInp.files && fileInp.files[0];
+    if (!f) return;
+    if (f.size > 4 * 1024 * 1024) { showErr('Файл обложки больше 4 МБ — выберите меньший.'); return; }
+    var r = new FileReader();
+    r.onload = function () {
+      var b = String(r.result);
+      coverB64 = b.substring(b.indexOf(',') + 1);
+      coverName = f.name; coverType = f.type; coverCleared = false;
+      coverImg.src = b; coverBox.classList.add('has'); clearBtn.style.display = '';
+    };
+    r.readAsDataURL(f);
+  });
+  clearBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    coverB64 = null; coverCleared = true;
+    coverImg.src = ''; coverBox.classList.remove('has'); clearBtn.style.display = 'none';
+  });
+  // текущая обложка (edit) — GET не требует CSRF
+  if (IS_EDIT) {
+    fetch('/_api/msdynce_courses(' + COURSE_ID + ')/msdynce_entityimage/?size=full', {
+      headers: { 'Accept': 'application/json' }, credentials: 'same-origin'
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (res) {
+        if (res && res.value) { coverImg.src = 'data:image/png;base64,' + res.value; coverBox.classList.add('has'); clearBtn.style.display = ''; }
+      }).catch(function () {});
+  }
+
+  function showErr(m) { err.textContent = m; err.style.display = 'block'; window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  function chips(id) {
+    var vals = [];
+    document.querySelectorAll('#' + id + ' input:checked').forEach(function (cb) { vals.push(cb.value); });
+    return vals.length ? vals.join(', ') : null;
+  }
+  function dt(id) {
+    var v = document.getElementById(id).value;
+    return v ? new Date(v).toISOString() : null;
+  }
+  function getToken() {
+    return fetch('/_layout/tokenhtml', { credentials: 'include' }).then(function (r) { return r.text(); })
+      .then(function (h) { var m = h.match(/name="__RequestVerificationToken"[^>]*value="([^"]+)"/); return m ? m[1] : ''; });
+  }
+
+  document.getElementById('acfSave').addEventListener('click', function () {
+    err.style.display = 'none';
+    var name = document.getElementById('f_name').value.trim();
+    var cat = document.getElementById('f_category').value;
+    var cap = document.getElementById('f_capacity').value;
+    var start = dt('f_start'), end = dt('f_end'), deadline = dt('f_deadline');
+    if (!name) { showErr('Укажите название курса.'); return; }
+    if (!cat) { showErr('Выберите категорию.'); return; }
+    if (!cap) { showErr('Укажите вместимость.'); return; }
+    if (!start || !end || !deadline) { showErr('Заполните даты: начало, окончание и дедлайн регистрации.'); return; }
+
+    var body = {
+      msdynce_coursename: name,
+      msdynce_coursecategory: parseInt(cat, 10),
+      msdynce_registerationmaxcapacity: parseInt(cap, 10),
+      msdynce_coursestartdateandtime: start,
+      msdynce_courseenddateandtime: end,
+      msdynce_registerationdeadline: deadline,
+      msdynce_coursedescription: document.getElementById('f_desc').value,
+      msdynce_coursetype: chips('f_types'),
+      msdynce_coursegradelevel: chips('f_grades'),
+      msdynce_coursedays: chips('f_days'),
+      new_trajectoryorder: parseInt(document.getElementById('f_trajorder').value, 10) || null
+    };
+    var freq = document.getElementById('f_frequency').value;
+    body.msdynce_frequency = freq ? parseInt(freq, 10) : null;
+    var traj = document.getElementById('f_traj').value;
+    if (traj) { body['new_trajectory@odata.bind'] = '/new_trajectories(' + traj + ')'; }
+    if (coverB64) {
+      body.msdynce_entityimage = coverB64;
+      body.msdynce_entityimage_file_name = coverName;
+      body.msdynce_entityimage_file_type = coverType.substring(coverType.indexOf('/') + 1);
+    } else if (coverCleared) {
+      body.msdynce_entityimage = null;
+      body.msdynce_entityimage_file_name = null;
+      body.msdynce_entityimage_file_type = null;
+    }
+
+    var btn = this;
+    btn.disabled = true; btn.innerHTML = 'Сохранение…';
+    getToken().then(function (tok) {
+      var url = IS_EDIT ? '/_api/msdynce_courses(' + COURSE_ID + ')' : '/_api/msdynce_courses';
+      return fetch(url, {
+        method: IS_EDIT ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', '__RequestVerificationToken': tok },
+        body: JSON.stringify(body)
+      });
+    }).then(function (res) {
+      if (res.ok) { location.href = '/admin/courses'; return; }
+      return res.text().then(function (t) { throw new Error('HTTP ' + res.status + ' — ' + t.slice(0, 300)); });
+    }).catch(function (e) {
+      btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i> Сохранить';
+      showErr('Не удалось сохранить: ' + e.message);
+    });
+  });
+
+  // ── Удаление курса (danger zone): DELETE; если связи мешают — предложить деактивацию ──
+  var delBtn = document.getElementById('acfDelete');
+  if (delBtn && IS_EDIT) {
+    delBtn.addEventListener('click', function () {
+      if (!confirm('Удалить курс безвозвратно?')) return;
+      delBtn.disabled = true; delBtn.innerHTML = 'Удаление…';
+      getToken().then(function (tok) {
+        return fetch('/_api/msdynce_courses(' + COURSE_ID + ')', {
+          method: 'DELETE',
+          headers: { 'Accept': 'application/json', '__RequestVerificationToken': tok }
+        });
+      }).then(function (res) {
+        if (res.ok) { location.href = '/admin/courses'; return; }
+        return res.text().then(function (t) {
+          console.warn('[course-delete]', res.status, t);
+          delBtn.disabled = false; delBtn.innerHTML = '<i class="bi bi-trash"></i> Удалить курс';
+          if (confirm('Удалить не получилось (вероятно, есть связанные записи: регистрации, уроки).\n\nДеактивировать курс вместо удаления? Он скроется с портала.')) {
+            delBtn.disabled = true; delBtn.innerHTML = 'Деактивация…';
+            return getToken().then(function (tok2) {
+              return fetch('/_api/msdynce_courses(' + COURSE_ID + ')', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', '__RequestVerificationToken': tok2 },
+                body: JSON.stringify({ statecode: 1, statuscode: 2 })
+              });
+            }).then(function (r2) {
+              if (r2.ok) { location.href = '/admin/courses'; return; }
+              return r2.text().then(function (t2) { throw new Error('HTTP ' + r2.status + ' — ' + t2.slice(0, 200)); });
+            });
+          }
+        });
+      }).catch(function (e) {
+        delBtn.disabled = false; delBtn.innerHTML = '<i class="bi bi-trash"></i> Удалить курс';
+        showErr('Не удалось удалить/деактивировать: ' + e.message);
+      });
+    });
+  }
+})();
+</script>
+
+{% endunless %}
