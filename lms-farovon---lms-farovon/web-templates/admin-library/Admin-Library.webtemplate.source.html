@@ -22,7 +22,8 @@
 </fetch>
 {% endfetchxml %}
 {% assign lib_total = 0 %}{% assign lib_dur = 0 %}
-{% for r in lib_tot.results.entities %}{% assign lib_total = r.tot | plus: 0 %}{% assign lib_dur = r.dsum | plus: 0 %}{% endfor %}
+{% comment %}default: 0 — sum по столбцу, где длительность нигде не заполнена, возвращает nil, и KPI печатался пустым{% endcomment %}
+{% for r in lib_tot.results.entities %}{% assign lib_total = r.tot | default: 0 | plus: 0 %}{% assign lib_dur = r.dsum | default: 0 | plus: 0 %}{% endfor %}
 {% assign lib_min = lib_dur | divided_by: 60 %}
 
 {% fetchxml lib_act %}
@@ -115,6 +116,10 @@
       В библиотеке пока нет материалов.
     </div>
     {% else %}
+    {% comment %}список обрезан top=100, а поиск ниже — клиентский: честно предупреждаем, иначе «материал пропал»{% endcomment %}
+    {% if lib_total > lc %}
+    <div class="adm-eyebrow" style="padding:12px 16px;">Показаны последние {{ lc }} из {{ lib_total }} · поиск работает только по показанным</div>
+    {% endif %}
     <div class="adml-tbl-wrap">
       <table class="adm-table" id="admlTable">
         <thead>
@@ -129,12 +134,12 @@
         </thead>
         <tbody id="admlBody">
           {% for c in lib_list.results.entities %}
-            {% assign nm = c.new_name | default: 'Без названия' %}
-            {% assign lt = c.new_librarytype | default: '' | remove: 'H5P.' | split: ' ' | first %}
+            {% assign nm = c.new_name | default: 'Без названия' | escape %}
+            {% assign lt = c.new_librarytype | default: '' | remove: 'H5P.' | split: ' ' | first | escape %}
             {% assign dur = c.new_durationseconds | plus: 0 %}
             {% assign mins = dur | divided_by: 60 %}
             {% assign secs = dur | modulo: 60 %}
-            {% assign ub = c['ub.fullname'] | default: '—' %}
+            {% assign ub = c['ub.fullname'] | default: '—' | escape %}
             {% assign act = c.new_isactive %}
           <tr data-search="{{ nm | downcase }} {{ lt | downcase }} {{ ub | downcase }}">
             <td>
@@ -147,7 +152,7 @@
             <td class="adm-r adm-num">{% if dur > 0 %}{{ mins }}:{% if secs < 10 %}0{% endif %}{{ secs }}{% else %}—{% endif %}</td>
             <td style="color:var(--adm-fg-2);">{{ ub }}</td>
             <td>{% if act %}<span class="adm-pill adm-pill--success adm-pill--dot">Активен</span>{% else %}<span class="adm-pill adm-pill--neutral adm-pill--dot">Скрыт</span>{% endif %}</td>
-            <td style="font-size:12px;color:var(--adm-fg-3);">{{ c.createdon | date: 'dd.MM.yyyy' }}</td>
+            <td style="font-size:12px;color:var(--adm-fg-3);">{{ c.createdon | date_add_hours: 5 | date: 'dd.MM.yyyy' }}</td>
           </tr>
           {% endfor %}
         </tbody>

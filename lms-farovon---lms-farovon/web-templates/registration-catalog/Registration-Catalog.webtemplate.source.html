@@ -10,7 +10,8 @@
 {% assign nextPage = page | plus: 1 %}
 
 {% assign cardsPerPageValue = settings['ASP/Pagination/CardsPerPage'] | default: 20 %}
-{% assign cardsPerPage = cardsPerPageValue | times: 1.0 %}
+{% comment %} только integer: "times: 1.0" на строке из site setting даёт Enumerable.Repeat и роняет деление {% endcomment %}
+{% assign cardsPerPage = cardsPerPageValue | integer | default: 20 %}
 {% assign cardCounter = 1 %}
 
 {% assign seasonFilter = request.params['season'] | xml_escape | default: currentSeason %}
@@ -94,53 +95,48 @@
 
 {% if registrations.results and registrations.results.entities %}
     {% assign registrationResults = registrations.results.entities %}
-    {% assign filteredIndices = "" %}
-    {% assign index = 0 %}
-    {% unless request.params['search'] | xml_escape %}
-    {% for registration in registrationResults %}
-      {% assign enddatemonth = registration.msdynce_courseenddateandtime | date: "MM" | integer%}
-      {% assign strIndex = index | string %}
-      {% case seasonFilter  %}
-        {% when fall %}
-          {% if enddatemonth >= 9 and enddatemonth <= 11 %}
-            {% if filteredIndices.size > 0 %}
-              {% assign filteredIndices = filteredIndices | append: "," %}
-            {% endif %}
-            {% assign filteredIndices = filteredIndices | append: strIndex %}
-          {% endif %}
-        {% when winter %}
-          {% if enddatemonth == 12 or enddatemonth <= 2 %}
-            {% if filteredIndices.size > 0 %}
-              {% assign filteredIndices = filteredIndices | append: "," %}
-            {% endif %}
-            {% assign filteredIndices = filteredIndices | append: strIndex  %}
-          {% endif %}
-        {% when spring %}
-          {% if enddatemonth >= 3 and enddatemonth <= 5 %}
-            {% if filteredIndices.size > 0 %}
-              {% assign filteredIndices = filteredIndices | append: "," %}
-            {% endif %}  
-            {% assign filteredIndices = filteredIndices | append: strIndex  %}
-          {% endif %}
-        {% when summer %}
-          {% if enddatemonth >= 6 and enddatemonth <= 8 %}
-            {% if filteredIndices.size > 0 %}
-              {% assign filteredIndices = filteredIndices | append: "," %}
-            {% endif %}
-            {% assign filteredIndices = filteredIndices | append: strIndex %}
-          {% endif %}
-      {% endcase %}
-      {% assign index = index | plus: 1 %}
-    {% endfor %}
-    {% endunless %}
-    {% if filteredIndices.size > 0 %}
-      {% assign filteredIndices = filteredIndices | split: "," %}
-      {% assign totalCount = filteredIndices.size %}
-      {% assign pages = totalCount | decimal | divided_by: cardsPerPage | ceil %}
 
-      {% for i in filteredIndices %}
-        {% assign index = i | integer %}
-        {% assign registration = registrationResults[index] %}
+    {% comment %}
+      Раньше карточки собирались в два прохода: строка индексов -> registrationResults[index].
+      Индексация массива переменной в DotLiquid падает (Parameter count mismatch), а месяц брался
+      из msdynce_courseenddateandtime, которого у msdynce_registration нет (это алиас courseend
+      связанного курса), поэтому список всегда выходил пустым. Теперь фильтр и вывод — один проход.
+    {% endcomment %}
+    {% assign hasSearch = false %}
+    {% if request.params['search'] | xml_escape %}{% assign hasSearch = true %}{% endif %}
+    {% assign hasSeason = false %}
+    {% if request.params['season'] | xml_escape %}{% assign hasSeason = true %}{% endif %}
+    {% assign totalCount = 0 %}
+
+    {% for registration in registrationResults %}
+      {% assign showCard = true %}
+      {% unless hasSearch %}
+        {% if hasSeason %}
+          {% assign showCard = false %}
+          {% assign courseEndDate = registration.courseend | default: registration.msdynce_courseenddate %}
+          {% assign enddatemonth = 0 %}
+          {% if courseEndDate %}
+            {% assign enddatemonth = courseEndDate | date: "MM" | integer %}
+          {% endif %}
+          {% comment %} сезоны сравниваем со строковыми литералами: fall/winter/... как переменные были nil {% endcomment %}
+          {% case seasonFilter %}
+            {% when 'fall' %}
+              {% if enddatemonth >= 9 and enddatemonth <= 11 %}{% assign showCard = true %}{% endif %}
+            {% when 'winter' %}
+              {% if enddatemonth == 12 %}{% assign showCard = true %}{% endif %}
+              {% if enddatemonth >= 1 and enddatemonth <= 2 %}{% assign showCard = true %}{% endif %}
+            {% when 'spring' %}
+              {% if enddatemonth >= 3 and enddatemonth <= 5 %}{% assign showCard = true %}{% endif %}
+            {% when 'summer' %}
+              {% if enddatemonth >= 6 and enddatemonth <= 8 %}{% assign showCard = true %}{% endif %}
+            {% else %}
+              {% assign showCard = true %}
+          {% endcase %}
+        {% endif %}
+      {% endunless %}
+
+      {% if showCard %}
+        {% assign totalCount = totalCount | plus: 1 %}
         <!-- Course Days -->
         {% assign dayvalues = '' %}
 
@@ -173,9 +169,11 @@
         <!-- END - Course Types -->
 
         {% editable snippets 'Card/Registrations' type: 'html' %}  
+      {% endif %}
+    {% endfor %}
 
-      {% endfor %}
-
+    {% if totalCount > 0 %}
+      {% assign pages = totalCount | decimal | divided_by: cardsPerPage | ceil %}
       {% include 'Custom Pagination' %}
     {% else %}
       <h2 class="my-registration-heading">{{ snippets["NoRegistrationsFound"] }}</h2>

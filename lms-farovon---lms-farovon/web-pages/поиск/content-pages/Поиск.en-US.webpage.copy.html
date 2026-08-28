@@ -1,0 +1,75 @@
+{% comment %}
+  Страница /search рендерит копию контент-страницы, а копия была пустой — отсюда «поиск в никуда».
+  Здесь настоящая выдача по индексу портала. Если индекс выключен настройкой сайта, честно говорим
+  об этом, а не показываем пустой результат, будто по запросу ничего не нашлось.
+{% endcomment %}
+{% assign search_query = request.params['q'] %}
+{% assign search_enabled_raw = settings['Search/Enabled'] %}
+{% assign search_enabled = true %}
+{% if search_enabled_raw %}
+  {% comment %} сравниваем строку явно: фильтр default срабатывает и на false, поэтому выключенная настройка снова становилась true {% endcomment %}
+  {% assign search_enabled_flag = search_enabled_raw | downcase %}
+  {% if search_enabled_flag == 'false' %}{% assign search_enabled = false %}{% endif %}
+{% endif %}
+
+<div class="row sectionBlockLayout" style="display:flex;flex-wrap:wrap;padding:8px;margin:0;text-align:left;">
+  <div class="container" style="padding:24px 0 48px;">
+
+    <div style="margin-bottom:20px;">
+      <span style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#64748B;display:block;margin-bottom:4px;">Портал</span>
+      <h1 style="font-size:22px;font-weight:700;color:#0B1220;margin:0 0 4px;">Результаты поиска</h1>
+      {% if search_query %}
+      <p style="font-size:13px;color:#64748B;margin:0;">По запросу «{{ search_query | escape }}»</p>
+      {% else %}
+      <p style="font-size:13px;color:#64748B;margin:0;">Курсы, уроки, темы форума и страницы портала</p>
+      {% endif %}
+    </div>
+
+    <form method="get" action="/search" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;">
+      <label for="fvSearchPageInput" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">Поисковый запрос</label>
+      <input type="text" id="fvSearchPageInput" name="q" value="{{ search_query | escape }}"
+             placeholder="Что ищем?" autocomplete="off"
+             style="flex:1;min-width:220px;max-width:480px;padding:10px 14px;font-size:14px;color:#0B1220;background:#F8FAFC;border:1px solid #E5E7EB;border-radius:8px;outline:none;" />
+      <button type="submit"
+              style="padding:10px 18px;font-size:14px;font-weight:600;color:#fff;background:#1E3A8A;border:1px solid #1E3A8A;border-radius:8px;cursor:pointer;">
+        Найти
+      </button>
+    </form>
+
+    {% unless search_enabled %}
+      <div style="border:1px solid #FDE68A;background:#FFFBEB;color:#92400E;border-radius:12px;padding:16px 18px;font-size:13px;line-height:1.5;">
+        <strong style="display:block;margin-bottom:4px;">Поиск по порталу отключён</strong>
+        Индекс поиска выключен настройкой сайта <code>Search/Enabled</code>. Пока она равна <code>false</code>,
+        выдача будет пустой при любом запросе. Включите настройку и переиндексируйте сайт — страница заработает без правок кода.
+      </div>
+    {% else %}
+      {% if search_query %}
+        {% assign search_page_size = 10 %}
+        {% searchindex query: request.params.q, page: request.params.page, page_size: search_page_size %}
+          {% if searchindex.results.size > 0 %}
+            <p style="font-size:12px;color:#64748B;margin:0 0 12px;">Найдено совпадений: {{ searchindex.approximate_total_hits }}</p>
+            <ul style="list-style:none;padding:0;margin:0;">
+              {% for result in searchindex.results %}
+              <li style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:14px 18px;margin-bottom:10px;box-shadow:0 1px 3px rgba(11,18,32,0.04);">
+                <a href="{{ result.url | escape }}" title="{{ result.title | escape }}"
+                   style="font-size:15px;font-weight:600;color:#1E3A8A;text-decoration:none;">{{ result.title | escape }}</a>
+                <p style="font-size:13px;color:#475569;margin:6px 0 0;">{{ result.fragment }}</p>
+              </li>
+              {% endfor %}
+            </ul>
+            {% include 'Pagination' current_page: searchindex.page, page_size: search_page_size, total: searchindex.approximate_total_hits %}
+          {% else %}
+            <div style="text-align:center;padding:48px 20px;color:#64748B;">
+              <i class="bi bi-search" style="font-size:40px;display:block;margin-bottom:12px;"></i>
+              <h3 style="font-size:16px;font-weight:600;color:#475569;margin-bottom:6px;">Ничего не найдено</h3>
+              <p style="font-size:13px;margin:0;">По запросу «{{ search_query | escape }}» совпадений нет. Попробуйте другую формулировку.</p>
+            </div>
+          {% endif %}
+        {% endsearchindex %}
+      {% else %}
+        <p style="font-size:13px;color:#64748B;margin:0;">Введите запрос — например, название курса, урока или темы форума.</p>
+      {% endif %}
+    {% endunless %}
+
+  </div>
+</div>

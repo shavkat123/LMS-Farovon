@@ -46,9 +46,6 @@
   adx_name: KnowledgeManagement/NotesFilter
   adx_sitesettingid: 2c60e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: '*WEB*'
-- adx_name: Webapi/adx_webrole/fields
-  adx_sitesettingid: 305fe5f3-a538-f111-88b5-7ced8d76b3cc
-  adx_value: adx_name,adx_webroleid
 - adx_name: ASP/Pagination/PagesInLine
   adx_sitesettingid: 32cfddf9-a538-f111-88b5-7ced8d76b3cc
   adx_value: 6
@@ -62,9 +59,6 @@
 - adx_name: Profile/ForceSignUp
   adx_sitesettingid: 3860e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: False
-- adx_name: Webapi/adx_webrole_contact/enabled
-  adx_sitesettingid: 4060e5f3-a538-f111-88b5-7ced8d76b3cc
-  adx_value: true
 - adx_name: ASP/Course/Form/Validation/Field/Level
   adx_sitesettingid: 40cfddf9-a538-f111-88b5-7ced8d76b3cc
   adx_value: Level
@@ -100,15 +94,13 @@
   adx_name: Authentication/LoginThrottling/IpAddressTimeoutTimeSpan
   adx_sitesettingid: 5860e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: 00:15:00
-- adx_name: HTTP/Content-Security-Policy
+- adx_description: "Скрипты только со своего домена: script-src * разрешал любой сторонний хост. Плейсхолдер 'nonce' подставляет Power Pages, blob: для плеера H5P добавляет Content-Security-Policy/Script-Src/Append."
+  adx_name: HTTP/Content-Security-Policy
   adx_sitesettingid: 5fc338c5-b58f-4195-8643-d03d9d7de019
-  adx_value: script-src * 'nonce'
+  adx_value: script-src 'self' 'nonce'
 - adx_name: Authentication/Registration/ExternalLoginEnabled
   adx_sitesettingid: 645fe5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: true
-- adx_name: Webapi/contact/fields
-  adx_sitesettingid: 685fe5f3-a538-f111-88b5-7ced8d76b3cc
-  adx_value: '*'
 - adx_name: Authentication/OpenAuth/Microsoft/ClientId
   adx_sitesettingid: 6ccfddf9-a538-f111-88b5-7ced8d76b3cc
 - adx_name: ASP/Course/Form/Validation/Field/Deadline
@@ -208,9 +200,10 @@
 - adx_name: Webapi/contact/enabled
   adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000005
   adx_value: true
-- adx_name: Webapi/contact/fields
+- adx_description: "Явный список вместо *: contact читается Web API глобально (ASP Contacts, scope Global). Поля нужны страницам профилей (firstname/lastname/birthdate/entityimage). Дубль-запись со '*' удалена."
+  adx_name: Webapi/contact/fields
   adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000006
-  adx_value: fullname,emailaddress1
+  adx_value: fullname,emailaddress1,firstname,lastname,contactid,birthdate,entityimage,msdynce_entityimage_file_name,msdynce_entityimage_file_type,parentcustomerid,_parentcustomerid_value
 - adx_name: Profile/ShowMarketingOptionsPanel
   adx_sitesettingid: a65fe5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: True
@@ -254,9 +247,6 @@
   adx_name: Authentication/Registration/AzureADLoginEnabled
   adx_sitesettingid: bc5fe5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: true
-- adx_name: Webapi/adx_webrole_contact/fields
-  adx_sitesettingid: bc60e5f3-a538-f111-88b5-7ced8d76b3cc
-  adx_value: '*'
 - adx_name: WebAPI/enableReadOperationPreview
   adx_sitesettingid: bd05e5ed-a538-f111-88b5-7ced8d76b3cc
   adx_value: true
@@ -345,6 +335,3 @@
 - adx_name: ASP/Course/ProcessingMessage
   adx_sitesettingid: fb60e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: Processing...
-- adx_name: Webapi/adx_webrole/enabled
-  adx_sitesettingid: fd5ee5f3-a538-f111-88b5-7ced8d76b3cc
-  adx_value: true

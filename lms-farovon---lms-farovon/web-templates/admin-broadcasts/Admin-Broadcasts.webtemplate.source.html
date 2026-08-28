@@ -1,14 +1,16 @@
 {% comment %}
   Admin Broadcasts — Рассылки (/admin/broadcasts). Примитивы .adm-* — customtheme.css.
   РЕАЛЬНЫЕ данные: таблица new_broadcast (активные). KPI — по статусам.
-  Создание записей пока в Power Apps (форму/модал добавим позже). Движок доставки — отдельная интеграция.
+  Создание рассылки есть прямо здесь (модалка → Web API POST в new_broadcast).
+  Чего нет — движка доставки: запись фиксирует только план отправки, письма/пуши не уходят.
 {% endcomment %}
 
-{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+{% comment %}Наставник убран из гварда: рассылка идёт на всю компанию, это зона HR/руководителя; его роль снята и в Broadcast-Admin-Manage{% endcomment %}
+{% unless user.roles contains 'HR' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
 <div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
   <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
   <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
-  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR и руководителям.</p>
   <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
 </div>
 {% else %}
@@ -80,7 +82,7 @@
     {% if b_total == 0 %}
     <div style="padding:48px 24px;text-align:center;color:var(--adm-fg-3);">
       <i class="bi bi-megaphone" style="display:block;font-size:40px;color:#CBD5E1;margin-bottom:12px;"></i>
-      Рассылок пока нет. Создайте запись в таблице «Рассылка» (Power Apps).
+      Рассылок пока нет. Нажмите «Новая рассылка».
     </div>
     {% else %}
     <div class="admb-tbl-wrap">
@@ -96,15 +98,16 @@
         </thead>
         <tbody id="admbBody">
           {% for b in bcasts.results.entities %}
-            {% assign nm  = b.new_name | default: 'Без названия' %}
-            {% assign ch  = b.new_channel.label | default: '—' %}
-            {% assign aud = b.new_audience.label | default: 'Все' %}
+            {% comment %}escape при assign: значение идёт и в ячейку, и в data-search{% endcomment %}
+            {% assign nm  = b.new_name | default: 'Без названия' | escape %}
+            {% assign ch  = b.new_channel.label | default: '—' | escape %}
+            {% assign aud = b.new_audience.label | default: 'Все' | escape %}
             {% assign st  = b.new_status.label | default: 'Черновик' %}
           <tr data-search="{{ nm | downcase }} {{ aud | downcase }} {{ ch | downcase }}">
             <td style="font-weight:600;">{{ nm }}</td>
             <td style="color:var(--adm-fg-2);">{{ ch }}</td>
             <td style="color:var(--adm-fg-2);">{{ aud }}</td>
-            <td style="font-size:12px;color:var(--adm-fg-3);">{% if b.new_senddatetime %}{{ b.new_senddatetime | date: 'dd.MM.yyyy HH:mm' }}{% else %}—{% endif %}</td>
+            <td style="font-size:12px;color:var(--adm-fg-3);">{% if b.new_senddatetime %}{{ b.new_senddatetime | date_add_hours: 5 | date: 'dd.MM.yyyy HH:mm' }}{% else %}—{% endif %}</td>
             <td>
               {% if st == 'Отправлено' %}<span class="adm-pill adm-pill--success adm-pill--dot">Отправлено</span>
               {% elsif st == 'Запланировано' %}<span class="adm-pill adm-pill--info adm-pill--dot">Запланировано</span>
@@ -227,7 +230,13 @@
         new_isactive: true
       };
       var sd = document.getElementById('admbF_send').value;
-      if (sd) { payload.new_senddatetime = new Date(sd).toISOString(); }
+      // Значение datetime-local — время портала (UTC+5). new Date(v) трактовал бы его как время
+      // браузера, и у админа в другой зоне дата отправки уезжала. Зону задаём явно —
+      // тот же приём, что в Admin-Course-Form (функция dt).
+      if (sd) {
+        var sdv = sd.length === 16 ? sd + ':00' : sd; // 'yyyy-MM-ddTHH:mm' → добавляем секунды
+        payload.new_senddatetime = new Date(sdv + '+05:00').toISOString();
+      }
 
       saveBt.disabled = true; saveBt.textContent = 'Создание…';
       getToken().then(function (tok) {

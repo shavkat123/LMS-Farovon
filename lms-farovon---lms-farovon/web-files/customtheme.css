@@ -3001,6 +3001,9 @@ html { overflow-x: hidden; overflow-x: clip; }
 
   --adm-border-1:   #E5E7EB;
   --adm-border-2:   #D1D5DB;
+  /* Алиас: часть /admin/* экранов пишет var(--adm-border) без суффикса.
+     Переменная не была объявлена -> border: 1px solid <invalid> и рамка не рисовалась вовсе. */
+  --adm-border:     var(--adm-border-1);
 
   --adm-radius-sm: 6px;
   --adm-radius-md: 8px;
@@ -3161,4 +3164,68 @@ html { overflow-x: hidden; overflow-x: clip; }
 .course-form-container .validators-summary, .course-form-container .validation-summary {
   background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px;
   color: #DC2626; font-size: 13px; padding: 10px 14px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   UX/UI-полиш платформы (только внешний вид, логика не затронута)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Выделение текста — фирменное */
+::selection { background: rgba(30,58,138,.16); color: #0B1220; }
+
+/* Тонкие фирменные скроллбары (WebKit/Chromium) */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: #94A3B8; border: 2px solid transparent; background-clip: content-box; }
+
+/* Заметное фокус-кольцо только для клавиатурной навигации */
+:focus-visible { outline: 3px solid rgba(30,58,138,.35) !important; outline-offset: 2px; border-radius: 4px; }
+:focus:not(:focus-visible) { outline: none; }
+
+/* Все Bootstrap-дропдауны — как меню профиля: радиус, тень, hover */
+.dropdown-menu {
+  border: 1px solid #E5E7EB !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px rgba(11,18,32,.12) !important;
+  padding: 6px !important;
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+.dropdown-menu .dropdown-item { border-radius: 7px; font-size: 13px; padding: 8px 12px; color: #0B1220; }
+.dropdown-menu .dropdown-item:hover, .dropdown-menu .dropdown-item:focus { background: #EEF2F9; color: #1E3A8A; }
+.dropdown-menu .dropdown-divider { border-color: #F1F5F9; margin: 4px 0; }
+
+/* Bootstrap-кнопки — фирменные скругления и navy */
+.btn { border-radius: 10px; font-weight: 600; }
+.btn-primary { background: #1E3A8A !important; border-color: #1E3A8A !important; }
+.btn-primary:hover, .btn-primary:focus { background: #15306E !important; border-color: #15306E !important; }
+.btn-secondary { border-radius: 10px; }
+
+/* Alert'ы — мягкие радиусы */
+.alert { border-radius: 12px; }
+
+/* Модальные окна Bootstrap — как карточки платформы */
+.modal-content { border-radius: 16px !important; border: 1px solid #E5E7EB !important; box-shadow: 0 20px 60px rgba(0,0,0,.3) !important; }
+.modal-header { border-bottom-color: #F1F5F9 !important; }
+.modal-footer { border-top-color: #F1F5F9 !important; }
+
+/* Бейджи-нотификации в топбаре и иконки — мягкий hover */
+.fv-icon-btn { transition: background .14s, color .14s; }
+.fv-icon-btn:hover { background: #EEF2F9 !important; color: #1E3A8A !important; }
+
+/* Таблицы (пользовательские и adm-*) — hover строк едино */
+.adm-table tbody tr { transition: background .12s; }
+.adm-table tbody tr:hover { background: #F8FAFC; }
+
+/* Плавное появление карточек контента (лёгкая, без задержек) */
+@media (prefers-reduced-motion: no-preference) {
+  .fv-card, .adm-card, .fv-lesson-card, .fv-cc-card, .fv-traj, .fv-path-card {
+    transition: box-shadow .18s ease, transform .18s ease, border-color .18s ease;
+  }
+}
+
+/* Печать: спрятать навигацию */
+@media print {
+  .fv-shell, .fv-header-wrap, .fv-shell-backdrop { display: none !important; }
+  body { padding-left: 0 !important; }
 }

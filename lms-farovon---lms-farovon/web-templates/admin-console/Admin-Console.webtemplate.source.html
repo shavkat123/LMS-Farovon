@@ -198,7 +198,8 @@
             {% assign dl = 'Безопасность на рабочем месте|60|high|12 марта;Кибергигиена 2026|79|med|20 марта;Антикоррупционная политика|95|low|25 марта;GDPR и защита данных|61|med|02 апреля' | split: ';' %}
             {% for d in dl %}
               {% assign f = d | split: '|' %}
-              {% assign pct = f[1] | plus: 0 %}
+              {% comment %} Приведение строки к числу — только | integer, см. Reports.html {% endcomment %}
+              {% assign pct = f[1] | integer %}
               {% assign urg = f[2] %}
               {% if urg == 'high' %}{% assign bc = 'var(--adm-danger)' %}{% assign pill = 'adm-pill--danger' %}{% elsif urg == 'med' %}{% assign bc = 'var(--adm-accent)' %}{% assign pill = 'adm-pill--warn' %}{% else %}{% assign bc = 'var(--adm-success)' %}{% assign pill = 'adm-pill--success' %}{% endif %}
             <tr>
@@ -244,8 +245,9 @@
         <li>
           <span class="adm-avatar" style="width:26px;height:26px;font-size:10px;">{{ ai1 }}{{ ai2 }}</span>
           <div style="flex:1;min-width:0;">
-            <div class="admd-act-txt"><b>{{ afull }}</b> <span style="color:var(--adm-fg-2);">завершил урок</span> <span style="color:var(--adm-fg-2);">«{{ lname }}»</span></div>
-            <div class="admd-act-when">{{ p.new_lastupdated | date: 'dd.MM.yyyy HH:mm' }}</div>
+            {% comment %} ФИО и название урока приходят из Dataverse (их правит пользователь) — в HTML-текст только через escape {% endcomment %}
+            <div class="admd-act-txt"><b>{{ afull | escape }}</b> <span style="color:var(--adm-fg-2);">завершил урок</span> <span style="color:var(--adm-fg-2);">«{{ lname | escape }}»</span></div>
+            <div class="admd-act-when">{{ p.new_lastupdated | date_add_hours: 5 | date: 'dd.MM.yyyy HH:mm' }}</div>
           </div>
         </li>
         {% endfor %}

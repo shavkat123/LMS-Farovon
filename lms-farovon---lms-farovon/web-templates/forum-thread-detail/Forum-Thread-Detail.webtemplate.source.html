@@ -1,10 +1,20 @@
 {% comment %}
   Forum Thread Detail — страница темы форума (/forum-thread?id=<threadId>).
   Тема (new_forumthread) + лента ответов (new_forumreply where new_thread == id) + форма ответа.
-  Ответ → Web API POST /_api/new_forumreplies (new_thread@odata.bind + new_author@odata.bind) + PATCH replycount.
+  Ответ → Web API POST /_api/new_forumreplies (new_thread@odata.bind + new_author@odata.bind).
+  Число ответов считается из new_forumreply на сервере; поле new_replycount не пишется и не читается.
 {% endcomment %}
 
-{% unless request.params['id'] %}
+{% comment %}
+  id проверяем ДО fetchxml: на значении, не похожем на GUID, запрос падает
+  с ошибкой вместо вежливого «Тема не найдена». Критерий: 36 символов и 32 без дефисов.
+{% endcomment %}
+{% assign tid_raw = request.params['id'] | replace: '{', '' | replace: '}', '' %}
+{% assign tid_hex = tid_raw | remove: '-' %}
+{% assign tid = '' %}
+{% if tid_raw.size == 36 and tid_hex.size == 32 %}{% assign tid = tid_raw | xml_escape %}{% endif %}
+
+{% unless request.params['id'] and tid != '' %}
 <div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
   <i class="bi bi-chat-square-text" style="font-size:52px;color:#64748B;display:block;margin-bottom:16px;"></i>
   <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin-bottom:6px;">Тема не выбрана</h2>
@@ -12,7 +22,6 @@
 </div>
 {% else %}
 
-{% assign tid = request.params['id'] | xml_escape %}
 {% fetchxml thread %}
 <fetch top="1">
   <entity name="new_forumthread">
@@ -21,7 +30,6 @@
     <attribute name="new_body" />
     <attribute name="new_tag" />
     <attribute name="new_votes" />
-    <attribute name="new_replycount" />
     <attribute name="createdon" />
     <link-entity name="contact" from="contactid" to="new_author" alias="auth" link-type="outer"><attribute name="fullname" /></link-entity>
     <filter><condition attribute="new_forumthreadid" operator="eq" value="{{ tid }}" /></filter>
@@ -29,7 +37,8 @@
 </fetch>
 {% endfetchxml %}
 
-{% if thread.results.entities.size == 0 %}
+{% assign tcount = thread.results.entities.size | default: 0 %}
+{% if tcount == 0 %}
 <div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
   <i class="bi bi-search" style="font-size:52px;color:#64748B;display:block;margin-bottom:16px;"></i>
   <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin-bottom:6px;">Тема не найдена</h2>
@@ -38,7 +47,7 @@
 {% else %}
 
 {% assign t = thread.results.entities[0] %}
-{% assign t_author = t['auth.fullname'] | default: 'Участник' %}
+{% assign t_author = t['auth.fullname'] | default: 'Участник' | escape %}
 
 {% fetchxml replies %}
 <fetch>
@@ -88,16 +97,16 @@
 
   {% comment %}── Тема ──{% endcomment %}
   <div class="fv-ft-card">
-    {% if t.new_tag %}<span class="fv-ft-tag">{{ t.new_tag }}</span>{% endif %}
-    <h1 class="fv-ft-title">{{ t.new_name | default: 'Тема' }}</h1>
+    {% if t.new_tag %}<span class="fv-ft-tag">{{ t.new_tag | escape }}</span>{% endif %}
+    <h1 class="fv-ft-title">{{ t.new_name | default: 'Тема' | escape }}</h1>
     <div class="fv-ft-byline">
       <span class="fv-ft-av">{{ t_author | slice: 0, 1 | upcase }}</span>
       <div>
         <div class="fv-ft-au">{{ t_author }}</div>
-        <div class="fv-ft-dt">{{ t.createdon | date: 'dd.MM.yyyy HH:mm' }}</div>
+        <div class="fv-ft-dt">{{ t.createdon | date_add_hours: 5 | date: 'dd.MM.yyyy HH:mm' }}</div>
       </div>
     </div>
-    {% if t.new_body %}<div class="fv-ft-body">{{ t.new_body }}</div>{% endif %}
+    {% if t.new_body %}<div class="fv-ft-body">{{ t.new_body | escape }}</div>{% endif %}
   </div>
 
   {% comment %}── Ответы ──{% endcomment %}
@@ -107,15 +116,15 @@
     <div class="fv-ft-empty">Пока нет ответов. Будьте первым!</div>
     {% else %}
     {% for r in replies.results.entities %}
-      {% assign r_author = r['ra.fullname'] | default: 'Участник' %}
+      {% assign r_author = r['ra.fullname'] | default: 'Участник' | escape %}
     <div class="fv-ft-reply">
       <span class="fv-ft-rav">{{ r_author | slice: 0, 1 | upcase }}</span>
       <div class="fv-ft-rbody">
         <div class="fv-ft-rhead">
           <span class="fv-ft-rname">{{ r_author }}</span>
-          <span class="fv-ft-dt">· {{ r.createdon | date: 'dd.MM.yyyy HH:mm' }}</span>
+          <span class="fv-ft-dt">· {{ r.createdon | date_add_hours: 5 | date: 'dd.MM.yyyy HH:mm' }}</span>
         </div>
-        <div class="fv-ft-rtext">{{ r.new_body }}</div>
+        <div class="fv-ft-rtext">{{ r.new_body | escape }}</div>
       </div>
     </div>
     {% endfor %}
@@ -132,7 +141,7 @@
       <button type="button" class="fv-ft-submit" id="fvRSubmit"><i class="bi bi-send"></i> Ответить</button>
     </div>
     {% else %}
-    <p class="fv-ft-login">Чтобы ответить, <a href="/SignIn?returnUrl=/forum-thread?id={{ tid }}">войдите в систему</a>.</p>
+    <p class="fv-ft-login">Чтобы ответить, <a href="/SignIn?returnUrl={{ '/forum-thread?id=' | append: tid | url_encode }}">войдите в систему</a>.</p>
     {% endif %}
   </div>
 </div>
@@ -142,7 +151,6 @@
   (function () {
     var TID = '{{ tid }}';
     var CURRENT_USER = '{{ user.id }}';
-    var REPLY_COUNT = {{ t.new_replycount | default: 0 }};
     var btn = document.getElementById('fvRSubmit');
     var txt = document.getElementById('fvRText');
     var err = document.getElementById('fvRErr');
@@ -174,14 +182,11 @@
           .then(function (res) { return res.ok ? res : postReply('new_Thread', null, body, tok); })
           .then(function (res) {
             if (!res.ok) return res.text().then(function (tt) { throw new Error('HTTP ' + res.status + ' — ' + tt.slice(0, 220)); });
-            // счётчик ответов — best-effort
-            return getToken().then(function (tok2) {
-              return fetch('/_api/new_forumthreads(' + TID + ')', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', '__RequestVerificationToken': tok2 },
-                body: JSON.stringify({ new_replycount: REPLY_COUNT + 1 })
-              });
-            }).catch(function () { return true; });
+            // Счётчик ответов НЕ пишем: он считается на сервере из new_forumreply.
+            // Клиентский PATCH сюда возвращать нельзя — он требовал права записи на
+            // ЧУЖИЕ темы (Forum-Thread scope Global + write) и терял ответы в гонке
+            // read-modify-write при одновременных ответах.
+            return true;
           });
       }).then(function () { location.reload(); })
         .catch(function (e) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send"></i> Ответить'; err.textContent = 'Не удалось отправить: ' + e.message; err.style.display = 'block'; });

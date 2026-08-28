@@ -79,6 +79,13 @@
     <button class="fv-ac-newbtn" type="button" disabled title="Появится после создания таблицы программ"><i class="bi bi-plus-lg"></i> Новая программа</button>
   </div>
 
+  {% comment %}── Дисклеймер поднят из подвала под шапку: внизу его не видели и принимали цифры
+     и рейтинг наставников за настоящие данные. Все числа на этом экране — заглушки. ──{% endcomment %}
+  <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 16px;margin:0 0 22px;font-size:12px;color:#92400E;display:flex;align-items:center;gap:10px;">
+    <i class="bi bi-info-circle-fill" style="color:#F59E0B;flex-shrink:0;"></i>
+    <span><strong>Демо-данные.</strong> Все цифры ниже — программы, стажёры, прогресс и рейтинг наставников — заглушки. Подключение к Dataverse-таблицам после их создания.</span>
+  </div>
+
   <div class="fv-ac-stats">
     <div class="fv-ac-stat">
       <div class="fv-ac-stat-icon" style="background:#ECF6EF;color:#15803D;"><i class="bi bi-collection"></i></div>
@@ -102,15 +109,17 @@
   <h2 class="fv-ac-section-title"><i class="bi bi-diagram-3" style="color:#15803D;"></i> Программы адаптации</h2>
 
   <div class="fv-ac-grid">
-    {% assign p_names = 'Базовая адаптация,Менеджер по продажам,IT-стажировка,Производство,Финансы,HR-департамент' | split: ',' %}
-    {% assign p_tags  = 'Все отделы,Продажи,IT,Производство,Финансы,HR' | split: ',' %}
-    {% assign p_colors_bg = '#ECF6EF,#EFF6FF,#EEF2F9,#FFF7ED,#F0FDF4,#F0F2F5' | split: ',' %}
-    {% assign p_colors_fg = '#15803D,#2563EB,#1E3A8A,#EA580C,#22C55E,#334155' | split: ',' %}
-    {% for n in p_names %}
+    {% comment %}── Одна строка на программу в формате «имя|тег|фон|цвет». Раньше были четыре параллельных
+       массива с обращением по переменной (p_tags[i]) — DotLiquid на индексе-переменной падает
+       с «Parameter count mismatch», литеральные f[0]..f[3] безопасны. ──{% endcomment %}
+    {% assign p_rows = 'Базовая адаптация|Все отделы|#ECF6EF|#15803D,Менеджер по продажам|Продажи|#EFF6FF|#2563EB,IT-стажировка|IT|#EEF2F9|#1E3A8A,Производство|Производство|#FFF7ED|#EA580C,Финансы|Финансы|#F0FDF4|#22C55E,HR-департамент|HR|#F0F2F5|#334155' | split: ',' %}
+    {% for row in p_rows %}
+      {% assign f   = row | split: '|' %}
+      {% assign n   = f[0] %}
+      {% assign tag = f[1] %}
+      {% assign bg  = f[2] %}
+      {% assign fg  = f[3] %}
       {% assign i = forloop.index0 %}
-      {% assign tag = p_tags[i] %}
-      {% assign bg  = p_colors_bg[i] %}
-      {% assign fg  = p_colors_fg[i] %}
       {% assign trainees = 0 %}{% assign pct = 0 %}{% assign duration = 0 %}
       {% case i %}
         {% when 0 %}{% assign trainees = 8 %}{% assign pct = 75 %}{% assign duration = 30 %}
@@ -142,9 +151,12 @@
   {% comment %}── Top mentors ──{% endcomment %}
   <h2 class="fv-ac-section-title"><i class="bi bi-trophy" style="color:#D97706;"></i> Рейтинг наставников</h2>
   <div class="fv-ac-mentors">
-    {% assign m_names = 'Сергей Иванов,Анна Петрова,Дмитрий Козлов,Елена Соколова,Максим Орлов' | split: ',' %}
-    {% assign m_dept  = 'IT,Продажи,Производство,HR,IT' | split: ',' %}
-    {% for n in m_names %}
+    {% comment %}── Тот же приём, что и выше: «имя|отдел» одной строкой, без m_dept[i] по переменной ──{% endcomment %}
+    {% assign m_rows = 'Сергей Иванов|IT,Анна Петрова|Продажи,Дмитрий Козлов|Производство,Елена Соколова|HR,Максим Орлов|IT' | split: ',' %}
+    {% for row in m_rows %}
+      {% assign f = row | split: '|' %}
+      {% assign n = f[0] %}
+      {% assign dept = f[1] %}
       {% assign i = forloop.index0 %}
       {% assign rank_class = '' %}
       {% case i %}
@@ -169,18 +181,13 @@
         <div class="fv-ac-mentor-avatar">{{ ini1 }}{{ ini2 }}</div>
         <div class="fv-ac-mentor-info">
           <p class="fv-ac-mentor-name">{{ n }}</p>
-          <span class="fv-ac-mentor-stat">{{ m_dept[i] }} · <strong>{{ mentees }}</strong> стажёров</span>
+          <span class="fv-ac-mentor-stat">{{ dept }} · <strong>{{ mentees }}</strong> стажёров</span>
         </div>
         <div class="fv-ac-mentor-score">{{ score }} / 50</div>
       </div>
     {% endfor %}
   </div>
 
-</div>
-
-<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 16px;margin:20px auto 0;max-width:1200px;font-size:12px;color:#92400E;display:flex;align-items:center;gap:10px;">
-  <i class="bi bi-info-circle-fill" style="color:#F59E0B;flex-shrink:0;"></i>
-  <span>Демо-данные. Подключение к Dataverse-таблицам (программы, стажёры, наставники) — после их создания.</span>
 </div>
 
 {% endunless %}

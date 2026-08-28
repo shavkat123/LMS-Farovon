@@ -1,5 +1,5 @@
 {% fetchxml h5plist %}
-<fetch>
+<fetch top="200">
   <entity name="new_h5pcontent">
     <attribute name="new_h5pcontentid" />
     <attribute name="new_name" />
@@ -17,7 +17,7 @@
 {% endfetchxml %}
 
 {% assign is_admin = false %}
-{% if user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Administrators' %}
+{% if user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
   {% assign is_admin = true %}
 {% endif %}
 
@@ -41,32 +41,142 @@
 {% assign completed_count = 0 %}
 
 {% if user %}
+  {% comment %}свежие записи первыми: при дублях прогресса по одному уроку первый матч = последний результат{% endcomment %}
   {% fetchxml user_progress %}
-  <fetch>
+  <fetch top="500">
     <entity name="new_h5pprogress">
       <attribute name="new_h5pcontent" />
       <attribute name="new_completion" />
       <attribute name="new_scorescaled" />
+      <attribute name="new_lastupdated" />
       <filter>
         <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
       </filter>
+      <order attribute="new_lastupdated" descending="true" />
     </entity>
   </fetch>
   {% endfetchxml %}
-
-  {% for p in user_progress.results.entities %}
-    {% assign started_count = started_count | plus: 1 %}
-    {% if p.new_completion %}
-      {% assign completed_count = completed_count | plus: 1 %}
-    {% endif %}
-  {% endfor %}
 {% endif %}
 
+{% comment %}карточки рендерим в capture ДО шапки: статус урока и счётчики считаются одним проходом{% endcomment %}
+{% capture cards_html %}
+    {% for item in h5plist.results.entities %}
+    {% assign cid = item.id %}
+
+    {% assign lesson_status = 'not_started' %}
+    {% assign prog_score = '' %}
+    {% assign found_status = false %}
+    {% if user %}
+      {% for p in user_progress.results.entities %}
+        {% unless found_status %}
+          {% if p.new_h5pcontent.id == cid %}
+            {% assign found_status = true %}
+            {% if p.new_completion %}
+              {% assign lesson_status = 'completed' %}
+              {% if p.new_scorescaled %}
+                {% assign prog_score = p.new_scorescaled | times: 100 | round %}
+              {% endif %}
+            {% else %}
+              {% assign lesson_status = 'in_progress' %}
+            {% endif %}
+          {% endif %}
+        {% endunless %}
+      {% endfor %}
+      {% comment %}считаем уроки, а не записи прогресса: дубли в new_h5pprogress раздували счётчики{% endcomment %}
+      {% if found_status %}
+        {% assign started_count = started_count | plus: 1 %}
+        {% if lesson_status == 'completed' %}{% assign completed_count = completed_count | plus: 1 %}{% endif %}
+      {% endif %}
+    {% endif %}
+
+    <div class="col fv-catalog-item" data-status="{{ lesson_status }}" data-title="{{ item.new_name | downcase | escape }}">
+      <div class="fv-cat-card{% if lesson_status == 'completed' %} is-completed{% endif %}">
+
+        <!-- THUMBNAIL / COVER -->
+        {% assign has_thumb = false %}
+        {% if item.new_thumbnailurl and item.new_thumbnailurl != '' %}{% assign has_thumb = true %}{% endif %}
+        {% assign cov_mod = forloop.index0 | modulo: 4 %}
+        {% case cov_mod %}
+          {% when 0 %}{% assign cov = 'paper' %}{% assign cov_dark = false %}
+          {% when 1 %}{% assign cov = 'navy' %}{% assign cov_dark = true %}
+          {% when 2 %}{% assign cov = 'warm' %}{% assign cov_dark = false %}
+          {% else %}{% assign cov = 'slate' %}{% assign cov_dark = true %}
+        {% endcase %}
+        <div class="fv-cat-thumb{% unless has_thumb %} fv-cat-cover fv-cover--{{ cov }}{% unless lesson_status == 'not_started' %} has-status{% endunless %}{% if is_admin %} has-admin{% endif %}{% endunless %}" data-href="/h5p-player?id={{ cid }}" role="link" tabindex="0" aria-label="Открыть урок {{ item.new_name | escape }}">
+          {% if has_thumb %}
+            <img src="{{ item.new_thumbnailurl | escape }}" alt="{{ item.new_name | escape }}" onerror="this.style.display='none'" />
+          {% else %}
+            <span class="fv-cover-label" style="color:{% if cov_dark %}rgba(255,255,255,0.7){% else %}#94A3B8{% endif %};">{{ item.new_librarytype | default: 'Урок' | escape }}</span>
+            <span class="fv-cover-title" style="color:{% if cov_dark %}#FFFFFF{% else %}#0B1220{% endif %};">{{ item.new_name | escape }}</span>
+          {% endif %}
+
+          {% if lesson_status == 'completed' %}
+            <span class="fv-status-badge" style="background:rgba(21,128,61,0.9);color:#fff;">
+              <i class="bi bi-check2"></i> Завершён
+            </span>
+            {% if prog_score != '' %}
+              <span class="fv-score-chip">{{ prog_score }}%</span>
+            {% endif %}
+          {% elsif lesson_status == 'in_progress' %}
+            <span class="fv-status-badge" style="background:rgba(30,58,138,0.9);color:#fff;">
+              <i class="bi bi-play-fill"></i> В процессе
+            </span>
+          {% endif %}
+
+          {% if is_admin %}
+          <button class="fv-admin-edit-btn edit-thumb-btn"
+                  data-id="{{ cid }}"
+                  data-thumb="{{ item.new_thumbnailurl | escape }}"
+                  data-course="{% if item.new_relatedcourse != blank %}{{ item.new_relatedcourse.id }}{% endif %}"                  type="button">
+            <i class="bi bi-pencil"></i> Урок
+          </button>
+          <button class="fv-admin-delete-btn delete-h5p"
+                  data-id="{{ cid }}"
+                  data-name="{{ item.new_name | escape }}"                  type="button"
+                  title="Удалить урок">
+            <i class="bi bi-trash3"></i>
+          </button>
+          {% endif %}
+        </div>
+
+        <!-- BODY -->
+        <div class="fv-cat-body">
+          <span class="fv-cat-type">{{ item.new_librarytype | default: 'Урок' | escape }}</span>
+          <span class="fv-cat-title">{{ item.new_name | escape }}</span>
+          {% if item.new_description %}
+            <span class="fv-cat-desc">{{ item.new_description | escape }}</span>
+          {% endif %}
+          {% if item.new_durationseconds %}
+            <div class="fv-cat-meta">
+              <i class="bi bi-clock"></i> {{ item.new_durationseconds | divided_by: 60 }} мин
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- FOOTER -->
+        <div class="fv-cat-foot">
+          {% if lesson_status == 'completed' %}
+            <a href="/h5p-player?id={{ cid }}" class="fv-cat-btn fv-cat-btn-done">
+              <i class="bi bi-arrow-repeat"></i> Смотреть снова
+            </a>
+          {% elsif lesson_status == 'in_progress' %}
+            <a href="/h5p-player?id={{ cid }}" class="fv-cat-btn fv-cat-btn-continue">
+              <i class="bi bi-play-circle"></i> Продолжить
+            </a>
+          {% else %}
+            <a href="/h5p-player?id={{ cid }}" class="fv-cat-btn fv-cat-btn-start">
+              <i class="bi bi-play-fill"></i> Начать урок
+            </a>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+    {% endfor %}
+{% endcapture %}
+
 {% assign in_progress_count = started_count | minus: completed_count %}
-{% assign total_count = 0 %}
-{% for item in h5plist.results.entities %}
-  {% assign total_count = total_count | plus: 1 %}
-{% endfor %}
+{% assign total_count = h5plist.results.entities.size %}
 
 <style>
   .fv-catalog { padding: 12px 0 48px; }
@@ -210,123 +320,19 @@
   <div class="fv-empty-state">
     <i class="bi bi-collection-play"></i>
     <h3>Уроки пока не добавлены</h3>
-    <p>Загрузите первый H5P урок, чтобы начать обучение.</p>
+    <p>Загрузите первый урок, чтобы начать обучение.</p>
   </div>
   {% else %}
 
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <span class="fv-catalog-count" id="fv-visible-count">{{ total_count }} уроков</span>
+    {% assign tc2 = total_count | modulo: 100 %}{% assign tc1 = total_count | modulo: 10 %}
+    {% assign tc_word = 'уроков' %}
+    {% if tc2 > 10 and tc2 < 20 %}{% assign tc_word = 'уроков' %}{% elsif tc1 == 1 %}{% assign tc_word = 'урок' %}{% elsif tc1 >= 2 and tc1 <= 4 %}{% assign tc_word = 'урока' %}{% endif %}
+    <span class="fv-catalog-count" id="fv-visible-count">{{ total_count }} {{ tc_word }}</span>
   </div>
 
   <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-4 g-3" id="fv-catalog-grid">
-    {% for item in h5plist.results.entities %}
-    {% assign cid = item.id %}
-
-    {% assign lesson_status = 'not_started' %}
-    {% assign prog_score = '' %}
-    {% assign found_status = false %}
-    {% if user %}
-      {% for p in user_progress.results.entities %}
-        {% unless found_status %}
-          {% if p.new_h5pcontent.id == cid %}
-            {% assign found_status = true %}
-            {% if p.new_completion %}
-              {% assign lesson_status = 'completed' %}
-              {% if p.new_scorescaled %}
-                {% assign prog_score = p.new_scorescaled | times: 100 | round %}
-              {% endif %}
-            {% else %}
-              {% assign lesson_status = 'in_progress' %}
-            {% endif %}
-          {% endif %}
-        {% endunless %}
-      {% endfor %}
-    {% endif %}
-
-    <div class="col fv-catalog-item" data-status="{{ lesson_status }}" data-title="{{ item.new_name | downcase }}">
-      <div class="fv-cat-card{% if lesson_status == 'completed' %} is-completed{% endif %}">
-
-        <!-- THUMBNAIL / COVER -->
-        {% assign has_thumb = false %}
-        {% if item.new_thumbnailurl and item.new_thumbnailurl != '' %}{% assign has_thumb = true %}{% endif %}
-        {% assign cov_mod = forloop.index0 | modulo: 4 %}
-        {% case cov_mod %}
-          {% when 0 %}{% assign cov = 'paper' %}{% assign cov_dark = false %}
-          {% when 1 %}{% assign cov = 'navy' %}{% assign cov_dark = true %}
-          {% when 2 %}{% assign cov = 'warm' %}{% assign cov_dark = false %}
-          {% else %}{% assign cov = 'slate' %}{% assign cov_dark = true %}
-        {% endcase %}
-        <div class="fv-cat-thumb{% unless has_thumb %} fv-cat-cover fv-cover--{{ cov }}{% unless lesson_status == 'not_started' %} has-status{% endunless %}{% if is_admin %} has-admin{% endif %}{% endunless %}" data-href="/h5p-player?id={{ cid }}" role="link" tabindex="0" aria-label="Открыть урок {{ item.new_name | escape }}">
-          {% if has_thumb %}
-            <img src="{{ item.new_thumbnailurl }}" alt="{{ item.new_name | escape }}" onerror="this.style.display='none'" />
-          {% else %}
-            <span class="fv-cover-label" style="color:{% if cov_dark %}rgba(255,255,255,0.7){% else %}#94A3B8{% endif %};">{{ item.new_librarytype | default: 'H5P' }}</span>
-            <span class="fv-cover-title" style="color:{% if cov_dark %}#FFFFFF{% else %}#0B1220{% endif %};">{{ item.new_name }}</span>
-          {% endif %}
-
-          {% if lesson_status == 'completed' %}
-            <span class="fv-status-badge" style="background:rgba(21,128,61,0.9);color:#fff;">
-              <i class="bi bi-check2"></i> Завершён
-            </span>
-            {% if prog_score != '' %}
-              <span class="fv-score-chip">{{ prog_score }}%</span>
-            {% endif %}
-          {% elsif lesson_status == 'in_progress' %}
-            <span class="fv-status-badge" style="background:rgba(30,58,138,0.9);color:#fff;">
-              <i class="bi bi-play-fill"></i> В процессе
-            </span>
-          {% endif %}
-
-          {% if is_admin %}
-          <button class="fv-admin-edit-btn edit-thumb-btn"
-                  data-id="{{ cid }}"
-                  data-thumb="{{ item.new_thumbnailurl }}"
-                  data-course="{% if item.new_relatedcourse != blank %}{{ item.new_relatedcourse.id }}{% endif %}"                  type="button">
-            <i class="bi bi-pencil"></i> Урок
-          </button>
-          <button class="fv-admin-delete-btn delete-h5p"
-                  data-id="{{ cid }}"
-                  data-name="{{ item.new_name | escape }}"                  type="button"
-                  title="Удалить урок">
-            <i class="bi bi-trash3"></i>
-          </button>
-          {% endif %}
-        </div>
-
-        <!-- BODY -->
-        <div class="fv-cat-body">
-          <span class="fv-cat-type">{{ item.new_librarytype | default: 'H5P' }}</span>
-          <span class="fv-cat-title">{{ item.new_name }}</span>
-          {% if item.new_description %}
-            <span class="fv-cat-desc">{{ item.new_description }}</span>
-          {% endif %}
-          {% if item.new_durationseconds %}
-            <div class="fv-cat-meta">
-              <i class="bi bi-clock"></i> {{ item.new_durationseconds | divided_by: 60 }} мин
-            </div>
-          {% endif %}
-        </div>
-
-        <!-- FOOTER -->
-        <div class="fv-cat-foot">
-          {% if lesson_status == 'completed' %}
-            <a href="/h5p-player?id={{ cid }}" class="fv-cat-btn fv-cat-btn-done">
-              <i class="bi bi-arrow-repeat"></i> Смотреть снова
-            </a>
-          {% elsif lesson_status == 'in_progress' %}
-            <a href="/h5p-player?id={{ cid }}" class="fv-cat-btn fv-cat-btn-continue">
-              <i class="bi bi-play-circle"></i> Продолжить
-            </a>
-          {% else %}
-            <a href="/h5p-player?id={{ cid }}" class="fv-cat-btn fv-cat-btn-start">
-              <i class="bi bi-play-fill"></i> Начать урок
-            </a>
-          {% endif %}
-        </div>
-
-      </div>
-    </div>
-    {% endfor %}
+    {{ cards_html }}
   </div>
 
   <!-- NO RESULTS (search/filter) -->
@@ -478,7 +484,10 @@
       el.style.display = show ? '' : 'none';
       if (show) visible++;
     });
-    if (countEl) countEl.textContent = visible + ' ' + (visible === 1 ? 'урок' : visible < 5 ? 'урока' : 'уроков');
+    // склонение по последним двум цифрам: 11..14 всегда «уроков», иначе смотрим последнюю
+    var n2 = visible % 100, n1 = visible % 10;
+    var word = (n2 > 10 && n2 < 20) ? 'уроков' : (n1 === 1 ? 'урок' : (n1 >= 2 && n1 <= 4 ? 'урока' : 'уроков'));
+    if (countEl) countEl.textContent = visible + ' ' + word;
     if (noResults) noResults.style.display = visible === 0 ? '' : 'none';
   }
 
@@ -582,20 +591,31 @@
     return new Promise(function (resolve, reject) {
       var reader = new FileReader();
       reader.onload = function (ev) {
-        var bytes = new Uint8Array(ev.target.result), binary = '';
-        for (var i = 0; i < bytes.byteLength; i++) { binary += String.fromCharCode(bytes[i]); }
         resetToken();
         getToken().then(function (token) {
-          return fetch('/_api/new_h5pcontents(' + id + ')', {
+          // new_thumbnailfile — колонка типа File: как и new_h5pfile (см. H5P-Upload),
+          // требует PATCH на суб-ресурс с сырым бинарником, а не base64 в основном JSON.
+          var headers = {
+            'Content-Type': 'application/octet-stream',
+            'x-ms-file-name': encodeURIComponent(file.name || 'thumbnail'),
+            'OData-MaxVersion': '4.0',
+            'OData-Version': '4.0'
+          };
+          if (token) headers['__RequestVerificationToken'] = token;
+          return fetch('/_api/new_h5pcontents(' + id + ')/new_thumbnailfile', {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'OData-MaxVersion': '4.0', 'OData-Version': '4.0', '__RequestVerificationToken': token },
-            body: JSON.stringify({ new_thumbnailfile: btoa(binary) }),
+            headers: headers,
+            body: ev.target.result,
             credentials: 'include'
           });
         }).then(function (res) {
           document.getElementById('thumb-upload-status').style.display = 'none';
           document.getElementById('thumb-save-btn').disabled = false;
-          if (res.ok || res.status === 204) { resolve(null); }
+          if (res.ok || res.status === 204) {
+            // карточка рисует превью только из new_thumbnailurl, поэтому после загрузки
+            // файла кладём туда ссылку на сам файл — иначе вкладка «Загрузить файл» бесполезна
+            saveThumbUrl(id, '/_api/new_h5pcontents(' + id + ')/new_thumbnailfile/$value').then(resolve, reject);
+          }
           else { res.text().then(function (t) { reject(new Error('HTTP ' + res.status + ': ' + t.slice(0, 200))); }); }
         }).catch(function (e) {
           document.getElementById('thumb-upload-status').style.display = 'none';
@@ -649,12 +669,16 @@
   function saveCourse(id, courseId, orig) {
     courseId = courseId || ''; orig = orig || '';
     if (courseId === orig) return Promise.resolve();            // не изменилось
-    if (!courseId) {                                            // отвязка (best effort)
+    if (!courseId) {                                            // отвязка: ошибку НЕ глотаем, иначе reload выглядит как успех
       resetToken();
       return unbindCourseAttempt(id, 'new_relatedcourse').then(function (r) {
         if (r.ok || r.status === 204) return;
-        resetToken(); return unbindCourseAttempt(id, 'new_RelatedCourse').then(function () {});
-      }).catch(function () {});
+        resetToken();
+        return unbindCourseAttempt(id, 'new_RelatedCourse').then(function (r2) {
+          if (r2.ok || r2.status === 204) return;
+          return r2.text().then(function (t) { throw new Error('Отвязка курса: HTTP ' + r2.status + ': ' + t.slice(0, 160)); });
+        });
+      });
     }
     resetToken();                                              // привязка/смена, с фолбэком регистра нав-свойства
     return bindCourseAttempt(id, courseId, 'new_relatedcourse').then(function (r) {

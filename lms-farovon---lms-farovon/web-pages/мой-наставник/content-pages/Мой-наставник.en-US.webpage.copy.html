@@ -1,3 +1,45 @@
+{% comment %}
+  Мой наставник. Единственная реальная связь «сотрудник → наставник» в схеме — поле new_mentor
+  в задачах адаптации (new_task); отдельного лукапа наставника у контакта нет. Поэтому наставника
+  берём из последней задачи текущего пользователя. Прежний вариант с объектом entities не работал
+  в принципе: entities адресуется только как entities['contact'][guid], перебрать/отфильтровать
+  «все контакты» через него нельзя, и карточка всегда оставалась пустой.
+{% endcomment %}
+{% assign has_mentor = false %}
+{% assign m_name = '' %}{% assign m_title = '' %}{% assign m_dept = '' %}{% assign m_email = '' %}{% assign m_phone = '' %}
+{% if user %}
+  {% fetchxml my_mentor %}
+  <fetch top="1">
+    <entity name="new_task">
+      <attribute name="new_taskid" />
+      <attribute name="new_mentor" />
+      <filter type="and">
+        <condition attribute="new_assignee" operator="eq" value="{{ user.id }}" />
+        <condition attribute="new_mentor" operator="not-null" />
+      </filter>
+      <link-entity name="contact" from="contactid" to="new_mentor" alias="m" link-type="inner">
+        <attribute name="fullname" />
+        <attribute name="jobtitle" />
+        <attribute name="department" />
+        <attribute name="emailaddress1" />
+        <attribute name="telephone1" />
+      </link-entity>
+      <order attribute="createdon" descending="true" />
+    </entity>
+  </fetch>
+  {% endfetchxml %}
+  {% if my_mentor.results.entities.size > 0 %}
+    {% assign mt = my_mentor.results.entities[0] %}
+    {% comment %}не-агрегатный fetchxml: поля из link-entity читаются как r['алиас.поле']{% endcomment %}
+    {% assign m_name = mt['m.fullname'] | default: '' %}
+    {% assign m_title = mt['m.jobtitle'] | default: '' %}
+    {% assign m_dept = mt['m.department'] | default: '' %}
+    {% assign m_email = mt['m.emailaddress1'] | default: '' %}
+    {% assign m_phone = mt['m.telephone1'] | default: '' %}
+    {% if m_name != '' %}{% assign has_mentor = true %}{% endif %}
+  {% endif %}
+{% endif %}
+
 <div class="row sectionBlockLayout" style="display: flex; flex-wrap: wrap; padding: 8px; margin: 0px;">
   <div class="container" style="display: flex; flex-wrap: wrap;">
     <div class="col-lg-12 columnBlockLayout" style="flex-grow: 1; min-width: 300px; display: flex; flex-direction: column;">
@@ -6,69 +48,107 @@
 
       <!-- Карточка наставника -->
       <div class="card mb-4" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 24px;">
-        {% assign mentor_contacts = entities['contacts'] | where: 'adx_username', user.username | first %}
         <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
           <div style="width: 80px; height: 80px; border-radius: 50%; background: #e8f4fd; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
             <i class="bi bi-person-video2" style="font-size: 2.5rem; color: #0078d4;"></i>
           </div>
           <div>
-            <h5 style="margin: 0 0 4px 0;" id="mentor-name">Наставник не назначен</h5>
-            <p style="margin: 0 0 4px 0; color: #666; font-size: 14px;" id="mentor-position">—</p>
-            <p style="margin: 0; color: #666; font-size: 14px;" id="mentor-department">—</p>
+            <h5 style="margin: 0 0 4px 0;" id="mentor-name">{% if has_mentor %}{{ m_name | escape }}{% else %}Наставник не назначен{% endif %}</h5>
+            <p style="margin: 0 0 4px 0; color: #666; font-size: 14px;" id="mentor-position">{% if has_mentor and m_title != '' %}{{ m_title | escape }}{% else %}—{% endif %}</p>
+            <p style="margin: 0; color: #666; font-size: 14px;" id="mentor-department">{% if has_mentor and m_dept != '' %}{{ m_dept | escape }}{% else %}—{% endif %}</p>
           </div>
         </div>
         <hr style="margin: 20px 0;">
         <div class="row g-3">
           <div class="col-md-6">
             <label style="font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px;">Email</label>
-            <p style="margin: 4px 0 0 0; font-weight: 500;" id="mentor-email">—</p>
+            <p style="margin: 4px 0 0 0; font-weight: 500;" id="mentor-email">{% if has_mentor and m_email != '' %}<a href="mailto:{{ m_email | escape }}">{{ m_email | escape }}</a>{% else %}—{% endif %}</p>
           </div>
           <div class="col-md-6">
             <label style="font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px;">Телефон</label>
-            <p style="margin: 4px 0 0 0; font-weight: 500;" id="mentor-phone">—</p>
+            <p style="margin: 4px 0 0 0; font-weight: 500;" id="mentor-phone">{% if has_mentor and m_phone != '' %}<a href="tel:{{ m_phone | escape }}">{{ m_phone | escape }}</a>{% else %}—{% endif %}</p>
           </div>
         </div>
+        {% unless has_mentor %}
+        <div style="margin-top: 16px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #92400E; display: flex; align-items: flex-start; gap: 10px;">
+          <i class="bi bi-info-circle-fill" style="color: #F59E0B; flex-shrink: 0;"></i>
+          <span>Наставник определяется по полю «Наставник» в ваших задачах адаптации. Пока такой задачи нет, карточка пустая — обратитесь в HR, чтобы наставника назначили.</span>
+        </div>
+        {% endunless %}
         <hr style="margin: 20px 0;">
-        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-          <a href="#schedule-meeting" class="btn btn-primary" style="border-radius: 8px;">
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+          {% if has_mentor and m_email != '' %}
+          <a href="#send-message" class="btn btn-primary" style="border-radius: 8px;">
+            <i class="bi bi-chat-dots"></i> Написать наставнику
+          </a>
+          {% else %}
+          <button type="button" class="btn btn-primary" style="border-radius: 8px;" disabled title="Появится, когда наставник назначен и у него указан email">
+            <i class="bi bi-chat-dots"></i> Написать наставнику
+          </button>
+          {% endif %}
+          <button type="button" class="btn btn-outline-secondary" style="border-radius: 8px;" disabled title="Запись на встречу через портал ещё не реализована">
             <i class="bi bi-calendar-plus"></i> Записаться на встречу
-          </a>
-          <a href="#send-message" class="btn btn-outline-secondary" style="border-radius: 8px;">
-            <i class="bi bi-chat-dots"></i> Написать сообщение
-          </a>
+          </button>
+          <span style="font-size: 11px; color: #94A3B8;">Запись на встречу — в разработке</span>
         </div>
       </div>
 
       <!-- График встреч -->
       <div class="card mb-4" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px;">
-        <h5 style="margin-bottom: 16px;"><i class="bi bi-calendar3" style="color: #0078d4;"></i> Запланированные встречи</h5>
+        <h5 style="margin-bottom: 16px;">
+          <i class="bi bi-calendar3" style="color: #0078d4;"></i> Запланированные встречи
+          <span class="adm-demo-chip" style="margin-left: 8px; vertical-align: middle;">в разработке</span>
+        </h5>
         <div id="meetings-list">
           <div style="text-align: center; padding: 32px; color: #aaa;">
             <i class="bi bi-calendar-x" style="font-size: 2rem; display: block; margin-bottom: 8px;"></i>
-            <p style="margin: 0;">Запланированных встреч нет</p>
+            <p style="margin: 0;">Встречи с наставником в Dataverse пока не хранятся — раздел к данным не подключён.</p>
           </div>
         </div>
-        <button class="btn btn-outline-primary btn-sm mt-2" style="border-radius: 8px;" id="schedule-meeting">
+        <button type="button" class="btn btn-outline-primary btn-sm mt-2" style="border-radius: 8px;" id="schedule-meeting" disabled title="Запрос встречи через портал ещё не реализован">
           <i class="bi bi-plus-circle"></i> Запросить встречу
         </button>
       </div>
 
       <!-- Форма сообщения -->
-      <div class="card" id="send-message" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px;">
+      <div class="card" id="send-message" style="border-radius: 12px; border: 1px solid #e1e4e8; padding: 20px;" data-email="{% if has_mentor %}{{ m_email | escape }}{% endif %}">
         <h5 style="margin-bottom: 16px;"><i class="bi bi-chat-dots" style="color: #0078d4;"></i> Написать наставнику</h5>
         <div class="mb-3">
           <label class="form-label">Тема</label>
-          <input type="text" class="form-control" placeholder="Укажите тему сообщения" style="border-radius: 8px;">
+          <input type="text" id="mentor-subj" class="form-control" placeholder="Укажите тему сообщения" style="border-radius: 8px;"{% unless has_mentor and m_email != '' %} disabled{% endunless %}>
         </div>
         <div class="mb-3">
           <label class="form-label">Сообщение</label>
-          <textarea class="form-control" rows="4" placeholder="Напишите ваш вопрос или сообщение..." style="border-radius: 8px;"></textarea>
+          <textarea id="mentor-body" class="form-control" rows="4" placeholder="Напишите ваш вопрос или сообщение..." style="border-radius: 8px;"{% unless has_mentor and m_email != '' %} disabled{% endunless %}></textarea>
         </div>
-        <button class="btn btn-primary" style="border-radius: 8px;">
-          <i class="bi bi-send"></i> Отправить
+        <button type="button" id="mentor-send" class="btn btn-primary" style="border-radius: 8px;"{% unless has_mentor and m_email != '' %} disabled title="Появится, когда наставник назначен и у него указан email"{% endunless %}>
+          <i class="bi bi-send"></i> Отправить письмом
         </button>
+        <div style="font-size: 11px; color: #94A3B8; margin-top: 8px;">
+          {% if has_mentor and m_email != '' %}Откроется ваш почтовый клиент с готовым письмом наставнику. Отправка сообщений внутри портала — в разработке.{% else %}Отправка недоступна: наставник не назначен или у него не указан email.{% endif %}
+        </div>
       </div>
 
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  // Email наставника берём из data-атрибута: внутри <script> HTML-сущности не декодируются,
+  // а в атрибуте их разбирает сам парсер — значение приходит целым.
+  var card = document.getElementById('send-message');
+  var btn = document.getElementById('mentor-send');
+  if (!card || !btn || btn.disabled) return;
+  var email = card.getAttribute('data-email') || '';
+  if (!email) { btn.disabled = true; return; }
+  btn.addEventListener('click', function () {
+    var s = (document.getElementById('mentor-subj').value || '').trim();
+    var b = (document.getElementById('mentor-body').value || '').trim();
+    if (!b) { alert('Напишите текст сообщения.'); return; }
+    window.location.href = 'mailto:' + email +
+      '?subject=' + encodeURIComponent(s || 'Вопрос наставнику') +
+      '&body=' + encodeURIComponent(b);
+  });
+})();
+</script>

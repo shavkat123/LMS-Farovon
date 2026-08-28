@@ -149,14 +149,15 @@
                 {% for h in linked_h5p.results.entities %}{% if h.new_relatedcourse.id == c.msdynce_courseid %}{% assign t_lessons = t_lessons | plus: 1 %}{% endif %}{% endfor %}
               {% endif %}
             {% endfor %}
-          <tr data-search="{{ nm | downcase }} {{ dep | downcase }}">
+          {% comment %}Название и отдел вводит пользователь — без escape они уезжают в разметку как HTML (хранимый XSS){% endcomment %}
+          <tr data-search="{{ nm | escape | downcase }} {{ dep | escape | downcase }}">
             <td>
               <div style="display:flex;align-items:center;gap:10px;">
                 <span class="admp-ico"><i class="bi bi-signpost-split"></i></span>
-                <span style="font-weight:600;">{{ nm }}</span>
+                <span style="font-weight:600;">{{ nm | escape }}</span>
               </div>
             </td>
-            <td style="color:var(--adm-fg-2);">{{ dep }}</td>
+            <td style="color:var(--adm-fg-2);">{{ dep | escape }}</td>
             <td class="adm-r adm-num" style="font-weight:600;">{{ t_courses }}</td>
             <td class="adm-r adm-num">{{ t_lessons }}</td>
             <td>{% if t.new_isactive %}<span class="adm-pill adm-pill--success adm-pill--dot">Опубликована</span>{% else %}<span class="adm-pill adm-pill--neutral adm-pill--dot">Черновик</span>{% endif %}</td>
@@ -211,7 +212,7 @@
         {% for c in courses.results.entities %}
         <label class="admp-crow" data-cid="{{ c.msdynce_courseid }}" data-traj="{% if c.new_trajectory %}{{ c.new_trajectory.id }}{% endif %}" data-order="{{ c.new_trajectoryorder | default: 0 }}" data-tname="{% if c.new_trajectory %}{{ c.new_trajectory.name | escape }}{% endif %}">
           <input type="checkbox" class="admp-ccheck">
-          <span class="admp-cname">{{ c.msdynce_coursename | default: 'Курс' }} <span class="admp-ctag" style="display:none;"></span></span>
+          <span class="admp-cname">{{ c.msdynce_coursename | default: 'Курс' | escape }} <span class="admp-ctag" style="display:none;"></span></span>
           <input type="number" class="admp-corder" min="1" placeholder="№" style="display:none;">
         </label>
         {% endfor %}
@@ -245,6 +246,16 @@
         .then(function (h) { var m = h.match(/name="__RequestVerificationToken"[^>]*value="([^"]+)"/); return m ? m[1] : ''; });
     }
     function chk(res) { if (res.ok) return true; return res.text().then(function (t) { var e = new Error('HTTP ' + res.status + ' — ' + t.slice(0, 220)); e.status = res.status; throw e; }); }
+    // Promise.allSettled есть не во всех браузерах, до которых дотягивается портал — при отсутствии эмулируем
+    function settleAll(ps) {
+      if (Promise.allSettled) return Promise.allSettled(ps);
+      return Promise.all(ps.map(function (p) {
+        return Promise.resolve(p).then(
+          function (v) { return { status: 'fulfilled', value: v }; },
+          function (e) { return { status: 'rejected', reason: e }; }
+        );
+      }));
+    }
 
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
     function closeModal(el) { el.style.display = 'none'; }
@@ -348,12 +359,20 @@
         });
         if (!ops.length) { closeModal(cModal); return; }
         cSave.disabled = true; cSave.textContent = 'Сохранение…';
+        // allSettled, а не all: при частичном сбое Promise.all терял результат остальных операций,
+        // и админ видел одну ошибку, не понимая, какие курсы всё-таки привязались
         getToken().then(function (tok) {
-          return Promise.all(ops.map(function (op) {
+          return settleAll(ops.map(function (op) {
             return op.act === 'bind' ? bindCourse(op.cid, tid, op.order, tok) : unbindCourse(op.cid, tok);
           }));
-        }).then(function () { location.reload(); })
-          .catch(function (e) { cErr.textContent = 'Ошибка сохранения: ' + e.message; cErr.style.display = 'block'; cSave.disabled = false; cSave.textContent = 'Сохранить'; });
+        }).then(function (res) {
+          var bad = res.filter(function (x) { return x.status === 'rejected'; });
+          if (!bad.length) { location.reload(); return; }
+          var first = (bad[0].reason && bad[0].reason.message) || '';
+          cErr.textContent = 'Сохранено ' + (res.length - bad.length) + ' из ' + res.length + '. Не удалось: ' + bad.length + '. ' + first + ' Обновите страницу, чтобы увидеть актуальные данные.';
+          cErr.style.display = 'block';
+          cSave.disabled = false; cSave.textContent = 'Сохранить';
+        }).catch(function (e) { cErr.textContent = 'Ошибка сохранения: ' + e.message; cErr.style.display = 'block'; cSave.disabled = false; cSave.textContent = 'Сохранить'; });
       });
     }
   })();

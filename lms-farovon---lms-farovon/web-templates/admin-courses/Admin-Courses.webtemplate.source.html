@@ -106,8 +106,8 @@
         <tbody id="admcoBody">
           {% for c in crs.results.entities %}
             {% assign cid = c.msdynce_courseid %}
-            {% assign nm = c.msdynce_coursename | default: 'Без названия' %}
-            {% assign instr = c.msdynce_instructor | default: '—' %}
+            {% assign nm = c.msdynce_coursename | default: 'Без названия' | escape %}
+            {% assign instr = c.msdynce_instructor | default: '—' | escape %}
             {% assign reg = c.msdynce_registeredparticipants | plus: 0 %}
             {% assign cap = c.msdynce_registerationmaxcapacity | plus: 0 %}
             {% assign pct = 0 %}{% if cap > 0 %}{% assign pct = reg | times: 100 | divided_by: cap %}{% endif %}
@@ -122,18 +122,19 @@
             </td>
             <td>{% assign tl = tlabel | strip %}{% if tl != '' %}<span class="adm-pill adm-pill--neutral">{{ tl }}</span>{% else %}<span style="color:var(--adm-fg-3);">—</span>{% endif %}</td>
             <td style="color:var(--adm-fg-2);">{{ instr }}</td>
-            <td style="font-size:12px;color:var(--adm-fg-2);">{{ c.msdynce_coursestartdateandtime | date: 'dd.MM.yyyy' }}</td>
+            <td style="font-size:12px;color:var(--adm-fg-2);">{{ c.msdynce_coursestartdateandtime | date_add_hours: 5 | date: 'dd.MM.yyyy' }}</td>
             <td>
               <div style="display:flex;align-items:center;gap:8px;">
                 <div class="adm-bar" style="flex:1;"><div style="width:{{ pct }}%;background:{{ bc }};"></div></div>
                 <span class="adm-num" style="font-size:11px;font-weight:600;color:var(--adm-fg-2);min-width:52px;">{{ reg }}/{{ cap }}</span>
               </div>
             </td>
-            <td style="font-size:12px;color:var(--adm-fg-3);">{{ c.msdynce_registerationdeadline | date: 'dd.MM.yyyy' }}</td>
+            <td style="font-size:12px;color:var(--adm-fg-3);">{{ c.msdynce_registerationdeadline | date_add_hours: 5 | date: 'dd.MM.yyyy' }}</td>
             <td>
               <div style="display:flex;gap:6px;justify-content:flex-end;">
                 <a href="/admin/course-form?id={{ cid }}" class="admco-act" title="Редактировать"><i class="bi bi-pencil"></i></a>
-                <a href="/admin/delete-course?id={{ cid }}" class="admco-act admco-act--del" title="Удалить"><i class="bi bi-trash"></i></a>
+                {% comment %}легаси /admin/delete-course только деактивирует курс; настоящее удаление — danger-зона карточки{% endcomment %}
+                <a href="/admin/course-form?id={{ cid }}#danger" class="admco-act admco-act--del" title="Удалить курс (в карточке курса)"><i class="bi bi-trash"></i></a>
               </div>
             </td>
           </tr>

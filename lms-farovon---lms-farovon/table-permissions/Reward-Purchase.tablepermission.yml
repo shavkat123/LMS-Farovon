@@ -1,3 +1,11 @@
+# ВЫКЛЮЧЕНО (statecode 1). Это полный дубль Reward-Purchase-Self: та же таблица, тот же
+# Global-scope, те же права (read+create, без write) и тот же список ролей. Три пересекающихся
+# права на new_rewardpurchase невозможно ревьюить — эффективный доступ считается как ИХ ОБЪЕДИНЕНИЕ,
+# поэтому лишние записи только маскировали лишний write из Reward-Purchase-via-Item.
+# Единственное живое право на таблицу — Reward-Purchase-Self.
+# Запись НЕ удалена, а деактивирована намеренно: pac paportal upload не удаляет из среды записи,
+# пропавшие с диска, — удалив файл, мы бы убрали право из репозитория, оставив его действующим
+# на портале. Деактивация же реально доезжает до среды при следующей выгрузке.
 adx_accountrelationship: 
 adx_append: true
 adx_appendto: true
@@ -19,3 +27,5 @@ adx_parentrelationship:
 adx_read: true
 adx_scope: 756150000
 adx_write: false
+statecode: 1
+statuscode: 2

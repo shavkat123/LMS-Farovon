@@ -1,16 +1,22 @@
+# Право намеренно оставлено ВЫКЛЮЧЕННЫМ (statecode 1): таблицу feedback в портале никто не читает
+# и не пишет — стартовая basic form 'simple contact us form' и страница /contact-us тоже
+# деактивированы, а живая страница /user-feedback чисто клиентская (ничего не сохраняет),
+# и пары Webapi/feedback/* в sitesetting.yml нет. Включать Global-право без потребителя —
+# это открыть чтение всех обращений впустую, поэтому активацию делаем только вместе с формой.
+# Заодно сняты write/delete и роль Anonymous: если право когда-нибудь включат, оно не окажется
+# сразу широко открытым — форме обращения хватает create + read.
 adx_append: false
 adx_appendto: false
 adx_create: true
-adx_delete: true
+adx_delete: false
 adx_entitylogicalname: feedback
 adx_entityname: Feedback
 adx_entitypermission_webrole:
-- 2106e5ed-a538-f111-88b5-7ced8d76b3cc
 - 2ccfddf9-a538-f111-88b5-7ced8d76b3cc
 - 3b5fe5f3-a538-f111-88b5-7ced8d76b3cc
 adx_entitypermissionid: 975fe5f3-a538-f111-88b5-7ced8d76b3cc
 adx_read: true
 adx_scope: 756150000
-adx_write: true
+adx_write: false
 statecode: 1
 statuscode: 2

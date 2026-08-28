@@ -21,20 +21,43 @@
 </fetch>
 {% endfetchxml %}
 
+{% comment %} KPI считаем агрегатом по всей таблице: раньше они складывались из top=500 и врали при большем объёме {% endcomment %}
+{% fetchxml h5p_kpi %}
+<fetch aggregate="true">
+  <entity name="new_h5pprogress">
+    <attribute name="new_h5pprogressid" alias="total_cnt" aggregate="count" />
+    <attribute name="new_scorescaled" alias="avg_score_raw" aggregate="avg" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %} По bit-полю (new_completion) допустим только COUNT с фильтром: sum/avg на bit роняет весь fetchxml {% endcomment %}
+{% fetchxml h5p_kpi_done %}
+<fetch aggregate="true">
+  <entity name="new_h5pprogress">
+    <attribute name="new_h5pprogressid" alias="done_cnt" aggregate="count" />
+    <filter>
+      <condition attribute="new_completion" operator="eq" value="1" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
 {% assign total_records = 0 %}
 {% assign total_completed = 0 %}
-{% assign score_sum = 0 %}
-{% assign score_count = 0 %}
-{% for p in progress.results.entities %}
-  {% assign total_records = total_records | plus: 1 %}
-  {% if p.new_completion %}{% assign total_completed = total_completed | plus: 1 %}{% endif %}
-  {% if p.new_scorescaled %}
-    {% assign score_sum = score_sum | plus: p.new_scorescaled %}
-    {% assign score_count = score_count | plus: 1 %}
-  {% endif %}
-{% endfor %}
 {% assign avg_score = 0 %}
-{% if score_count > 0 %}{% assign avg_score = score_sum | divided_by: score_count | times: 100 | round %}{% endif %}
+{% if h5p_kpi.results.entities.size > 0 %}
+  {% comment %} литеральный индекс [0] допустим, индекс переменной в DotLiquid падает {% endcomment %}
+  {% assign kpi_row = h5p_kpi.results.entities[0] %}
+  {% assign total_records = kpi_row.total_cnt | integer %}
+  {% if kpi_row.avg_score_raw %}
+    {% comment %} decimal перед times: без приведения строка ушла бы в Enumerable.Repeat {% endcomment %}
+    {% assign avg_score = kpi_row.avg_score_raw | decimal | times: 100 | round %}
+  {% endif %}
+{% endif %}
+{% if h5p_kpi_done.results.entities.size > 0 %}
+  {% assign total_completed = h5p_kpi_done.results.entities[0].done_cnt | integer %}
+{% endif %}
 
 {% else %}
 {% comment %} ── USER VIEW: own progress ───────────────────────────────────── {% endcomment %}
@@ -184,7 +207,7 @@
   <div class="fv-prog-header">
     <span class="fv-prog-eyebrow">Администрирование</span>
     <h1 class="fv-prog-title">Прогресс обучающихся</h1>
-    <p class="fv-prog-sub">Активность всех пользователей по H5P урокам</p>
+    <p class="fv-prog-sub">Активность пользователей по урокам</p>
   </div>
 
   <div class="fv-kpi-row">
@@ -209,7 +232,7 @@
   {% if progress.results.entities.size > 0 %}
   <div class="fv-tbl-card">
     <div class="fv-tbl-head">
-      <span class="fv-tbl-title">Детальный журнал</span>
+      <span class="fv-tbl-title">Детальный журнал (последние 500)</span>
       <div class="fv-search-wrap">
         <i class="bi bi-search"></i>
         <input type="text" id="fv-admin-search" class="fv-search-input" placeholder="Поиск по имени…" />
@@ -232,16 +255,16 @@
         {% if p.new_scorescaled %}{% assign score_pct = p.new_scorescaled | times: 100 | round %}{% endif %}
         {% assign user_init = p.new_user.name | truncate: 1, '' %}
         {% assign safe_lesson = p.new_h5pcontent.name | replace: "'", " " %}
-        <tr class="fv-admin-row" data-search="{{ p.new_user.name | downcase }} {{ p.new_h5pcontent.name | downcase }}">
+        <tr class="fv-admin-row" data-search="{{ p.new_user.name | downcase | escape }} {{ p.new_h5pcontent.name | downcase | escape }}">
           <td>
             <div class="fv-user-cell">
-              <div class="fv-avatar">{{ user_init }}</div>
-              <span style="font-weight:500;">{{ p.new_user.name | default: '—' }}</span>
+              <div class="fv-avatar">{{ user_init | escape }}</div>
+              <span style="font-weight:500;">{{ p.new_user.name | default: '—' | escape }}</span>
             </div>
           </td>
           <td style="max-width:220px;">
             <a href="/h5p-player?id={{ p.new_h5pcontent.id }}" style="color:#1E3A8A;font-weight:500;text-decoration:none;">
-              {{ p.new_h5pcontent.name | default: '—' }}
+              {{ p.new_h5pcontent.name | default: '—' | escape }}
             </a>
           </td>
           <td>
@@ -263,7 +286,7 @@
               <span class="fv-badge-no"><i class="bi bi-hourglass-split"></i> Нет</span>
             {% endif %}
           </td>
-          <td style="color:#64748B;font-size:12px;">{{ p.new_lastupdated | date: 'dd.MM.yyyy HH:mm' }}</td>
+          <td style="color:#64748B;font-size:12px;">{{ p.new_lastupdated | date_add_hours: 5 | date: 'dd.MM.yyyy HH:mm' }}</td>
           <td>
             <button type="button" class="fv-btn-detail"
                     data-progress-id="{{ p.new_h5pprogressid }}" data-lesson="{{ safe_lesson | escape }}"
@@ -356,7 +379,7 @@
         </div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#64748B;">{{ item.new_librarytype | default: 'H5P' }}</div>
-          <div style="font-size:14px;font-weight:600;color:#0B1220;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ item.new_name }}</div>
+          <div style="font-size:14px;font-weight:600;color:#0B1220;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ item.new_name | escape }}</div>
           {% if prog_score != '' %}
             <div class="fv-prog-bar-wrap">
               <span style="font-size:11px;color:#64748B;">Балл: <strong>{{ prog_score }}%</strong></span>
@@ -373,7 +396,7 @@
             <span class="fv-badge-no"><i class="bi bi-play-fill"></i> В процессе</span>
           {% endif %}
           {% if prog_updated %}
-          <div style="font-size:11px;color:#64748B;margin-top:4px;">{{ prog_updated | date: 'dd.MM.yyyy' }}</div>
+          <div style="font-size:11px;color:#64748B;margin-top:4px;">{{ prog_updated | date_add_hours: 5 | date: 'dd.MM.yyyy' }}</div>
           {% endif %}
         </div>
       </a>
@@ -583,12 +606,14 @@
   }
 
   /* ── Нет вопросов ── */
-  function renderNoQuestions(body) {
+  function renderNoQuestions(body, reason) {
     body.innerHTML =
       '<div class="fv-detail-noq">' +
       '<i class="bi bi-chat-square-text"></i>' +
       '<p style="font-weight:600;color:#475569;margin:0;">Данных по вопросам нет</p>' +
       '<p style="font-size:12px;margin:4px 0 0;">Этот урок не содержит интерактивных вопросов или они не были записаны.</p>' +
+      /* причина передаётся вызывающим кодом — раньше молча терялась */
+      (reason ? '<p style="font-size:11px;margin:8px 0 0;color:#94A3B8;">' + fvEsc(reason) + '</p>' : '') +
       '</div>';
   }
 

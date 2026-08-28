@@ -1,6 +1,15 @@
+{% comment %}── Тот же guard, что и в content-page: рендерится обычно копия, но корневая запись
+   тоже не должна отдавать разметку удаления курса пользователю без админ-роли. ──{% endcomment %}
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Удаление курсов доступно только администраторам, HR, наставникам и руководителям.</p>
+</div>
+{% else %}
 <div class="row sectionBlockLayout" style="display: flex; flex-wrap: wrap; padding: 8px; margin: 0px; text-align: left; min-height: 100px;">
       <div class="container" style="display: flex; flex-wrap: wrap;">
         <div class="col-lg-12 columnBlockLayout" style="display: flex; flex-direction: column;"></div>
       </div>
     </div>
-    
+{% endunless %}

@@ -32,7 +32,8 @@
 {% endif %}
 
 {% assign homeurl = website.adx_partialurl %}
-{% assign search_enabled = settings['Search/Enabled'] | boolean | default:true %}
+{% comment %}Без "| default:true": фильтр default срабатывает и на false, поэтому выключенный Search/Enabled снова становился true и поиск показывался всем{% endcomment %}
+{% assign search_enabled = settings['Search/Enabled'] | boolean %}
 
 {% if user %}
   {% assign name_parts = user.fullname | split: ' ' %}
@@ -47,6 +48,12 @@
   {% assign primary_nav = nil %}
 {% endif %}
 {% assign portal_nav = weblinks["User Portal Navigation"] %}
+{% comment %}
+  Набора «User Portal Navigation» в сайте нет, поэтому у «Нового сотрудника» сайдбар
+  оставался вообще без пунктов. Фолбэк на «Primary Navigation» — чтобы меню не пропадало;
+  убрать, когда набор для новых сотрудников будет заведён.
+{% endcomment %}
+{% unless primary_nav or portal_nav %}{% assign primary_nav = weblinks["Primary Navigation"] %}{% endunless %}
 
 <style>
   /* ═══ Farovon v2 App Shell — сайдбар слева + топбар (дизайн-кит web_app_v2) ═══ */
@@ -152,7 +159,8 @@
   .fv-ctx--admin .fv-shell-brand-sub { color: #8A99BD; }
   .fv-ctx--admin .fv-shell-section { color: #8A99BD; opacity: 0.6; }
   .fv-ctx--admin .fv-shell-nav { scrollbar-color: #182849 transparent; }
-  .fv-shell--adm .fv-shell-nav::-webkit-scrollbar-thumb { background: #182849; }
+  /* класса .fv-shell--adm в разметке нет — тёмный контекст задаётся .fv-ctx--admin, иначе правило мёртвое */
+  .fv-ctx--admin .fv-shell-nav::-webkit-scrollbar-thumb { background: #182849; }
   .fv-adm-link {
     display: flex;
     align-items: center;
@@ -352,42 +360,6 @@
   }
 </style>
 
-{% comment %}── Баланс: формула как в rewards-shop. Считаем всегда — портальный ctx рендерится всегда ──{% endcomment %}
-{% fetchxml fv_hd_done %}
-<fetch>
-  <entity name="new_h5pprogress">
-    <attribute name="new_scorescaled" />
-    <filter>
-      <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
-      <condition attribute="new_completion" operator="eq" value="1" />
-    </filter>
-  </entity>
-</fetch>
-{% endfetchxml %}
-{% fetchxml fv_hd_spent %}
-<fetch>
-  <entity name="new_rewardpurchase">
-    <attribute name="new_pointsspent" />
-    <filter>
-      <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
-    </filter>
-  </entity>
-</fetch>
-{% endfetchxml %}
-{% assign fv_hd_earned = 0 %}
-{% for p in fv_hd_done.results.entities %}
-  {% assign fv_hd_pts = 0 %}
-  {% if p.new_scorescaled %}
-    {% assign fv_hd_pts = p.new_scorescaled | times: 50 | round %}
-  {% endif %}
-  {% assign fv_hd_earned = fv_hd_earned | plus: 100 | plus: fv_hd_pts %}
-{% endfor %}
-{% assign fv_hd_sp = 0 %}
-{% for pur in fv_hd_spent.results.entities %}
-  {% assign fv_hd_sp = fv_hd_sp | plus: pur.new_pointsspent %}
-{% endfor %}
-{% assign fv_hd_balance = fv_hd_earned | minus: fv_hd_sp %}
-
 <!-- Контекст сайдбара выбирается на клиенте (обходит кеш page.url в шапке) -->
 <script>(function(){var adm={% if is_admin_role %}true{% else %}false{% endif %};document.documentElement.classList.add((adm && /^\/admin(\/|$)/.test(location.pathname))?'ctx-admin':'ctx-portal');})();</script>
 
@@ -406,7 +378,8 @@
 
   <nav class="fv-shell-nav">
     {% assign cur = page.url %}
-    {% assign adm_secs = 'Обзор~Дашборд;/admin;grid-1x2,Аналитика;/admin/reports;bar-chart-line|Люди~Сотрудники;/admin/users;people,Группы;/admin/groups;diagram-3,Роли;/admin/roles;shield-check,Центр адаптации;/admin/adaptation-center;person-check,Задачи;/admin/tasks;kanban|Коммуникации~Форум;/admin/forum;chat-dots,Рассылки;/admin/broadcasts;send,Мероприятия;/admin/events;calendar3|Контент~Курсы;/admin/courses;book,Траектории;/admin/paths;signpost-split,Библиотека;/admin/library;collection-play,Тесты;/admin/tests;clipboard-check,Загрузка H5P;/admin/h5p-upload;cloud-upload,Программы;/admin/admin-home;journal-text|Система~Настройки;/admin/settings;gear,Интеграции;/admin/integrations;plug,Журнал;/admin/audit;file-text' | split: '|' %}
+    {% comment %}Пункт «Мероприятия» ведёт на /events: страницы /admin/events в сайте нет, ссылка на неё давала 404{% endcomment %}
+    {% assign adm_secs = 'Обзор~Дашборд;/admin;grid-1x2,Аналитика;/admin/reports;bar-chart-line|Люди~Сотрудники;/admin/users;people,Группы;/admin/groups;diagram-3,Роли;/admin/roles;shield-check,Центр адаптации;/admin/adaptation-center;person-check,Задачи;/admin/tasks;kanban|Коммуникации~Форум;/admin/forum;chat-dots,Рассылки;/admin/broadcasts;send,Мероприятия;/events;calendar3|Контент~Курсы;/admin/courses;book,Траектории;/admin/paths;signpost-split,Библиотека;/admin/library;collection-play,Тесты;/admin/tests;clipboard-check,Загрузка H5P;/admin/h5p-upload;cloud-upload,Программы;/admin/admin-home;journal-text|Система~Настройки;/admin/settings;gear,Интеграции;/admin/integrations;plug,Журнал;/admin/audit;file-text' | split: '|' %}
     {% for sec in adm_secs %}
       {% assign sec_parts = sec | split: '~' %}
       <div class="fv-shell-section">{{ sec_parts[0] }}</div>
@@ -464,11 +437,12 @@
           {% assign tnt = meta[1] | default: '#F0F2F5' %}
           {% assign clr = meta[2] | default: '#475569' %}
           <li>
+            {% comment %}adx_description задаёт редактор портала — экранируем, иначе кавычка в описании ломает атрибут/style{% endcomment %}
             <a href="{{ link.url | escape }}"
-               class="fv-shell-link" data-tint="{{ tnt }}" data-clr="{{ clr }}"
+               class="fv-shell-link" data-tint="{{ tnt | escape }}" data-clr="{{ clr | escape }}"
                aria-label="{{ link.name | escape }}"
                {% if link.open_in_new_window %}target="_blank"{% endif %}>
-              <span class="fv-shell-ico" style="background:{{ tnt }};color:{{ clr }};"><i class="bi bi-{{ ico }}" aria-hidden="true"></i></span>
+              <span class="fv-shell-ico" style="background:{{ tnt | escape }};color:{{ clr | escape }};"><i class="bi bi-{{ ico | escape }}" aria-hidden="true"></i></span>
               <span>{{ link.name | escape }}</span>
             </a>
           </li>
@@ -488,25 +462,26 @@
       {% endif %}
 
     {% elsif portal_nav %}
-      {% comment %}── Новый сотрудник: меню адаптации ──{% endcomment %}
+      {% comment %}
+        ── Новый сотрудник: меню адаптации ──
+        Оформление берём из adx_description ссылки ("иконка,фон,цвет"), как в Primary Navigation.
+        Параллельные массивы с индексом p_icons[forloop.index0] убраны: индексация массива
+        переменной в DotLiquid падает с «Parameter count mismatch» (безопасен только литерал).
+      {% endcomment %}
       <div class="fv-shell-section">Меню</div>
-      {% assign p_icons  = "person-check,newspaper,building,list-task,calendar3,person-video2,journal-bookmark,telephone-inbound,chat-dots,shop" | split: "," %}
-      {% assign p_tints  = "#EEF2F9,#FAF3E8,#F0F2F5,#ECF6EF,#EEF2F9,#FAF3E8,#ECF6EF,#F0F2F5,#EEF2F9,#FAF3E8" | split: "," %}
-      {% assign p_colors = "#1E3A8A,#B45309,#475569,#15803D,#1E3A8A,#B45309,#15803D,#475569,#1E3A8A,#D97706" | split: "," %}
       <ul>
         {% for link in portal_nav.weblinks %}
-          {% assign ico = p_icons[forloop.index0] %}
-          {% assign tnt = p_tints[forloop.index0] %}
-          {% assign clr = p_colors[forloop.index0] %}
-          {% unless ico %}{% assign ico = "link-45deg" %}{% endunless %}
-          {% unless tnt %}{% assign tnt = "#F0F2F5" %}{% endunless %}
-          {% unless clr %}{% assign clr = "#475569" %}{% endunless %}
+          {% assign meta = link.description | split: ',' %}
+          {% assign ico = meta[0] | default: 'link-45deg' %}
+          {% assign tnt = meta[1] | default: '#F0F2F5' %}
+          {% assign clr = meta[2] | default: '#475569' %}
           <li>
+            {% comment %}adx_description задаёт редактор портала — экранируем, иначе кавычка в описании ломает атрибут/style{% endcomment %}
             <a href="{{ link.url | escape }}"
-               class="fv-shell-link" data-tint="{{ tnt }}" data-clr="{{ clr }}"
+               class="fv-shell-link" data-tint="{{ tnt | escape }}" data-clr="{{ clr | escape }}"
                aria-label="{{ link.name | escape }}"
                {% if link.open_in_new_window %}target="_blank"{% endif %}>
-              <span class="fv-shell-ico" style="background:{{ tnt }};color:{{ clr }};"><i class="bi bi-{{ ico }}" aria-hidden="true"></i></span>
+              <span class="fv-shell-ico" style="background:{{ tnt | escape }};color:{{ clr | escape }};"><i class="bi bi-{{ ico | escape }}" aria-hidden="true"></i></span>
               <span>{{ link.name | escape }}</span>
             </a>
           </li>
@@ -515,6 +490,48 @@
     {% endif %}
   </nav>
 
+  {% comment %}
+    ── Баланс: формула как в rewards-shop/profile (100 за урок + round(scorescaled*50)) ──
+    Весь расчёт внутри substitution-блока: шапка кешируется (Header/OutputCache/Enabled = True),
+    и без него баланс «замерзал» на значении, посчитанном при первом рендере.
+    top на обоих fetch — чтобы шапка не тянула неограниченную выборку на каждой странице.
+  {% endcomment %}
+  {% substitution %}
+  {% fetchxml fv_hd_done %}
+  <fetch top="5000">
+    <entity name="new_h5pprogress">
+      <attribute name="new_scorescaled" />
+      <filter>
+        <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
+        <condition attribute="new_completion" operator="eq" value="1" />
+      </filter>
+    </entity>
+  </fetch>
+  {% endfetchxml %}
+  {% fetchxml fv_hd_spent %}
+  <fetch top="5000">
+    <entity name="new_rewardpurchase">
+      <attribute name="new_pointsspent" />
+      <filter>
+        <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
+      </filter>
+    </entity>
+  </fetch>
+  {% endfetchxml %}
+  {% assign fv_hd_earned = 0 %}
+  {% for p in fv_hd_done.results.entities %}
+    {% assign fv_hd_pts = 0 %}
+    {% if p.new_scorescaled %}
+      {% assign fv_hd_pts = p.new_scorescaled | times: 50 | round %}
+    {% endif %}
+    {% assign fv_hd_earned = fv_hd_earned | plus: 100 | plus: fv_hd_pts %}
+  {% endfor %}
+  {% assign fv_hd_sp = 0 %}
+  {% for pur in fv_hd_spent.results.entities %}
+    {% comment %}незаполненный new_pointsspent обнулял накопленную сумму — прибавляем только заполненные{% endcomment %}
+    {% if pur.new_pointsspent %}{% assign fv_hd_sp = fv_hd_sp | plus: pur.new_pointsspent %}{% endif %}
+  {% endfor %}
+  {% assign fv_hd_balance = fv_hd_earned | minus: fv_hd_sp %}
   <div class="fv-shell-balance">
     <div class="fv-shell-balance-top">
       <span class="fv-shell-balance-lbl">Ваш баланс</span>
@@ -525,6 +542,7 @@
     </div>
     <a class="fv-shell-balance-btn" href="/rewards-shop/">В магазин →</a>
   </div>
+  {% endsubstitution %}
   </div>
 </aside>
 <div class="fv-shell-backdrop" id="fvShellBackdrop"></div>
@@ -553,6 +571,8 @@
       </a>
       {% endif %}
 
+      {% comment %}Поиск скрыт, пока Search/Enabled = false — иначе форма ведёт на неработающий поиск{% endcomment %}
+      {% if search_enabled %}
       <div class="fv-topbar-search d-none d-md-block">
         <i class="bi bi-search fv-si"></i>
         <form action="{{ sitemarkers['Search'].url | default: '/search' }}" method="get">
@@ -560,6 +580,7 @@
           <input type="text" id="fvTopSearch" name="q" placeholder="Найти урок или тему…" autocomplete="off" />
         </form>
       </div>
+      {% endif %}
 
       <div class="fv-topbar-gap"></div>
 
@@ -573,15 +594,22 @@
       {% endif %}
 
       {% if is_admin_role %}
-      <a href="/admin/events" class="fv-icon-btn d-none d-md-flex" title="Мероприятия" aria-label="Мероприятия">
+      {% comment %}/admin/events не существует — календарь мероприятий лежит в корне сайта{% endcomment %}
+      <a href="/events" class="fv-icon-btn d-none d-md-flex" title="Мероприятия" aria-label="Мероприятия">
         <i class="bi bi-calendar-check"></i>
       </a>
       {% endif %}
 
+      {% if user %}
+      {% comment %}
+        Колокольчик только для вошедших. Красная точка «есть непрочитанное» убрана:
+        она была захардкожена и горела всегда — вернуть, когда появится реальный счётчик
+        непрочитанных (отметки прочтения по new_broadcast в схеме пока нет).
+      {% endcomment %}
       <a href="/news" class="fv-icon-btn d-none d-md-flex" title="Новости" aria-label="Новости">
         <i class="bi bi-bell"></i>
-        <span class="fv-icon-dot" aria-hidden="true"></span>
       </a>
+      {% endif %}
 
       <div class="fv-topbar-div d-none d-md-block"></div>
 
@@ -611,8 +639,11 @@
             {% if profile_nav %}
               {% for link in profile_nav.weblinks %}
               <li>
+                {% assign pnav_ico = 'person' %}
+                {% if link.name contains 'стажёр' or link.name contains 'Стажёр' %}{% assign pnav_ico = 'people' %}
+                {% elsif link.name contains 'настав' or link.name contains 'Настав' %}{% assign pnav_ico = 'person-check' %}{% endif %}
                 <a class="dropdown-item" href="{{ link.url | escape }}" aria-label="{{ link.name | escape }}">
-                  <i class="bi bi-person"></i> {{ link.name | escape }}
+                  <i class="bi bi-{{ pnav_ico }}"></i> {{ link.name | escape }}
                 </a>
               </li>
               {% endfor %}
@@ -627,8 +658,8 @@
           <li><hr class="dropdown-divider"></li>
           <li>
             <a class="dropdown-item" href="{% if homeurl %}/{{ homeurl }}{% endif %}{{ website.sign_out_url_substitution }}"
-               aria-label="{{ snippets['links/logout'] | default:resx['Sign_Out'] | escape }}">
-              <i class="bi bi-box-arrow-right"></i> {{ snippets["links/logout"] | default:resx["Sign_Out"] | escape }}
+               aria-label="{{ snippets['links/logout'] | default:'Выйти' | escape }}">
+              <i class="bi bi-box-arrow-right"></i> {{ snippets["links/logout"] | default:'Выйти' | escape }}
             </a>
           </li>
         </ul>
@@ -636,7 +667,7 @@
 
       {% else %}
       <a href="{% if homeurl %}/{{ homeurl }}{% endif %}{{ website.sign_in_url_substitution }}" class="fv-signin-btn">
-        {{ snippets["links/login"] | default:resx["Sign_In"] | escape }}
+        {{ snippets["links/login"] | default:'Войти' | escape }}
       </a>
       {% endif %}
 
@@ -653,7 +684,8 @@
 {% assign section_class = "section-landing-search" %}
 {% if current_page == forum_page %}{% assign section_class = "section-landing-forums" %}{% endif %}
 <section class="page_section {{ section_class | h }} color-inverse">
-  <div class="row sectionBlockLayout sectionFixedStyle" style="display:flex;flex-wrap:wrap;text-align:center;min-height:420px;background:url('/Homehero.png') center/cover no-repeat;padding:8px;margin:0;">
+  {% comment %}Web-file Homehero.png в сайте нет — картинка давала 404 и пустой белый баннер, поэтому фирменный градиент{% endcomment %}
+  <div class="row sectionBlockLayout sectionFixedStyle" style="display:flex;flex-wrap:wrap;text-align:center;min-height:420px;background:linear-gradient(135deg,#0E1A35,#1E3A8A) center/cover no-repeat;padding:8px;margin:0;">
     <div class="container" style="display:flex;flex-wrap:wrap;">
       <div class="col-lg-12 columnBlockLayout" style="display:flex;flex-direction:column;justify-content:center;">
         {% if current_page == sr_page %}

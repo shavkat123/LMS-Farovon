@@ -1,6 +1,6 @@
 {% comment %}── Step 1: lessons + user progress ──{% endcomment %}
 {% fetchxml h5p_all %}
-<fetch>
+<fetch top="200">
   <entity name="new_h5pcontent">
     <attribute name="new_h5pcontentid" />
     <attribute name="new_name" />
@@ -8,6 +8,7 @@
     <attribute name="new_description" />
     <attribute name="new_thumbnailurl" />
     <attribute name="new_durationseconds" />
+    <attribute name="new_relatedcourse" />
     <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
     <order attribute="new_name" descending="false" />
   </entity>
@@ -33,8 +34,9 @@
 {% endif %}
 
 {% if user %}
+  {% comment %}── top не меньше лимита каталога уроков (200), иначе счётчики «завершено/в работе» разойдутся ──{% endcomment %}
   {% fetchxml user_progress %}
-  <fetch>
+  <fetch top="200">
     <entity name="new_h5pprogress">
       <attribute name="new_h5pprogressid" />
       <attribute name="new_h5pcontent" />
@@ -121,8 +123,9 @@
     {% assign r_bonus = r_sum | times: 50 | round %}
     {% assign r_coins = r_cnt | times: 100 | plus: r_bonus %}
     {% if r_uid == user.id %}{% assign lb_my_coins = r_coins %}{% endif %}
-    {% assign r_name = r['ctc.fname'] | default: 'Участник' %}
-    {% assign r_job = r['ctc.fjob'] | default: '' %}
+    {% comment %}── В агрегатном fetchxml алиасы link-entity доступны только как r.fname, синтаксис r['ctc.fname'] даёт пусто ──{% endcomment %}
+    {% assign r_name = r.fname | default: 'Участник' %}
+    {% assign r_job = r.fjob | default: '' %}
     {% if r_coins > lb_top1_c %}
       {% assign lb_top3_c = lb_top2_c %}{% assign lb_top3_n = lb_top2_n %}{% assign lb_top3_j = lb_top2_j %}
       {% assign lb_top2_c = lb_top1_c %}{% assign lb_top2_n = lb_top1_n %}{% assign lb_top2_j = lb_top1_j %}
@@ -146,6 +149,8 @@
       {% assign r_bonus = r_sum | times: 50 | round %}
       {% assign r_coins = r_cnt | times: 100 | plus: r_bonus %}
       {% if r_coins > lb_my_coins %}{% assign lb_my_rank = lb_my_rank | plus: 1 %}{% endif %}
+      {% comment %}── Тот же тай-брейк по id, что и в /leaderboard: иначе при равных баллах места расходятся ──{% endcomment %}
+      {% if r_coins == lb_my_coins and r_uid < user.id %}{% assign lb_my_rank = lb_my_rank | plus: 1 %}{% endif %}
     {% endfor %}
   {% endif %}
 
@@ -163,21 +168,7 @@
   {% if ach_fire %}{% assign ach_got = ach_got | plus: 1 %}{% endif %}
 {% endif %}
 
-{% assign fv_mon_n = 'now' | date: 'MM' %}
-{% case fv_mon_n %}
-  {% when '01' %}{% assign fv_mon = 'января' %}
-  {% when '02' %}{% assign fv_mon = 'февраля' %}
-  {% when '03' %}{% assign fv_mon = 'марта' %}
-  {% when '04' %}{% assign fv_mon = 'апреля' %}
-  {% when '05' %}{% assign fv_mon = 'мая' %}
-  {% when '06' %}{% assign fv_mon = 'июня' %}
-  {% when '07' %}{% assign fv_mon = 'июля' %}
-  {% when '08' %}{% assign fv_mon = 'августа' %}
-  {% when '09' %}{% assign fv_mon = 'сентября' %}
-  {% when '10' %}{% assign fv_mon = 'октября' %}
-  {% when '11' %}{% assign fv_mon = 'ноября' %}
-  {% else %}{% assign fv_mon = 'декабря' %}
-{% endcase %}
+{% comment %}── Название месяца убрано: рейтинг ниже считается за всё время, месяц в заголовке вводил в заблуждение ──{% endcomment %}
 
 {% comment %}── Ближайшие события из new_event (для правого рейла) ──{% endcomment %}
 {% fetchxml home_events %}
@@ -194,16 +185,38 @@
   </entity>
 </fetch>
 {% endfetchxml %}
-{% assign ev_now_num   = 'now' | date: 'yyyyMMddHHmm' | plus: 0 %}
+{% comment %}── plus: 0 на строке конкатенирует ("2026…"+"0"), нужен настоящий каст; decimal, а не integer: 12 знаков не влезают в Int32 ──{% endcomment %}
+{% assign ev_now_num   = 'now' | date: 'yyyyMMddHHmm' | decimal %}
 {% assign ev_ru_months = 'янв,фев,мар,апр,мая,июн,июл,авг,сен,окт,ноя,дек' | split: ',' %}
 
-{% comment %}── Траектория развития: первая активная траектория + её курсы-шаги ──{% endcomment %}
+{% comment %}── Курсы для секции «Доступные курсы» (уроки сгруппированы по курсам) ──{% endcomment %}
+{% fetchxml home_courses %}
+<fetch top="100">
+  <entity name="msdynce_course">
+    <attribute name="msdynce_courseid" />
+    <attribute name="msdynce_coursename" />
+    <attribute name="msdynce_coursecategory" />
+    <filter><condition attribute="statuscode" operator="eq" value="1" /></filter>
+    <order attribute="msdynce_coursename" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Траектория развития: активная траектория для роли пользователя (или общая) ──{% endcomment %}
+{% comment %}── Коды new_targetrole собираем из ролей портала: «Все» плюс роли текущего пользователя ──{% endcomment %}
+{% capture traj_role_values %}<value>100000000</value>{% if user.roles contains 'Новый сотрудник' %}<value>100000001</value>{% endif %}{% if user.roles contains 'Наставник' %}<value>100000002</value>{% endif %}{% if user.roles contains 'Руководитель' %}<value>100000003</value>{% endif %}{% if user.roles contains 'HR' %}<value>100000004</value>{% endif %}{% endcapture %}
 {% fetchxml home_trajs %}
 <fetch top="1">
   <entity name="new_trajectory">
     <attribute name="new_trajectoryid" />
     <attribute name="new_name" />
-    <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
+    <filter type="and">
+      <condition attribute="new_isactive" operator="eq" value="1" />
+      <filter type="or">
+        <condition attribute="new_targetrole" operator="null" />
+        <condition attribute="new_targetrole" operator="in">{{ traj_role_values }}</condition>
+      </filter>
+    </filter>
     <order attribute="new_name" />
   </entity>
 </fetch>
@@ -227,7 +240,7 @@
   </fetch>
   {% endfetchxml %}
   {% fetchxml home_tlinked %}
-  <fetch>
+  <fetch top="200">
     <entity name="new_h5pcontent">
       <attribute name="new_h5pcontentid" />
       <attribute name="new_relatedcourse" />
@@ -385,7 +398,8 @@
   <!-- HERO -->
   <div class="fv-hero" style="margin-bottom:24px;">
     <span class="fv-hero-eyebrow">Добро пожаловать</span>
-    <h1>{{ user.firstname }}, у вас отличный темп — продолжайте!</h1>
+    {% comment %}── Данные из Dataverse выводим только через escape: имя редактируемо самим пользователем (self-XSS) ──{% endcomment %}
+    <h1>{{ user.firstname | escape }}, у вас отличный темп — продолжайте!</h1>
     <p>Ваш персональный центр обучения. Отслеживайте прогресс и открывайте новые знания.</p>
     <div class="fv-hero-stats">
       <div class="fv-hero-stat">
@@ -472,8 +486,8 @@
         <div class="fv-cont-grid">
           <div class="fv-cont-left">
             <span class="fv-card-eyebrow" style="color:#1E3A8A;">Продолжить обучение</span>
-            <h2 class="fv-cont-title">{{ last_lesson.new_name }}</h2>
-            <p class="fv-cont-sub">{{ last_lesson.new_librarytype | default: 'H5P' }} · вы остановились на этом уроке</p>
+            <h2 class="fv-cont-title">{{ last_lesson.new_name | escape }}</h2>
+            <p class="fv-cont-sub">{{ last_lesson.new_librarytype | default: 'Урок' | escape }} · вы остановились на этом уроке</p>
             {% if cont_pct >= 0 %}
             <div class="fv-cont-bar-row">
               <div class="fv-cont-track"><div class="fv-cont-fill" style="width:{{ cont_pct }}%;"></div></div>
@@ -489,10 +503,10 @@
           </div>
           <div class="fv-cont-cover">
             {% if last_lesson.new_thumbnailurl and last_lesson.new_thumbnailurl != '' %}
-              <img src="{{ last_lesson.new_thumbnailurl }}" alt="{{ last_lesson.new_name | escape }}" onerror="this.style.display='none'" />
+              <img src="{{ last_lesson.new_thumbnailurl | escape }}" alt="{{ last_lesson.new_name | escape }}" onerror="this.style.display='none'" />
             {% else %}
-              <span class="fv-cont-cover-label">{{ last_lesson.new_librarytype | default: 'H5P' }}</span>
-              <span class="fv-cont-cover-title">{{ last_lesson.new_name }}</span>
+              <span class="fv-cont-cover-label">{{ last_lesson.new_librarytype | default: 'Урок' | escape }}</span>
+              <span class="fv-cont-cover-title">{{ last_lesson.new_name | escape }}</span>
               <span class="fv-cont-chip"><i class="bi bi-award-fill"></i> +100 баллов</span>
             {% endif %}
           </div>
@@ -513,8 +527,8 @@
       <div class="fv-card mb-4">
         <div class="fv-card-head" style="padding-bottom:2px;">
           <div>
-            <span class="fv-card-eyebrow" style="color:#15803D;">Траектория развития</span>
-            <h2 class="fv-card-title">{% if has_traj %}{{ htraj.new_name | default: 'Ваш путь развития' }}{% else %}Ваш путь развития{% endif %}</h2>
+            <span class="fv-card-eyebrow" style="color:#15803D;">Рекомендуемая траектория</span>
+            <h2 class="fv-card-title">{% if has_traj %}{{ htraj.new_name | default: 'Ваш путь развития' | escape }}{% else %}Ваш путь развития{% endif %}</h2>
           </div>
           <a href="/paths" class="fv-card-link">Открыть полностью →</a>
         </div>
@@ -537,7 +551,7 @@
                   {% if is_done %}<div class="fv-path-dot" style="background:#15803D;color:#fff;border:4px solid #ECF6EF;"><i class="bi bi-check"></i></div>
                   {% elsif is_current %}<div class="fv-path-dot" style="background:#B45309;color:#fff;border:4px solid #FAF3E8;">{{ forloop.index }}</div>
                   {% else %}<div class="fv-path-dot" style="background:#fff;color:#475569;border:4px solid #E5E7EB;">{{ forloop.index }}</div>{% endif %}
-                  <div class="fv-path-lbl"{% if is_current %} style="font-weight:700;"{% endif %}>{{ c.msdynce_coursename | default: 'Курс' | truncate: 20 }}</div>
+                  <div class="fv-path-lbl"{% if is_current %} style="font-weight:700;"{% endif %}>{{ c.msdynce_coursename | default: 'Курс' | truncate: 20 | escape }}</div>
                   {% if is_current %}<div class="fv-path-now">сейчас</div>{% endif %}
                 </div>
                 {% endfor %}
@@ -560,84 +574,118 @@
         </div>
       </div>
 
-      <!-- LESSON GRID -->
+      <!-- ДОСТУПНЫЕ КУРСЫ (уроки сгруппированы по курсам) -->
       <div class="fv-sec-hdr">
         <div>
           <span class="fv-eyebrow" style="color:#B45309;">Каталог</span>
-          <h2 class="fv-sec-title">Доступные уроки</h2>
+          <h2 class="fv-sec-title">Доступные курсы</h2>
         </div>
-        <a href="/h5p-catalog" class="fv-card-link">Весь каталог →</a>
+        <a href="/courses" class="fv-card-link">Все курсы →</a>
       </div>
+
+      {% comment %}── Уникальные завершённые уроки пользователя ──{% endcomment %}
+      {% assign hc_done = '|' %}
+      {% for p in user_progress.results.entities %}
+        {% if p.new_completion and p.new_h5pcontent %}
+          {% assign hcpid = p.new_h5pcontent.id %}
+          {% unless hc_done contains hcpid %}{% assign hc_done = hc_done | append: hcpid | append: '|' %}{% endunless %}
+        {% endif %}
+      {% endfor %}
+
       <div class="row g-3">
-        {% assign card_count = 0 %}
-        {% for item in h5p_all.results.entities %}
-          {% if card_count < 6 %}
-            {% assign lesson_status = 'not_started' %}
-            {% assign found_status = false %}
-            {% for p in user_progress.results.entities %}
-              {% unless found_status %}
-                {% if p.new_h5pcontent.id == item.id %}
-                  {% assign found_status = true %}
-                  {% if p.new_completion %}
-                    {% assign lesson_status = 'completed' %}
-                  {% else %}
-                    {% assign lesson_status = 'in_progress' %}
-                  {% endif %}
-                {% endif %}
-              {% endunless %}
+        {% assign ccount = 0 %}
+        {% for crs in home_courses.results.entities %}
+          {% if ccount < 6 %}
+            {% assign hcid = crs.msdynce_courseid %}
+            {% assign hc_total = 0 %}{% assign hc_ok = 0 %}
+            {% for item in h5p_all.results.entities %}
+              {% if item.new_relatedcourse and item.new_relatedcourse.id == hcid %}
+                {% assign hc_total = hc_total | plus: 1 %}
+                {% if hc_done contains item.new_h5pcontentid %}{% assign hc_ok = hc_ok | plus: 1 %}{% endif %}
+              {% endif %}
             {% endfor %}
-            {% assign cov_mod = card_count | modulo: 4 %}
-            {% case cov_mod %}
-              {% when 0 %}{% assign cov = 'paper' %}{% assign cov_dark = false %}
-              {% when 1 %}{% assign cov = 'navy' %}{% assign cov_dark = true %}
-              {% when 2 %}{% assign cov = 'warm' %}{% assign cov_dark = false %}
-              {% else %}{% assign cov = 'slate' %}{% assign cov_dark = true %}
-            {% endcase %}
-            <div class="col-6 col-md-4">
-              <a href="/h5p-player?id={{ item.new_h5pcontentid }}" class="fv-lesson-card">
-                {% if item.new_thumbnailurl and item.new_thumbnailurl != '' %}
-                <div class="fv-lesson-thumb">
-                  <img src="{{ item.new_thumbnailurl }}" alt="{{ item.new_name | escape }}" onerror="this.style.display='none'" />
-                  {% if lesson_status == 'completed' %}
-                    <span class="fv-lesson-badge" style="background:#15803D;color:#fff;"><i class="bi bi-check2"></i></span>
-                  {% elsif lesson_status == 'in_progress' %}
-                    <span class="fv-lesson-badge" style="background:#1E3A8A;color:#fff;"><i class="bi bi-play-fill"></i></span>
-                  {% endif %}
-                </div>
-                {% else %}
-                <div class="fv-cover fv-cover--{{ cov }}">
-                  <span class="fv-cover-label" style="color:{% if cov_dark %}rgba(255,255,255,0.7){% else %}#94A3B8{% endif %};">{{ item.new_librarytype | default: 'H5P' }}</span>
-                  <span class="fv-cover-title" style="color:{% if cov_dark %}#FFFFFF{% else %}#0B1220{% endif %};">{{ item.new_name }}</span>
-                  {% if lesson_status == 'completed' %}
-                    <span class="fv-lesson-badge" style="background:#15803D;color:#fff;"><i class="bi bi-check2"></i></span>
-                  {% elsif lesson_status == 'in_progress' %}
-                    <span class="fv-lesson-badge" style="background:#1E3A8A;color:#fff;"><i class="bi bi-play-fill"></i></span>
-                  {% endif %}
-                </div>
-                {% endif %}
-                <div class="fv-lesson-body">
-                  <span class="fv-lesson-type">{{ item.new_librarytype | default: 'H5P' }}{% if item.new_durationseconds and item.new_durationseconds >= 60 %} · {{ item.new_durationseconds | divided_by: 60 }} мин{% endif %}</span>
-                  <span class="fv-lesson-title">{{ item.new_name }}</span>
-                  {% if item.new_description %}<span class="fv-lesson-desc">{{ item.new_description }}</span>{% endif %}
-                </div>
-                <div class="fv-lesson-foot">
-                  <span class="fv-lesson-status">
-                  {% if lesson_status == 'completed' %}
-                    <i class="bi bi-check-circle-fill" style="color:#15803D;"></i> Завершён
-                  {% elsif lesson_status == 'in_progress' %}
-                    <i class="bi bi-play-circle-fill" style="color:#1E3A8A;"></i> В процессе
-                  {% else %}
-                    <i class="bi bi-circle" style="color:#64748B;"></i> Не начат
-                  {% endif %}
-                  </span>
-                  <span class="fv-lesson-pts"><i class="bi bi-award-fill" aria-hidden="true"></i> +100</span>
-                </div>
-              </a>
+            {% if hc_total > 0 %}
+              {% assign hc_pct = hc_ok | times: 100 | divided_by: hc_total %}
+              {% assign cov_mod = ccount | modulo: 4 %}
+              {% case cov_mod %}
+                {% when 0 %}{% assign cov = 'paper' %}{% assign cov_dark = false %}
+                {% when 1 %}{% assign cov = 'navy' %}{% assign cov_dark = true %}
+                {% when 2 %}{% assign cov = 'warm' %}{% assign cov_dark = false %}
+                {% else %}{% assign cov = 'slate' %}{% assign cov_dark = true %}
+              {% endcase %}
+              {% assign hcat = '' %}{% if crs.msdynce_coursecategory %}{% assign hcat = crs.msdynce_coursecategory.label | default: '' %}{% endif %}
+      <div class="col-6 col-md-4">
+        <a href="/course-details?id={{ hcid }}" class="fv-lesson-card">
+          <div class="fv-cover fv-cover--{{ cov }}" style="position:relative;overflow:hidden;">
+            <img src="/_api/msdynce_courses({{ hcid }})/msdynce_entityimage/$value?size=full" alt="" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;" onload="this.nextElementSibling.style.display='block';this.parentElement.querySelectorAll('.fv-cover-label,.fv-cover-title').forEach(function(e){e.style.color='#fff';e.style.textShadow='0 1px 3px rgba(0,0,0,.45)';})" onerror="this.remove()">
+            <span style="display:none;position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,18,32,.15) 0%,rgba(11,18,32,.55) 100%);z-index:1;"></span>
+            <span class="fv-cover-label" style="position:relative;z-index:2;color:{% if cov_dark %}rgba(255,255,255,0.7){% else %}#94A3B8{% endif %};">{{ hcat | default: 'Курс' | escape }}</span>
+            <span class="fv-cover-title" style="position:relative;z-index:2;color:{% if cov_dark %}#FFFFFF{% else %}#0B1220{% endif %};">{{ crs.msdynce_coursename | escape }}</span>
+            {% if hc_pct == 100 %}<span class="fv-lesson-badge" style="background:#15803D;color:#fff;z-index:2;"><i class="bi bi-check2"></i></span>
+            {% elsif hc_ok > 0 %}<span class="fv-lesson-badge" style="background:#1E3A8A;color:#fff;z-index:2;"><i class="bi bi-play-fill"></i></span>{% endif %}
+          </div>
+          <div class="fv-lesson-body">
+            <span class="fv-lesson-type">{% if hcat != '' %}{{ hcat | escape }}{% else %}Курс{% endif %} · {{ hc_total }} урок{% if hc_total >= 2 and hc_total < 5 %}а{% elsif hc_total >= 5 %}ов{% endif %}</span>
+            <span class="fv-lesson-title">{{ crs.msdynce_coursename | escape }}</span>
+          </div>
+          <div class="fv-lesson-foot" style="flex-direction:column;align-items:stretch;gap:6px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;">
+              <span class="fv-lesson-status">
+                {% if hc_pct == 100 %}<i class="bi bi-check-circle-fill" style="color:#15803D;"></i> Пройден
+                {% elsif hc_ok > 0 %}<i class="bi bi-play-circle-fill" style="color:#1E3A8A;"></i> {{ hc_ok }}/{{ hc_total }} · {{ hc_pct }}%
+                {% else %}<i class="bi bi-circle" style="color:#64748B;"></i> Не начат{% endif %}
+              </span>
+              <span class="fv-lesson-pts"><i class="bi bi-award-fill" aria-hidden="true"></i> +{{ hc_total | times: 100 }}</span>
             </div>
-            {% assign card_count = card_count | plus: 1 %}
+            <div style="height:5px;border-radius:999px;background:#F1F5F9;overflow:hidden;">
+              <div style="height:100%;width:{{ hc_pct }}%;border-radius:999px;background:{% if hc_pct == 100 %}#15803D{% else %}linear-gradient(90deg,#15803D,#D97706){% endif %};"></div>
+            </div>
+          </div>
+        </a>
+      </div>
+              {% assign ccount = ccount | plus: 1 %}
+            {% endif %}
           {% endif %}
         {% endfor %}
+
+        {% comment %}── Отдельные уроки без курса (если есть) ──{% endcomment %}
+        {% assign solo_count = 0 %}
+        {% for item in h5p_all.results.entities %}
+          {% unless item.new_relatedcourse %}{% assign solo_count = solo_count | plus: 1 %}{% endunless %}
+        {% endfor %}
+        {% if ccount == 0 and solo_count == 0 %}
+        <div class="col-12"><div style="text-align:center;padding:28px 12px;color:#94A3B8;font-size:13px;background:#fff;border:1px solid #E5E7EB;border-radius:12px;">Курсы скоро появятся.</div></div>
+        {% endif %}
       </div>
+
+      {% if solo_count > 0 %}
+      <div class="fv-sec-hdr" style="margin-top:18px;">
+        <div><h2 class="fv-sec-title" style="font-size:15px;">Отдельные уроки</h2></div>
+        <a href="/h5p-catalog" class="fv-card-link">Все уроки →</a>
+      </div>
+      <div class="row g-3">
+        {% assign scount = 0 %}
+        {% for item in h5p_all.results.entities %}
+          {% unless item.new_relatedcourse %}
+            {% if scount < 3 %}
+        <div class="col-6 col-md-4">
+          <a href="/h5p-player?id={{ item.new_h5pcontentid }}" class="fv-lesson-card">
+            <div class="fv-lesson-body">
+              <span class="fv-lesson-type">{{ item.new_librarytype | default: 'Урок' | escape }}{% if item.new_durationseconds and item.new_durationseconds >= 60 %} · {{ item.new_durationseconds | divided_by: 60 }} мин{% endif %}</span>
+              <span class="fv-lesson-title">{{ item.new_name | escape }}</span>
+            </div>
+            <div class="fv-lesson-foot">
+              <span class="fv-lesson-status">{% if hc_done contains item.new_h5pcontentid %}<i class="bi bi-check-circle-fill" style="color:#15803D;"></i> Завершён{% else %}<i class="bi bi-circle" style="color:#64748B;"></i> Не начат{% endif %}</span>
+              <span class="fv-lesson-pts"><i class="bi bi-award-fill" aria-hidden="true"></i> +100</span>
+            </div>
+          </a>
+        </div>
+              {% assign scount = scount | plus: 1 %}
+            {% endif %}
+          {% endunless %}
+        {% endfor %}
+      </div>
+      {% endif %}
 
     </div><!-- /col-lg-8 -->
 
@@ -656,12 +704,13 @@
         <div class="fv-card-body" style="padding-top:4px;">
           {% assign ev_shown = 0 %}
           {% for e in home_events.results.entities %}
-            {% assign esn = e.new_startdatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
-            {% assign een = e.new_enddatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+            {% assign esn = e.new_startdatetime | date: 'yyyyMMddHHmm' | decimal %}
+            {% assign een = e.new_enddatetime | date: 'yyyyMMddHHmm' | decimal %}
             {% assign epast = false %}
-            {% if een > 0 %}{% if ev_now_num > een %}{% assign epast = true %}{% endif %}{% else %}{% if ev_now_num > esn %}{% assign epast = true %}{% endif %}{% endif %}
+            {% comment %}── Наличие даты окончания проверяем по самому полю: een после каста пусто, а не 0 ──{% endcomment %}
+            {% if e.new_enddatetime %}{% if ev_now_num > een %}{% assign epast = true %}{% endif %}{% else %}{% if ev_now_num > esn %}{% assign epast = true %}{% endif %}{% endif %}
             {% unless epast %}{% if ev_shown < 3 %}
-              {% assign elive  = false %}{% if een > 0 and ev_now_num >= esn and ev_now_num <= een %}{% assign elive = true %}{% endif %}
+              {% assign elive  = false %}{% if e.new_enddatetime %}{% if ev_now_num >= esn and ev_now_num <= een %}{% assign elive = true %}{% endif %}{% endif %}
               {% assign eday   = e.new_startdatetime | date: 'dd' %}
               {% assign emon_s = e.new_startdatetime | date: 'MM' %}
               {% case emon_s %}{% when '01' %}{% assign emon = 'янв' %}{% when '02' %}{% assign emon = 'фев' %}{% when '03' %}{% assign emon = 'мар' %}{% when '04' %}{% assign emon = 'апр' %}{% when '05' %}{% assign emon = 'мая' %}{% when '06' %}{% assign emon = 'июн' %}{% when '07' %}{% assign emon = 'июл' %}{% when '08' %}{% assign emon = 'авг' %}{% when '09' %}{% assign emon = 'сен' %}{% when '10' %}{% assign emon = 'окт' %}{% when '11' %}{% assign emon = 'ноя' %}{% else %}{% assign emon = 'дек' %}{% endcase %}
@@ -670,9 +719,9 @@
           <div class="fv-ev-row">
             <div class="fv-ev-date"><div class="fv-ev-day">{{ eday }}</div><div class="fv-ev-mon">{{ emon }}</div></div>
             <div style="flex:1;min-width:0;">
-              {% if elive %}<span class="fv-ev-tag" style="background:#FBEAEA;color:#B91C1C;">live</span>{% else %}<span class="fv-ev-tag" style="background:#EEF2F9;color:#1E3A8A;">{{ etype }}</span>{% endif %}
-              <div class="fv-ev-name">{{ e.new_name | default: 'Событие' }}</div>
-              <div class="fv-ev-time">{{ etime }}{% if e.new_location %} · {{ e.new_location }}{% endif %}</div>
+              {% if elive %}<span class="fv-ev-tag" style="background:#FBEAEA;color:#B91C1C;">live</span>{% else %}<span class="fv-ev-tag" style="background:#EEF2F9;color:#1E3A8A;">{{ etype | escape }}</span>{% endif %}
+              <div class="fv-ev-name">{{ e.new_name | default: 'Событие' | escape }}</div>
+              <div class="fv-ev-time">{{ etime }}{% if e.new_location %} · {{ e.new_location | escape }}{% endif %}</div>
             </div>
           </div>
               {% assign ev_shown = ev_shown | plus: 1 %}
@@ -691,19 +740,20 @@
       <div class="fv-card mb-4">
         <div class="fv-card-head" style="padding-bottom:12px;">
           <div>
-            <span class="fv-card-eyebrow" style="color:#D97706;">Рейтинг {{ fv_mon }}</span>
+            <span class="fv-card-eyebrow" style="color:#D97706;">Рейтинг за всё время</span>
             <h2 class="fv-card-title">Лидеры</h2>
           </div>
           <a href="/leaderboard" class="fv-card-link">Полный рейтинг →</a>
         </div>
         <div class="fv-card-body" style="padding-top:4px;">
+          {% comment %}── fullname/jobtitle контакта редактирует сам пользователь, поэтому в HTML только через escape ──{% endcomment %}
           {% if lb_count > 0 %}
             {% if lb_top1_c >= 0 %}
             <div class="fv-lb-row first">
               <span class="fv-lb-medal">🥇</span>
               <div style="flex:1;min-width:0;">
-                <div class="fv-lb-name">{{ lb_top1_n }}</div>
-                {% if lb_top1_j != '' %}<div class="fv-lb-job">{{ lb_top1_j }}</div>{% endif %}
+                <div class="fv-lb-name">{{ lb_top1_n | escape }}</div>
+                {% if lb_top1_j != '' %}<div class="fv-lb-job">{{ lb_top1_j | escape }}</div>{% endif %}
               </div>
               <span class="fv-lb-pts">{{ lb_top1_c }}</span>
             </div>
@@ -712,8 +762,8 @@
             <div class="fv-lb-row">
               <span class="fv-lb-medal">🥈</span>
               <div style="flex:1;min-width:0;">
-                <div class="fv-lb-name">{{ lb_top2_n }}</div>
-                {% if lb_top2_j != '' %}<div class="fv-lb-job">{{ lb_top2_j }}</div>{% endif %}
+                <div class="fv-lb-name">{{ lb_top2_n | escape }}</div>
+                {% if lb_top2_j != '' %}<div class="fv-lb-job">{{ lb_top2_j | escape }}</div>{% endif %}
               </div>
               <span class="fv-lb-pts">{{ lb_top2_c }}</span>
             </div>
@@ -722,8 +772,8 @@
             <div class="fv-lb-row">
               <span class="fv-lb-medal">🥉</span>
               <div style="flex:1;min-width:0;">
-                <div class="fv-lb-name">{{ lb_top3_n }}</div>
-                {% if lb_top3_j != '' %}<div class="fv-lb-job">{{ lb_top3_j }}</div>{% endif %}
+                <div class="fv-lb-name">{{ lb_top3_n | escape }}</div>
+                {% if lb_top3_j != '' %}<div class="fv-lb-job">{{ lb_top3_j | escape }}</div>{% endif %}
               </div>
               <span class="fv-lb-pts">{{ lb_top3_c }}</span>
             </div>

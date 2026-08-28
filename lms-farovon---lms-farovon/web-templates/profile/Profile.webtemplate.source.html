@@ -16,7 +16,9 @@
 </div>
 {% else %}
 
-{% comment %}── 1. Completed lessons (for coins + activity) ──{% endcomment %}
+{% comment %}── 1. Completed lessons (for coins + activity) ──
+   link-type="outer" обязателен: inner join выбрасывал прогресс с пустым/удалённым уроком,
+   из-за чего «Монет заработано» и счётчик уроков были занижены ──{% endcomment %}
 {% fetchxml completed_lessons %}
 <fetch>
   <entity name="new_h5pprogress">
@@ -24,7 +26,7 @@
     <attribute name="new_scorescaled" />
     <attribute name="new_lastupdated" />
     <attribute name="new_h5pcontent" />
-    <link-entity name="new_h5pcontent" from="new_h5pcontentid" to="new_h5pcontent" alias="lc">
+    <link-entity name="new_h5pcontent" from="new_h5pcontentid" to="new_h5pcontent" alias="lc" link-type="outer">
       <attribute name="new_name" />
     </link-entity>
     <filter>
@@ -36,7 +38,21 @@
 </fetch>
 {% endfetchxml %}
 
-{% comment %}── 2. Purchases ──{% endcomment %}
+{% comment %}── 2. Purchases ──
+   spent_all — БЕЗ top: баланс и «Покупок совершено» обязаны считаться по ВСЕМ покупкам.
+   С top="10" потраченное недосчитывалось и баланс в профиле расходился с шапкой и магазином ──{% endcomment %}
+{% fetchxml spent_all %}
+<fetch>
+  <entity name="new_rewardpurchase">
+    <attribute name="new_pointsspent" />
+    <filter>
+      <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}my_purchases — только для списка «История покупок» (последние 10){% endcomment %}
 {% fetchxml my_purchases %}
 <fetch top="10">
   <entity name="new_rewardpurchase">
@@ -69,7 +85,8 @@
 
 {% assign total_spent = 0 %}
 {% assign purchase_count = 0 %}
-{% for pur in my_purchases.results.entities %}
+{% comment %}считаем по spent_all, а не по my_purchases: тот обрезан top="10"{% endcomment %}
+{% for pur in spent_all.results.entities %}
   {% assign total_spent = total_spent | plus: pur.new_pointsspent %}
   {% assign purchase_count = purchase_count | plus: 1 %}
 {% endfor %}
@@ -81,7 +98,10 @@
 {% assign name_parts = fullname | split: ' ' %}
 {% assign initials = '' %}
 {% if name_parts.size >= 2 %}
-  {% assign initials = name_parts[0] | slice: 0 | append: name_parts[1] | slice: 0 | upcase %}
+  {% comment %}тремя assign: в одной цепочке второй slice резал уже склеенную строку до 1 буквы{% endcomment %}
+  {% assign i1 = name_parts[0] | slice: 0, 1 | upcase %}
+  {% assign i2 = name_parts[1] | slice: 0, 1 | upcase %}
+  {% assign initials = i1 | append: i2 %}
 {% else %}
   {% assign initials = fullname | slice: 0, 2 | upcase %}
 {% endif %}
@@ -309,7 +329,7 @@
             <div class="fv-purchase-emoji">{{ ri_emoji }}</div>
             <div style="flex:1;min-width:0;">
               <p class="fv-purchase-name">{{ ri_name }}</p>
-              <div class="fv-purchase-date">{{ pur.createdon }}</div>
+              <div class="fv-purchase-date">{{ pur.createdon | date_add_hours: 5 | date: 'dd.MM.yyyy, HH:mm' }}</div>
             </div>
             <div class="fv-purchase-cost">
               <i class="bi bi-award-fill fv-coin-img-xs" aria-hidden="true"></i>

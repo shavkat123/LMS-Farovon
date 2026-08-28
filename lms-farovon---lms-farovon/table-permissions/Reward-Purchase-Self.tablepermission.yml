@@ -1,17 +1,35 @@
+# ЕДИНСТВЕННОЕ живое право на new_rewardpurchase: Reward-Purchase деактивирован как полный дубль,
+# Reward-Purchase-via-Item деактивирован (он давал write на ЧУЖИЕ покупки: scope Parental,
+# а родитель Reward Item Read — Global read на весь каталог для всех ролей).
+#
+# Scope Contact: пользователь видит и создаёт ТОЛЬКО свои покупки. Схемное имя связи
+# new_rewardpurchase -> contact по полю new_user подтверждено в Power Apps
+# (Таблицы -> Reward Purchase -> Связи -> многие-к-одному -> Contact -> «Имя отношения»).
+# Все потребители (header, user-portal-sidebar, profile, rewards-shop) и так фильтруют по
+# new_user eq user.id, поэтому переход на Contact их не меняет.
+#
+# adx_write: false — магазину запись не нужна, он делает только POST (create). Правка чужого
+# списания через PATCH закрыта и правом, и scope.
+#
+# Список ролей свёрнут до Authenticated Users: это встроенная роль, которая выдаётся каждому
+# вошедшему, поэтому HR/Наставник/Руководитель/Новый сотрудник/Администратор получают доступ
+# через неё, а перечисление ролей больше не нужно поддерживать.
+#
+# ВНИМАНИЕ при деплое: если админам понадобится отчётность по чужим покупкам, заводить отдельное
+# Global read-only право — расширять это обратно на Global нельзя.
+adx_accountrelationship:
 adx_append: true
 adx_appendto: true
+adx_contactrelationship: new_rewardpurchase_user_contact
 adx_create: true
 adx_delete: false
 adx_entitylogicalname: new_rewardpurchase
 adx_entityname: Reward Purchase Self
 adx_entitypermission_webrole:
 - 2ccfddf9-a538-f111-88b5-7ced8d76b3cc
-- 3b5fe5f3-a538-f111-88b5-7ced8d76b3cc
-- a1b2c3d4-1111-2222-3333-000000000001
-- a1b2c3d4-1111-2222-3333-000000000002
-- a1b2c3d4-1111-2222-3333-000000000003
-- a1b2c3d4-1111-2222-3333-000000000004
 adx_entitypermissionid: b2c3d4e5-f6a7-4b89-9c01-200000000002
+adx_parententitypermission:
+adx_parentrelationship:
 adx_read: true
-adx_scope: 756150000
-adx_write: true
+adx_scope: 756150001
+adx_write: false

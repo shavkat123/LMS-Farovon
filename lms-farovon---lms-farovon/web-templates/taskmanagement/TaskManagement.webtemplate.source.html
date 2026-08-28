@@ -29,9 +29,37 @@
 </fetch>
 {% endfetchxml %}
 
+{% comment %}── Контакты для выбора исполнителя в модалке: read по contact даёт Contacts Admin Manage (те же роли, что и гейт страницы) ──{% endcomment %}
+{% fetchxml assignees %}
+<fetch top="200">
+  <entity name="contact">
+    <attribute name="contactid" />
+    <attribute name="fullname" />
+    <filter>
+      <condition attribute="statecode" operator="eq" value="0" />
+    </filter>
+    <order attribute="fullname" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
 {% assign tasks_count = 0 %}
 {% for t in all_tasks.results.entities %}
   {% assign tasks_count = tasks_count | plus: 1 %}
+{% endfor %}
+
+{% comment %}
+  Метки приоритета берём из реальных записей: локальный OptionSet из Liquid не перечислить,
+  а выдумывать подписи нельзя. Нет ни одной задачи с приоритетом — поле в форме не показываем.
+{% endcomment %}
+{% assign prio_lbl_0 = '' %}{% assign prio_lbl_1 = '' %}{% assign prio_lbl_2 = '' %}{% assign prio_lbl_3 = '' %}
+{% for t in all_tasks.results.entities %}
+  {% case t.new_priority.value %}
+    {% when 100000000 %}{% assign prio_lbl_0 = t.new_priority.label %}
+    {% when 100000001 %}{% assign prio_lbl_1 = t.new_priority.label %}
+    {% when 100000002 %}{% assign prio_lbl_2 = t.new_priority.label %}
+    {% when 100000003 %}{% assign prio_lbl_3 = t.new_priority.label %}
+  {% endcase %}
 {% endfor %}
 
 <style>
@@ -74,6 +102,21 @@
   .fv-tm-card-due { display: flex; align-items: center; gap: 4px; }
   .fv-tm-card-due.urgent { color: #DC2626; font-weight: 600; }
   .fv-tm-card-priority { width: 4px; height: 18px; border-radius: 2px; display: inline-block; vertical-align: middle; margin-right: 4px; }
+
+  /* drag-n-drop реализован, поэтому cursor: grab на карточке больше не обманывает */
+  .fv-tm-cards { min-height: 60px; }
+  .fv-tm-card.is-dragging { opacity: .5; cursor: grabbing; }
+  .fv-tm-card.is-saving { opacity: .55; pointer-events: none; }
+  .fv-tm-col.is-over { outline: 2px dashed #1E3A8A; outline-offset: -4px; background: #EEF2F9; }
+
+  .fv-tm-modal { display: none; position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: rgba(11,18,32,.45); z-index: 1050; align-items: center; justify-content: center; padding: 16px; }
+  .fv-tm-modal-box { background: #fff; border-radius: 14px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; padding: 20px 22px; }
+  .fv-tm-modal-box h3 { font-size: 16px; font-weight: 700; color: #0B1220; margin: 0 0 14px; }
+  .fv-tm-fld { margin-bottom: 12px; }
+  .fv-tm-fld label { display: block; font-size: 11px; font-weight: 600; color: #64748B; margin-bottom: 4px; }
+  .fv-tm-fld input, .fv-tm-fld select, .fv-tm-fld textarea { width: 100%; border: 1px solid #E5E7EB; border-radius: 8px; padding: 8px 10px; font-size: 13px; color: #0B1220; font-family: inherit; background: #fff; }
+  .fv-tm-modal-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+  .fv-tm-err { display: none; background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; border-radius: 8px; padding: 8px 10px; font-size: 12px; margin-bottom: 10px; }
 </style>
 
 <div class="fv-tm container-fluid px-3 px-md-4">
@@ -93,7 +136,8 @@
     </div>
     <div class="fv-tm-toolbar">
       <button class="fv-tm-btn" type="button" disabled><i class="bi bi-funnel"></i> Фильтр</button>
-      <a class="fv-tm-btn primary" href="/task-edit" role="button"><i class="bi bi-plus-lg"></i> Новая задача</a>
+      {% comment %}страницы /task-edit в портале нет — задача создаётся модалкой через Web API new_tasks{% endcomment %}
+      <button class="fv-tm-btn primary" type="button" id="fvTmNew"><i class="bi bi-plus-lg"></i> Новая задача</button>
     </div>
   </div>
 
@@ -119,21 +163,26 @@
       {% comment %}── Count tasks in this column ──{% endcomment %}
       {% assign col_count = 0 %}
       {% for t in all_tasks.results.entities %}
-        {% if t.new_taskstatus == col_status %}{% assign col_count = col_count | plus: 1 %}{% endif %}
+        {% comment %}
+          Choice-поле в Liquid — объект, а не число: сравнивать нужно .value.
+          Прямое `t.new_taskstatus == 100000000` всегда false → колонки были пустыми.
+        {% endcomment %}
+        {% if t.new_taskstatus.value == col_status %}{% assign col_count = col_count | plus: 1 %}{% endif %}
       {% endfor %}
 
-      <div class="fv-tm-col">
+      <div class="fv-tm-col" data-status="{{ col_status }}">
         <div class="fv-tm-col-head">
           <div class="fv-tm-col-name"><span class="fv-tm-col-dot" style="background:{{ col_color }};"></span>{{ col_label }}</div>
           <span class="fv-tm-col-count">{{ col_count }}</span>
         </div>
+        <div class="fv-tm-cards" data-status="{{ col_status }}">
 
         {% comment %}── Real task cards in this column ──{% endcomment %}
         {% for t in all_tasks.results.entities %}
-          {% if t.new_taskstatus == col_status %}
+          {% if t.new_taskstatus.value == col_status %}
             {% comment %}─ Priority colour ─{% endcomment %}
             {% assign prio_color = '#94A3B8' %}
-            {% case t.new_priority %}
+            {% case t.new_priority.value %}
               {% when 100000000 %}{% assign prio_color = '#94A3B8' %}
               {% when 100000001 %}{% assign prio_color = '#2563EB' %}
               {% when 100000002 %}{% assign prio_color = '#D97706' %}
@@ -163,10 +212,12 @@
               {% assign due_text = t.new_duedate | date: 'd MMM' %}
             {% endif %}
 
-            <div class="fv-tm-card">
-              {% if cat != '' %}<span class="fv-tm-card-tag" style="background:{{ tag_bg }};color:{{ tag_fg }};">{{ cat }}</span>{% endif %}
+            {% comment %}data-tid нужен для PATCH статуса при переносе карточки в другую колонку{% endcomment %}
+            <div class="fv-tm-card" draggable="true" data-tid="{{ t.new_taskid }}" data-status="{{ col_status }}" title="Перетащите карточку в другую колонку, чтобы сменить статус">
+              {% comment %}категория и название приходят из данных — только через escape, иначе хранимый XSS{% endcomment %}
+              {% if cat != '' %}<span class="fv-tm-card-tag" style="background:{{ tag_bg }};color:{{ tag_fg }};">{{ cat | escape }}</span>{% endif %}
               <h4 class="fv-tm-card-name">
-                <span class="fv-tm-card-priority" style="background:{{ prio_color }};"></span>{{ t.new_name }}
+                <span class="fv-tm-card-priority" style="background:{{ prio_color }};"></span>{{ t.new_name | escape }}
               </h4>
               <div class="fv-tm-card-meta">
                 {% if assignee_name != '' %}<span class="fv-tm-card-avatar" title="{{ assignee_name | escape }}">{{ ini1 }}{{ ini2 }}</span>{% else %}<span class="fv-tm-card-avatar" style="background:#CBD5E1;">?</span>{% endif %}
@@ -176,9 +227,9 @@
           {% endif %}
         {% endfor %}
 
-        {% if col_count == 0 %}
-          <div style="text-align:center;padding:20px 8px;font-size:11px;color:#64748B;">Нет задач</div>
-        {% endif %}
+          {% comment %}заглушку рендерим всегда — после переноса карточки её показывает/прячет JS{% endcomment %}
+          <div class="fv-tm-empty" style="text-align:center;padding:20px 8px;font-size:11px;color:#64748B;{% if col_count > 0 %}display:none;{% endif %}">Нет задач</div>
+        </div>
       </div>
     {% endfor %}
   </div>
@@ -191,5 +242,217 @@
   <span>Пока ни одной задачи. Добавь задачи в Dataverse — таблица <code>new_task</code> — и они появятся в досках.</span>
 </div>
 {% endif %}
+
+{% comment %}── Модалка создания задачи: страницы /task-edit в портале нет, пишем через Web API new_tasks ──{% endcomment %}
+<div class="fv-tm-modal" id="fvTmModal" role="dialog" aria-modal="true" aria-labelledby="fvTmModalTitle">
+  <div class="fv-tm-modal-box">
+    <h3 id="fvTmModalTitle">Новая задача</h3>
+    <div class="fv-tm-err" id="fvTmErr"></div>
+
+    <div class="fv-tm-fld">
+      <label for="fvTmF_name">Название <span style="color:#DC2626;">*</span></label>
+      <input type="text" id="fvTmF_name" maxlength="200" placeholder="Например: Пройти вводный курс">
+    </div>
+    <div class="fv-tm-fld">
+      <label for="fvTmF_desc">Описание</label>
+      <textarea id="fvTmF_desc" rows="3"></textarea>
+    </div>
+    <div class="fv-tm-fld">
+      <label for="fvTmF_status">Статус</label>
+      <select id="fvTmF_status">
+        <option value="{{ status_todo }}">К выполнению</option>
+        <option value="{{ status_doing }}">В работе</option>
+        <option value="{{ status_review }}">На проверке</option>
+        <option value="{{ status_done }}">Готово</option>
+      </select>
+    </div>
+    {% comment %}приоритет показываем, только если метки удалось взять из реальных записей — выдумывать подписи OptionSet нельзя{% endcomment %}
+    {% if prio_lbl_0 != '' or prio_lbl_1 != '' or prio_lbl_2 != '' or prio_lbl_3 != '' %}
+    <div class="fv-tm-fld">
+      <label for="fvTmF_prio">Приоритет</label>
+      <select id="fvTmF_prio">
+        <option value="">— не задан —</option>
+        {% if prio_lbl_0 != '' %}<option value="100000000">{{ prio_lbl_0 | escape }}</option>{% endif %}
+        {% if prio_lbl_1 != '' %}<option value="100000001">{{ prio_lbl_1 | escape }}</option>{% endif %}
+        {% if prio_lbl_2 != '' %}<option value="100000002">{{ prio_lbl_2 | escape }}</option>{% endif %}
+        {% if prio_lbl_3 != '' %}<option value="100000003">{{ prio_lbl_3 | escape }}</option>{% endif %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="fv-tm-fld">
+      <label for="fvTmF_cat">Категория</label>
+      <input type="text" id="fvTmF_cat" maxlength="100" placeholder="Обучение / Документы / Встреча…">
+    </div>
+    <div class="fv-tm-fld">
+      <label for="fvTmF_assignee">Исполнитель</label>
+      <select id="fvTmF_assignee">
+        <option value="">— не назначен —</option>
+        {% for a in assignees.results.entities %}
+        <option value="{{ a.contactid }}">{{ a.fullname | escape }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="fv-tm-fld">
+      <label for="fvTmF_due">Срок</label>
+      <input type="date" id="fvTmF_due">
+    </div>
+
+    <div class="fv-tm-modal-foot">
+      <button type="button" class="fv-tm-btn" id="fvTmCancel">Отмена</button>
+      <button type="button" class="fv-tm-btn primary" id="fvTmSave">Создать</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    function getToken() {
+      return fetch('/_layout/tokenhtml', { credentials: 'include' })
+        .then(function (r) { return r.text(); })
+        .then(function (h) { var m = h.match(/name="__RequestVerificationToken"[^>]*value="([^"]+)"/); return m ? m[1] : ''; });
+    }
+    function chk(res) { if (res.ok) { return res; } return res.text().then(function (t) { throw new Error('HTTP ' + res.status + ' — ' + t.slice(0, 200)); }); }
+
+    // счётчики колонок и заглушки «Нет задач» после переноса карточки пересчитываем на клиенте
+    function refreshCounts() {
+      Array.prototype.forEach.call(document.querySelectorAll('.fv-tm-col'), function (col) {
+        var n = col.querySelectorAll('.fv-tm-card').length;
+        var badge = col.querySelector('.fv-tm-col-count');
+        if (badge) { badge.textContent = n; }
+        var empty = col.querySelector('.fv-tm-empty');
+        if (empty) { empty.style.display = n > 0 ? 'none' : ''; }
+      });
+    }
+
+    // ── Drag-n-drop: перенос карточки = PATCH new_taskstatus. Без него cursor:grab обещал бы несуществующее ──
+    var dragged = null;
+
+    Array.prototype.forEach.call(document.querySelectorAll('.fv-tm-card'), function (card) {
+      card.addEventListener('dragstart', function (e) {
+        dragged = card;
+        card.classList.add('is-dragging');
+        try { e.dataTransfer.setData('text/plain', card.getAttribute('data-tid') || ''); } catch (ex) {}
+        if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; }
+      });
+      card.addEventListener('dragend', function () {
+        card.classList.remove('is-dragging');
+        dragged = null;
+        Array.prototype.forEach.call(document.querySelectorAll('.fv-tm-col.is-over'), function (c) { c.classList.remove('is-over'); });
+      });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('.fv-tm-col'), function (col) {
+      col.addEventListener('dragover', function (e) {
+        if (!dragged) { return; }
+        e.preventDefault();
+        if (e.dataTransfer) { e.dataTransfer.dropEffect = 'move'; }
+        col.classList.add('is-over');
+      });
+      col.addEventListener('dragleave', function (e) {
+        if (!col.contains(e.relatedTarget)) { col.classList.remove('is-over'); }
+      });
+      col.addEventListener('drop', function (e) {
+        e.preventDefault();
+        col.classList.remove('is-over');
+        var card = dragged;
+        if (!card) { return; }
+        var newStatus = col.getAttribute('data-status');
+        var oldStatus = card.getAttribute('data-status');
+        var tid = card.getAttribute('data-tid');
+        if (!newStatus || !tid || newStatus === oldStatus) { return; }
+
+        // запоминаем исходное место: если PATCH упадёт, доска не должна показывать несохранённый статус
+        var homeList = card.parentNode;
+        var homeNext = card.nextSibling;
+        var list = col.querySelector('.fv-tm-cards');
+        if (!list) { return; }
+        var empty = list.querySelector('.fv-tm-empty');
+        if (empty) { list.insertBefore(card, empty); } else { list.appendChild(card); }
+        card.classList.add('is-saving');
+        refreshCounts();
+
+        getToken().then(function (tok) {
+          return fetch('/_api/new_tasks(' + tid + ')', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', '__RequestVerificationToken': tok },
+            body: JSON.stringify({ new_taskstatus: parseInt(newStatus, 10) })
+          }).then(chk);
+        }).then(function () {
+          card.setAttribute('data-status', newStatus);
+          card.classList.remove('is-saving');
+        }).catch(function (err) {
+          if (homeNext) { homeList.insertBefore(card, homeNext); } else { homeList.appendChild(card); }
+          card.classList.remove('is-saving');
+          refreshCounts();
+          window.alert('Не удалось изменить статус задачи: ' + err.message);
+        });
+      });
+    });
+
+    refreshCounts();
+
+    // ── Создание задачи через Web API ──
+    var modal = document.getElementById('fvTmModal');
+    var openBt = document.getElementById('fvTmNew');
+    if (!modal || !openBt) { return; }
+    var errBox = document.getElementById('fvTmErr');
+    var saveBt = document.getElementById('fvTmSave');
+    function show() { modal.style.display = 'flex'; document.getElementById('fvTmF_name').focus(); }
+    function hide() { modal.style.display = 'none'; }
+    openBt.addEventListener('click', show);
+    document.getElementById('fvTmCancel').addEventListener('click', hide);
+    modal.addEventListener('click', function (e) { if (e.target === modal) { hide(); } });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && modal.style.display === 'flex') { hide(); } });
+
+    function postTask(payload, tok) {
+      return fetch('/_api/new_tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', '__RequestVerificationToken': tok },
+        body: JSON.stringify(payload)
+      }).then(chk);
+    }
+    function withBind(base, prop, aid) {
+      var o = {};
+      for (var k in base) { if (Object.prototype.hasOwnProperty.call(base, k)) { o[k] = base[k]; } }
+      o[prop + '@odata.bind'] = '/contacts(' + aid + ')';
+      return o;
+    }
+
+    saveBt.addEventListener('click', function () {
+      errBox.style.display = 'none';
+      var name = document.getElementById('fvTmF_name').value.trim();
+      if (!name) { errBox.textContent = 'Укажите название задачи.'; errBox.style.display = 'block'; return; }
+
+      var base = {
+        new_name: name,
+        new_description: document.getElementById('fvTmF_desc').value,
+        new_taskstatus: parseInt(document.getElementById('fvTmF_status').value, 10)
+      };
+      var cat = document.getElementById('fvTmF_cat').value.trim();
+      if (cat) { base.new_category = cat; }
+      // срок задачи по таймзоне не сдвигаем — отправляем ровно то, что выбрал пользователь
+      var due = document.getElementById('fvTmF_due').value;
+      if (due) { base.new_duedate = due; }
+      var pel = document.getElementById('fvTmF_prio');
+      if (pel && pel.value) { base.new_priority = parseInt(pel.value, 10); }
+      var aid = document.getElementById('fvTmF_assignee').value;
+
+      saveBt.disabled = true; saveBt.textContent = 'Создание…'; // блокируем двойной клик — иначе дубли задач
+      getToken().then(function (tok) {
+        if (!aid) { return postTask(base, tok); }
+        // регистр навигационного свойства lookup зависит от схемы — пробуем оба варианта
+        return postTask(withBind(base, 'new_assignee', aid), tok).catch(function () {
+          return postTask(withBind(base, 'new_Assignee', aid), tok);
+        });
+      }).then(function () {
+        location.reload();
+      }).catch(function (e) {
+        errBox.textContent = 'Ошибка сохранения: ' + e.message;
+        errBox.style.display = 'block';
+        saveBt.disabled = false; saveBt.textContent = 'Создать';
+      });
+    });
+  })();
+</script>
 
 {% endunless %}

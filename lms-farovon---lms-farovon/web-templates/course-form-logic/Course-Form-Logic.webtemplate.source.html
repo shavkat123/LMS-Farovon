@@ -10,6 +10,17 @@
   </entity>
 </fetch>
 {% endfetchxml %}
+
+{% comment %}
+  Роль "C1 ASP" может быть удалена/переименована: тогда entities[0] пуст и во второй запрос
+  уходил пустой GUID (список преподавателей молча пустой). Берём id только при наличии записи.
+{% endcomment %}
+{% assign instructorRoleId = '' %}
+{% if role.results and role.results.entities.size > 0 %}
+  {% assign instructorRoleId = role.results.entities[0].powerpagecomponentid %}
+{% endif %}
+
+{% if instructorRoleId != '' %}
 {% fetchxml instructors %}
 <fetch>
   <entity name='contact'>
@@ -20,7 +31,7 @@
         entityname='powerpagecomponent_mspp_webrole_contact'
         attribute='powerpagecomponentid'
         operator='eq'
-        value='{{role.results.entities[0].powerpagecomponentid}}'
+        value='{{ instructorRoleId }}'
       />
     </filter>
     <link-entity
@@ -34,20 +45,29 @@
   </entity>
 </fetch>
 {% endfetchxml %}
+{% endif %}
 
-<script>
-  
-  
-  
-  
-  
-//Save the instructors in an array to use on the webpage's JS
-var instructorsArr = [];
+<!-- Имена отдаём data-атрибутами: внутри тега script HTML-сущности не декодируются, поэтому
+     escape прямо в JS-строке дал бы битое имя, а без escape кавычка в ФИО ломает скрипт. -->
+<div id="instructorsData" hidden style="display:none;">
+{% if instructorRoleId != '' %}
 {% if instructors.results.entities %}
-{%for instructor in instructors.results.entities %}
- instructorsArr.push({id: "{{instructor.contactid}}", name: "{{instructor.fullname}}"});
+{% for instructor in instructors.results.entities %}
+<span class="instructor-item" data-id="{{ instructor.contactid }}" data-name="{{ instructor.fullname | xml_escape }}"></span>
 {% endfor %}
 {% endif %}
+{% endif %}
+</div>
+
+<script>
+//Save the instructors in an array to use on the webpage's JS
+var instructorsArr = [];
+Array.prototype.forEach.call(document.querySelectorAll('#instructorsData .instructor-item'), function (el) {
+    instructorsArr.push({ id: el.getAttribute('data-id'), name: el.getAttribute('data-name') || '' });
+});
+
+//GUID текущего контакта — подставляется на странице создания
+var currentUserContactId = "{{ user.contactid }}";
 
 var documentbodyContents;
 var selectedDays = [];
@@ -136,16 +156,50 @@ $(function () {
     oob_days.parent().parent().hide();
     oob_createBtn.remove();
 
+    //Синхронизируем наш чекбокс с сохранённым msdynce_frequency: без этого при открытии
+    //существующего курса галка всегда снята, и isRecurrent/блокировка enddate ниже врут.
+    //Значение "One-time" читаем из самого контрола (radio _0 на create, первая непустая опция
+    //select на edit/duplicate), чтобы не зашивать номер опции OptionSet в код.
+    var freqRadioOne = document.getElementById("msdynce_frequency_0");
+    var freqRadioRec = document.getElementById("msdynce_frequency_1");
+    var freqSelect = freqRadioOne ? null : document.getElementById("msdynce_frequency");
+    var oneTimeVal = null, recurringVal = null, currentFreqVal = null;
+    if (freqRadioOne) {
+        oneTimeVal = freqRadioOne.value;
+        recurringVal = freqRadioRec ? freqRadioRec.value : null;
+        if (freqRadioOne.checked) currentFreqVal = freqRadioOne.value;
+        else if (freqRadioRec && freqRadioRec.checked) currentFreqVal = freqRadioRec.value;
+    } else if (freqSelect && freqSelect.options) {
+        var freqOpts = [];
+        for (var fi = 0; fi < freqSelect.options.length; fi++) {
+            if (freqSelect.options[fi].value) freqOpts.push(freqSelect.options[fi].value);
+        }
+        oneTimeVal = freqOpts.length > 0 ? freqOpts[0] : null;
+        recurringVal = freqOpts.length > 1 ? freqOpts[1] : null;
+        currentFreqVal = freqSelect.value;
+    }
+    if (oneTimeVal !== null && currentFreqVal) {
+        document.getElementById("frequency").checked = (String(currentFreqVal) === String(oneTimeVal));
+    }
+
     //Populate instructor dropdown
     const instructorDropdown = $("#instructorname");
     instructorsArr.forEach(function (element, index, array) {
-        instructorDropdown.append('<option value="' + element.id + '">' + element.name + '</option>');
+        //.text() экранирует ФИО — строкой HTML вставлять нельзя
+        instructorDropdown.append($('<option>').val(element.id).text(element.name));
     });
 
-    {% if request.path contains 'create' %}
-    //On the create page, set the instructor to the current user
-    instructorDropdown.val("{{ user.contactid }}");
-    {% endif %}
+    if (instructorsArr.length === 0) {
+        //Роль "C1 ASP" не найдена или нет прав на powerpagecomponent: честно говорим,
+        //что список пуст, а не показываем пустой рабочий на вид выпадающий список
+        instructorDropdown.append($('<option>').val('').text('Список преподавателей недоступен'));
+    }
+
+    //request.path кешируется в шапке между страницами — какая это страница, решаем клиентски
+    if (currentUserContactId && location.pathname.toLowerCase().indexOf('create-course') !== -1) {
+        //On the create page, set the instructor to the current user
+        instructorDropdown.val(currentUserContactId);
+    }
 
     //Populate days field
     const daysContainer = $(".day-container");
@@ -223,6 +277,13 @@ $(function () {
     let endDateInput = document.getElementById("enddate");
     $("#frequency").on("change", function () {
         let daysCheckboxes = document.getElementsByClassName("day-of-week");
+        //Пишем выбор обратно в OOB-поле: сохраняется msdynce_frequency, а не наш чекбокс
+        if (freqRadioOne) {
+            freqRadioOne.checked = this.checked;
+            if (freqRadioRec) freqRadioRec.checked = !this.checked;
+        } else if (freqSelect && (oneTimeVal !== null || recurringVal !== null)) {
+            freqSelect.value = this.checked ? (oneTimeVal || '') : (recurringVal || '');
+        }
         if (this.checked) {
             isRecurrent = false;
             //Set end date the same as start date

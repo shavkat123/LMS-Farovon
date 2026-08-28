@@ -8,6 +8,8 @@
     <attribute name="new_description" />
     <attribute name="new_librarytype" />
     <attribute name="new_durationseconds" />
+    <attribute name="new_relatedcourse" />
+    <attribute name="modifiedon" />
     <filter type="and">
       <condition attribute="new_h5pcontentid" operator="eq" value="{{ contentid }}" />
       <condition attribute="new_isactive" operator="eq" value="1" />
@@ -73,15 +75,20 @@
 
 <div class="container fv-player-page">
   <div class="fv-player-topbar">
+    {% if content.new_relatedcourse %}
+    <a href="/course-details?id={{ content.new_relatedcourse.id }}" class="fv-player-back"><i class="bi bi-arrow-left"></i> Назад к курсу</a>
+    {% else %}
     <a href="/h5p-catalog" class="fv-player-back"><i class="bi bi-arrow-left"></i> Назад к каталогу</a>
+    {% endif %}
   </div>
 
   <div class="fv-player-header">
     <div style="flex:1;min-width:0;">
       <div class="fv-player-meta">{{ content.new_librarytype | default: 'H5P' }}</div>
-      <h1 class="fv-player-title">{{ content.new_name }}</h1>
+      {% comment %}escape обязателен: имя и описание вводит админ, без него разметка в тексте ломает страницу{% endcomment %}
+      <h1 class="fv-player-title">{{ content.new_name | escape }}</h1>
       {% if content.new_description %}
-        <p class="fv-player-desc">{{ content.new_description }}</p>
+        <p class="fv-player-desc">{{ content.new_description | escape }}</p>
       {% endif %}
       <div class="fv-player-badges">
         {% if content.new_durationseconds %}
@@ -90,7 +97,7 @@
           </span>
         {% endif %}
         <span class="fv-player-badge" style="background:#ECF6EF;color:#15803D;">
-          <i class="bi bi-bar-chart-line"></i> xAPI прогресс
+          <i class="bi bi-bar-chart-line"></i> Прогресс сохраняется
         </span>
       </div>
     </div>
@@ -102,6 +109,14 @@
   <div class="fv-player-container">
     <div id="h5p-container-{{ contentid }}" class="h5p-container"></div>
   </div>
+
+  {% comment %}
+    Конфиг плеера — в data-атрибутах, а не в JS-строке: внутри <script> HTML-сущности
+    не декодируются, поэтому URL с & через `| escape` в JS-строке приехал бы битым,
+    а без escape кавычка в значении сломала бы скрипт. В атрибуте парсер декодирует сам.
+  {% endcomment %}
+  <div id="fvPlayerCfg" hidden
+       data-flow-url="{{ settings['H5P/FlowProxyUrl'] | default: '' | escape }}"></div>
 </div>
 
 <link rel="stylesheet" href="/h5p.css">
@@ -111,20 +126,16 @@
 (function () {
   var contentId = '{{ contentid }}';
   var userId    = '{{ user.contactid }}';
-  var spUrl     = '{{ spdocurl }}';
-  var spLocId   = '{{ splocid }}';
-  var spRelUrl  = '{{ sprelurl }}';
-  var spLib     = '{{ splibname }}';
+  // SharePoint-значения (URL библиотеки, relativeurl, имя библиотеки) в JS больше не
+  // подставляются: без экранирования кавычка в имени библиотеки рвала скрипт, а фильтра
+  // json в Power Pages нет. Использовались они только в console.log — диагностика того
+  // не стоит; при необходимости смотреть их в Dataverse.
   var container = document.getElementById('h5p-container-' + contentId);
   var VBASE     = window.location.origin + '/h5p-content/' + contentId;
   var blobs     = {};   // path → blob: URL (binary content, fetched via window.fetch)
   var texts     = {};   // path → string (JS/CSS, inlined synchronously to avoid eval race)
 
   console.log('[H5P] contentId:', contentId);
-  console.log('[H5P] spUrl:',    spUrl    || '(empty)');
-  console.log('[H5P] spLocId:',  spLocId  || '(empty)');
-  console.log('[H5P] spRelUrl:', spRelUrl || '(empty)');
-  console.log('[H5P] spLib:',    spLib    || '(empty)');
 
   if (!window.H5PStandalone) {
     container.innerHTML = '<div class="alert alert-danger">H5PStandalone не загружена (проверьте CDN)</div>';
@@ -136,15 +147,59 @@
 
   // ── xAPI state (IIFE-scope so saveXAPIProgress/saveXAPIWithToken can access) ─
   var allStatements = [];
-  var progressId    = null;   // UUID assigned after first successful POST
+  var progressId    = null;   // UUID: из GET существующей записи либо из ответа POST
   var postPending   = false;  // true while POST is in-flight (no progressId yet)
   var lastSaved     = 0;
   var saveInFlight  = false;
+  var lastRootStmt  = null;   // последний стейтмент САМОГО урока — источник скаляров
+  var lastPosition  = null;   // позиция воспроизведения в секундах (НЕ длительность попытки)
+  var savedPosition = null;   // позиция из ранее сохранённого прогресса — для продолжения
+  // Поле new_xapistatements — текст: массив, накопленный за много заходов, однажды
+  // перестанет в него влезать и PATCH начнёт падать. Держим последние MAX_STMTS.
+  var MAX_STMTS     = 500;
 
   container.innerHTML =
     '<div class="text-center py-5">' +
     '<div class="spinner-border text-primary" role="status"></div>' +
-    '<p class="mt-2 text-muted">Загрузка содержимого…</p></div>';
+    '<p class="mt-2 text-muted" id="h5pLoadStatus">Загрузка урока…</p>' +
+    '<div style="max-width:260px;margin:8px auto 0;height:6px;border-radius:999px;background:#E5E7EB;overflow:hidden;display:none;" id="h5pLoadBarWrap">' +
+    '<div id="h5pLoadBar" style="height:100%;width:0%;background:#1E3A8A;border-radius:999px;transition:width .2s;"></div></div></div>';
+  function setStatus(text, pct) {
+    var el = document.getElementById('h5pLoadStatus');
+    if (el) el.textContent = text;
+    var wrap = document.getElementById('h5pLoadBarWrap');
+    var bar = document.getElementById('h5pLoadBar');
+    if (wrap && bar && typeof pct === 'number') { wrap.style.display = ''; bar.style.width = Math.min(100, Math.round(pct)) + '%'; }
+  }
+
+  // ── Кэш .h5p в IndexedDB: повторные открытия урока — мгновенно, без Flow ──
+  var CONTENT_VER = '{{ content.modifiedon }}';
+  function idbOpen() {
+    return new Promise(function (resolve, reject) {
+      var rq = indexedDB.open('fv-h5p-cache', 1);
+      rq.onupgradeneeded = function () { rq.result.createObjectStore('files'); };
+      rq.onsuccess = function () { resolve(rq.result); };
+      rq.onerror = function () { reject(rq.error); };
+    });
+  }
+  function idbGet(key) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (resolve) {
+        var tx = db.transaction('files', 'readonly').objectStore('files').get(key);
+        tx.onsuccess = function () { resolve(tx.result || null); };
+        tx.onerror = function () { resolve(null); };
+      });
+    }).catch(function () { return null; });
+  }
+  function idbPut(key, value) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (resolve) {
+        var tx = db.transaction('files', 'readwrite').objectStore('files').put(value, key);
+        tx.onsuccess = function () { resolve(true); };
+        tx.onerror = function () { resolve(false); };
+      });
+    }).catch(function () { return false; });
+  }
 
   // ── Read CSP nonce from a nonce-bearing <script src> element ─────────────
   // Power Pages adds nonce to external <script src> tags it renders.
@@ -402,8 +457,61 @@
   })();
 
   // ── Power Automate flow proxy URL ───────────────────────────────────────
-  // Proxies SharePoint file download — no CORS issues since flow is server-side.
-  var FLOW_URL = 'https://defaultc50a298835254bd2aca8ff2e12cb2c.b8.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/89f3200e86c24eefb32ffad06d22d4ed/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=-Rgw9F0XSyFEGFR81jf1lmb2Xhmhu17VhF72DCvZqFY';
+  // Проксирует скачивание файла из SharePoint — flow серверный, CORS не мешает.
+  //
+  // URL берётся из Site Setting «H5P/FlowProxyUrl», а НЕ из кода: в нём лежит
+  // SAS-подпись (?sig=...), которая даёт право вызвать flow всякому, кто её знает.
+  // Хранение подписи в репозитории означало, что она утекала вместе с исходниками
+  // и её нельзя было отозвать без правки шаблона.
+  //
+  // ВАЖНО: подпись, которая раньше стояла здесь, надо считать скомпрометированной —
+  // она осталась в истории git. Перевыпустите URL триггера flow и положите новый
+  // в Site Setting. Полноценное решение — закрыть flow аутентификацией
+  // (Entra / Power Pages) вместо анонимной SAS-ссылки.
+  var _fvCfg = document.getElementById('fvPlayerCfg');
+  var FLOW_URL = _fvCfg ? (_fvCfg.getAttribute('data-flow-url') || '') : '';
+  if (!FLOW_URL) {
+    console.error('[H5P] Не задан Site Setting «H5P/FlowProxyUrl» — файл урока не загрузится.');
+  }
+
+  // ── Существующая запись прогресса ────────────────────────────────────────
+  // Без этого GET'а progressId всегда был null, и КАЖДЫЙ заход в урок уходил POST'ом,
+  // создавая новую new_h5pprogress: в «Моём прогрессе» плодились дубли, прошлые попытки
+  // и позиция терялись. Читаем запись пары (пользователь, урок) один раз при старте.
+  function loadExistingProgress() {
+    // Аноним: contactid пустой — фильтр «_new_user_value eq » дал бы 400, а не запись.
+    if (!userId) { console.warn('[H5P] пользователь не определён — прогресс не читаем'); return Promise.resolve(); }
+    var q = '/_api/new_h5pprogresses'
+          + '?$select=new_h5pprogressid,new_xapistatements,new_lastposition'
+          + '&$filter=_new_user_value eq ' + userId
+          + ' and _new_h5pcontent_value eq ' + contentId
+          + '&$top=1';
+    return _fetch(q, { headers: { 'Accept': 'application/json' }, credentials: 'include' })
+      .then(function (res) {
+        if (!res.ok) { console.warn('[H5P] чтение прогресса: HTTP ' + res.status + ' — сохраним новой записью'); return null; }
+        return res.json();
+      })
+      .then(function (j) {
+        var rec = j && j.value && j.value[0];
+        if (!rec) { console.log('[H5P] прогресс по уроку не найден — будет создана новая запись'); return; }
+        progressId = rec.new_h5pprogressid || null;
+        if (rec.new_lastposition != null) savedPosition = +rec.new_lastposition;
+        if (rec.new_xapistatements) {
+          try {
+            var prev = JSON.parse(rec.new_xapistatements);
+            // Продолжаем накопленный массив, иначе первый же PATCH затёр бы прошлые попытки.
+            if (Object.prototype.toString.call(prev) === '[object Array]') {
+              allStatements = prev.length > MAX_STMTS ? prev.slice(-MAX_STMTS) : prev;
+            }
+          } catch (e) { console.warn('[H5P] new_xapistatements не разобрался — начинаем массив заново'); }
+        }
+        console.log('[H5P] найден прогресс:', progressId, '| стейтментов:', allStatements.length, '| позиция:', savedPosition);
+      })
+      .catch(function (e) {
+        console.warn('[H5P] чтение прогресса не удалось (' + ((e && e.message) || e) + ') — сохраним новой записью');
+      });
+  }
+  var progressReady = loadExistingProgress();
 
   // ── Bootstrap H5P core into parent window ─────────────────────────────────
   // In div-mode, h5p-standalone doesn't load frame.bundle.js — but library scripts
@@ -474,9 +582,74 @@
 
   // Скачивание + чтение тела с ретраем на СЕТЕВЫЕ обрывы (ERR_HTTP2_PROTOCOL_ERROR,
   // Failed to fetch): статус 200 может прийти, а стрим тела оборваться — ловим и повторяем.
+  // Чтение тела ответа стримом с прогресс-баром (общая для Dataverse и Flow)
+  async function readBodyProgress(response) {
+    if (!(response.body && response.body.getReader)) return response.arrayBuffer();
+    var total = parseInt(response.headers.get('Content-Length') || '0', 10);
+    var reader = response.body.getReader();
+    var chunks = [], received = 0;
+    for (;;) {
+      var step = await reader.read();
+      if (step.done) break;
+      chunks.push(step.value);
+      received += step.value.length;
+      var mb = (received / 1048576).toFixed(1);
+      if (total > 0) setStatus('Загрузка урока… ' + mb + ' / ' + (total / 1048576).toFixed(1) + ' МБ', received * 100 / total);
+      else setStatus('Загрузка урока… ' + mb + ' МБ');
+    }
+    var merged = new Uint8Array(received), off = 0;
+    for (var ci = 0; ci < chunks.length; ci++) { merged.set(chunks[ci], off); off += chunks[ci].length; }
+    return merged.buffer;
+  }
+
+  // Валидная сигнатура ZIP ('PK\x03\x04') — защита от битых копий файла:
+  // если быстрый источник (кэш/Dataverse) отдал не-ZIP, откатываемся на Flow.
+  function isZip(b) {
+    if (!b || b.byteLength < 4) return false;
+    var v = new Uint8Array(b, 0, 4);
+    return v[0] === 0x50 && v[1] === 0x4B && v[2] === 0x03 && v[3] === 0x04;
+  }
+
   async function fetchBuf(fileName, attempt) {
     attempt = attempt || 1;
     try {
+      // ── 1. Кэш: тот же урок той же версии — отдаём мгновенно, без Flow ──
+      if (attempt === 1) {
+        var cached = await idbGet(contentId);
+        if (cached && cached.ver === CONTENT_VER && isZip(cached.buf)) {
+          console.log('[H5P] cache HIT (' + cached.buf.byteLength + ' bytes) — Flow пропущен');
+          setStatus('Открываем урок…');
+          return cached.buf;
+        }
+        if (cached && cached.ver === CONTENT_VER) console.warn('[H5P] cache INVALID (не ZIP) — игнорируем, качаем заново');
+        else if (cached) console.log('[H5P] cache STALE (ver ' + cached.ver + ' → ' + CONTENT_VER + ')');
+      }
+
+      // ── 2. Быстрый путь: файл из Dataverse (new_h5pfile) — same-origin, БЕЗ Flow ──
+      //    Уроки, загруженные через портал, хранят .h5p и в Dataverse; Flow остаётся
+      //    fallback'ом для файлов, которых там нет (загруженные напрямую в SharePoint)
+      //    или чья Dataverse-копия повреждена (проверка сигнатуры ZIP).
+      if (attempt === 1) {
+        try {
+          var dvRes = await _fetch('/_api/new_h5pcontents(' + contentId + ')/new_h5pfile/$value', {
+            headers: { 'Accept': 'application/octet-stream' }, credentials: 'same-origin'
+          });
+          if (dvRes.ok) {
+            var dvBuf = await readBodyProgress(dvRes);
+            if (isZip(dvBuf)) {
+              console.log('[H5P] Dataverse file HIT (' + dvBuf.byteLength + ' bytes) — Flow пропущен');
+              idbPut(contentId, { ver: CONTENT_VER, buf: dvBuf });
+              setStatus('Распаковка урока…');
+              return dvBuf;
+            }
+            console.warn('[H5P] Dataverse-копия повреждена (не ZIP, ' + (dvBuf ? dvBuf.byteLength : 0) + ' байт) — переходим на Flow. Рекомендуется перезалить урок через «Загрузка H5P».');
+          } else {
+            console.log('[H5P] Dataverse file MISS (HTTP ' + dvRes.status + ') — загрузка через Flow');
+          }
+        } catch (dvErr) { console.log('[H5P] Dataverse file error (' + dvErr.message + ') — загрузка через Flow'); }
+      }
+
+      setStatus('Загрузка урока…');
       var response = await flowFetch(fileName, 1);
       var ct = (response.headers.get('Content-Type') || '').toLowerCase();
       console.log('[H5P] Flow response Content-Type:', ct);
@@ -499,9 +672,17 @@
             '. First 200 chars: ' + txt.slice(0, 200));
         }
       } else {
-        // Binary (application/octet-stream or similar)
-        buf = await response.arrayBuffer();
+        // Бинарный ответ — стрим с прогрессом
+        buf = await readBodyProgress(response);
       }
+
+      // ── 3. Сохраняем в кэш только валидный ZIP (не блокируем открытие) ──
+      if (isZip(buf)) {
+        idbPut(contentId, { ver: CONTENT_VER, buf: buf }).then(function (ok) {
+          console.log('[H5P] cache save:', ok ? 'OK' : 'skip');
+        });
+      }
+      setStatus('Распаковка урока…');
       return buf;
     } catch (err) {
       var msg = String((err && err.message) || err);
@@ -580,6 +761,59 @@
     return buf.buffer;
   }
 
+  // ── Что считать результатом урока ────────────────────────────────────────
+  // H5P шлёт xAPI и по вложенным вопросам: у них свой score/success, и запись скаляров
+  // из ЛЮБОГО стейтмента затирала итог урока результатом последнего вопроса.
+  // Дочерние узнаём по subContentId в object.id и по context.contextActivities.parent.
+  function isRootStatement(stmt) {
+    if (!stmt || !stmt.object) return false;
+    var oid = stmt.object.id || '';
+    if (oid.indexOf('subContentId') > -1) return false;
+    var ctx = stmt.context && stmt.context.contextActivities;
+    if (ctx && ctx.parent && ctx.parent.length) return false;
+    return true;
+  }
+
+  // Позиция в уроке (секунды). Раньше в new_lastposition писалась r.duration —
+  // длительность попытки, из-за чего Home считал процент просмотра по чужому числу.
+  var VIDEO_TIME_EXT = 'https://w3id.org/xapi/video/extensions/time';
+  function statementPosition(stmt) {
+    var ext = stmt && stmt.result && stmt.result.extensions;
+    var t = ext ? ext[VIDEO_TIME_EXT] : null;
+    return (typeof t === 'number' && isFinite(t) && t >= 0) ? t : null;
+  }
+  function h5pInstance() {
+    try { return (window.H5P && window.H5P.instances && window.H5P.instances[0]) || null; }
+    catch (e) { return null; }
+  }
+  function playerPosition() {
+    var inst = h5pInstance();
+    try {
+      if (inst && inst.video && typeof inst.video.getCurrentTime === 'function') {
+        var t = inst.video.getCurrentTime();
+        if (typeof t === 'number' && isFinite(t) && t >= 0) return t;
+      }
+    } catch (e) {}
+    return null;
+  }
+  // Продолжение с сохранённой позиции. Видео готово не сразу, поэтому пробуем
+  // несколько раз и молча сдаёмся: урок обязан открыться в любом случае.
+  function resumeSavedPosition(tries) {
+    if (savedPosition == null || savedPosition < 5) return;
+    tries = tries || 0;
+    var inst = h5pInstance();
+    var v = inst && inst.video;
+    if (v && typeof v.seek === 'function' &&
+        (typeof v.getDuration !== 'function' || v.getDuration() > 0)) {
+      try {
+        v.seek(savedPosition);
+        console.log('[H5P] продолжаем с', savedPosition, 'сек');
+        return;
+      } catch (e) {}
+    }
+    if (tries < 10) setTimeout(function () { resumeSavedPosition(tries + 1); }, 1000);
+  }
+
   // ── Init h5p-standalone ───────────────────────────────────────────────────
   function initH5P(h5pJsonPath) {
     console.log('[H5P] initH5P starting, path:', h5pJsonPath);
@@ -595,6 +829,8 @@
     })
     .then(function () {
       console.log('[H5P] H5PStandalone initialized successfully');
+      // Позиция из ранее сохранённой записи — только после того, как GET её принёс.
+      progressReady.then(function () { resumeSavedPosition(0); });
       if (window.H5P && window.H5P.externalDispatcher) {
         window.H5P.externalDispatcher.on('xAPI', function (event) {
           var stmt   = event.data.statement;
@@ -605,13 +841,22 @@
           // Всегда добавляем в массив — не теряем ни одного стейтмента
           allStatements.push(stmt);
 
-          var isCompleted = verbId.indexOf('completed') !== -1;
+          // Скаляры (score/completion/success) берём только из стейтмента самого урока.
+          var isRoot = isRootStatement(stmt);
+          if (isRoot) lastRootStmt = stmt;
+
+          // Позиция: сперва из стейтмента (video/extensions/time), иначе спрашиваем плеер.
+          var pos = statementPosition(stmt);
+          if (pos == null) pos = playerPosition();
+          if (pos != null) lastPosition = pos;
+
+          var isCompleted = isRoot && verbId.indexOf('completed') !== -1;
           var now = Date.now();
 
-          // "completed" сохраняем немедленно; остальные — не чаще раз в 8 сек
+          // "completed" урока сохраняем немедленно; остальные — не чаще раз в 8 сек
           if (isCompleted || now - lastSaved >= 8000) {
             lastSaved = now;
-            saveXAPIProgress(stmt, isCompleted);
+            saveXAPIProgress(isCompleted);
           }
         });
       }
@@ -643,30 +888,39 @@
     return _csrfTokenPromise;
   }
 
-  function saveXAPIProgress(triggerStmt, isCompleted) {
+  function saveXAPIProgress(isCompleted) {
     // Не блокируем "completed" — он должен сохраниться в любом случае
     if (saveInFlight && !isCompleted) return;
 
     // POST ещё летит — progressId не известен. Completed ждёт и повторяет.
     if (postPending) {
       if (isCompleted) {
-        setTimeout(function () { saveXAPIProgress(triggerStmt, isCompleted); }, 800);
+        setTimeout(function () { saveXAPIProgress(isCompleted); }, 800);
       }
       return;
     }
 
+    // Первый POST помечаем синхронно, ДО асинхронных запросов (чтение записи, токен):
+    // пара answered→completed (клик «Отправить ответы») иначе успевает
+    // запустить два параллельных POST и создать запись-дубль.
+    if (!progressId) postPending = true;
     saveInFlight = true;
-    getCsrfToken().then(function (tok) {
-      saveXAPIWithToken(triggerStmt, tok);
+    // Дожидаемся GET'а: если запись уже есть, дальше пойдёт PATCH, а не второй POST.
+    progressReady.then(function () {
+      if (progressId) postPending = false;
+      return getCsrfToken();
+    }).then(function (tok) {
+      saveXAPIWithToken(tok);
     });
   }
 
-  function saveXAPIWithToken(stmt, tok) {
+  function saveXAPIWithToken(tok) {
     var hdrs = { 'Content-Type': 'application/json' };
     if (tok) hdrs['__RequestVerificationToken'] = tok;
 
     var isFirstSave = !progressId;
 
+    if (allStatements.length > MAX_STMTS) allStatements = allStatements.slice(-MAX_STMTS);
     var body = {
       'new_xapistatements': JSON.stringify(allStatements),
       'new_lastupdated'   : new Date().toISOString()
@@ -679,8 +933,9 @@
       postPending = true;
     }
 
-    // Scalar-поля из текущего стейтмента (score, completion, success, duration)
-    var r = stmt.result;
+    // Scalar-поля — ТОЛЬКО из стейтмента самого урока: у вложенных вопросов свой
+    // score/success, и они затирали итог урока результатом последнего вопроса.
+    var r = lastRootStmt && lastRootStmt.result;
     var decParts = [];
     if (r) {
       if (r.score) {
@@ -689,12 +944,13 @@
         if (r.score.scaled != null) decParts.push('"new_scorescaled":' + (+r.score.scaled).toFixed(4));
       }
       if (r.completion !== undefined) body.new_completion = !!r.completion;
-      if (r.success    !== undefined) body.new_success    = !!r.success;
-      if (r.duration) {
-        var durSec = parseISO(r.duration);
-        if (durSec != null) decParts.push('"new_lastposition":' + durSec.toFixed(4));
-      }
+      // new_success в живой таблице — Whole Number (Int32), а НЕ Yes/No:
+      // булево true даёт OData 400 «Cannot convert 'True' to Edm.Int32» и рушит весь запрос.
+      if (r.success    !== undefined) body.new_success    = r.success ? 1 : 0;
     }
+    // new_lastposition — ПОЗИЦИЯ в уроке, а не длительность попытки (r.duration):
+    // Home считает процент просмотра как lastposition / new_durationseconds.
+    if (lastPosition != null) decParts.push('"new_lastposition":' + (+lastPosition).toFixed(4));
 
     var bodyJson = JSON.stringify(body);
     if (decParts.length) bodyJson = bodyJson.slice(0, -1) + ',' + decParts.join(',') + '}';
@@ -711,12 +967,20 @@
     }).then(function (res) {
       saveInFlight = false;
       if (res.ok) {
+        var warnEl = document.getElementById('fvSaveWarn');
+        if (warnEl) warnEl.parentNode.removeChild(warnEl);
         if (isFirstSave) {
           // Извлекаем UUID из заголовка OData-EntityId: .../(UUID)
           var entityHdr = res.headers.get('OData-EntityId') || res.headers.get('Location') || '';
           var m = entityHdr.match(/\(([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\)/i);
           if (m) progressId = m[1];
           postPending = false;
+          if (!progressId) {
+            // Заголовка нет: без перечитывания следующее сохранение снова ушло бы POST'ом
+            // и создало дубль. Перечитываем — следующий save дождётся и сделает PATCH.
+            console.warn('[H5P] OData-EntityId не пришёл — перечитываем запись прогресса');
+            progressReady = loadExistingProgress();
+          }
           console.log('[H5P] xAPI POST OK — progressId:', progressId || '(header missing)');
         } else {
           console.log('[H5P] xAPI PATCH OK — progressId:', progressId);
@@ -724,20 +988,36 @@
       } else {
         if (isFirstSave) postPending = false;
         res.text().then(function (txt) {
-          console.warn('[H5P] xAPI save failed:', res.status, res.statusText, '—', txt.slice(0, 600));
+          console.warn('[H5P] xAPI save failed:', method, res.status, res.statusText, '—', txt.slice(0, 1200));
+          var msg = method + ' HTTP ' + res.status;
+          try {
+            var j = JSON.parse(txt);
+            if (j && j.error && j.error.message) msg += ': ' + j.error.message.slice(0, 220);
+          } catch (pe) {}
+          showSaveWarn(msg);
         });
       }
     }).catch(function (e) {
       saveInFlight = false;
       if (isFirstSave) postPending = false;
+      showSaveWarn(e && e.message ? e.message : 'сетевая ошибка');
       console.error('[H5P] xAPI save error:', e);
     });
   }
 
-  function parseISO(iso) {
-    var m = /PT(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?/.exec(iso || '');
-    if (!m) return null;
-    return Math.round(+(m[1]||0)*3600 + +(m[2]||0)*60 + +(m[3]||0));
+  // Видимое предупреждение: раньше ошибка сохранения жила только в консоли,
+  // и пользователь узнавал о потерянном прогрессе постфактум.
+  function showSaveWarn(detail) {
+    var el = document.getElementById('fvSaveWarn');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'fvSaveWarn';
+      el.className = 'alert alert-warning';
+      el.style.margin = '12px 0 0';
+      container.parentNode.insertBefore(el, container);
+    }
+    el.innerHTML = '<i class="bi bi-exclamation-triangle"></i> <b>Прогресс не сохраняется</b> (' +
+      escHtml(detail) + '). Результаты этого сеанса могут не попасть в «Мой прогресс» — сообщите администратору.';
   }
 
   function showError(html) {
@@ -750,7 +1030,7 @@
 })();
 </script>
 {% else %}
-<div class="alert alert-warning">H5P контент не найден или не активен</div>
+<div class="alert alert-warning">Урок не найден или не активен</div>
 {% endif %}
 {% else %}
 <div class="alert alert-info">Укажите id контента в URL: ?id=&lt;guid&gt;</div>

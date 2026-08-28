@@ -12,14 +12,17 @@
 </div>
 {% else %}
 
-{% comment %}── Агрегат прогресса по контенту (groupby main lookup + link, как лидерборд) ──{% endcomment %}
+{% comment %}
+  Агрегат прогресса по контенту (groupby main lookup + link, как лидерборд).
+  Балл берём AVG, а не SUM/попытки: AVG в Dataverse пропускает записи без балла,
+  а деление суммы на все сеансы занижало средний балл.
+{% endcomment %}
 {% fetchxml tst %}
 <fetch aggregate="true">
   <entity name="new_h5pprogress">
     <attribute name="new_h5pcontent" groupby="true" alias="cid" />
     <attribute name="new_h5pprogressid" aggregate="count" alias="att" />
-    <attribute name="new_completion" aggregate="sum" alias="passed" />
-    <attribute name="new_scorescaled" aggregate="sum" alias="ssum" />
+    <attribute name="new_scorescaled" aggregate="avg" alias="savg" />
     <link-entity name="new_h5pcontent" from="new_h5pcontentid" to="new_h5pcontent" alias="hc" link-type="outer">
       <attribute name="new_name" groupby="true" alias="cname" />
     </link-entity>
@@ -27,14 +30,39 @@
 </fetch>
 {% endfetchxml %}
 
+{% comment %}
+  new_completion — bit-поле (Yes/No): Dataverse не поддерживает SUM/AVG на bit-атрибуте
+  ("Aggregate AVG or SUM is not supported for attribute of type bit" — падал весь fetchxml).
+  Сдачи на контент — отдельным COUNT с фильтром eq 1.
+{% endcomment %}
+{% fetchxml tst_passed %}
+<fetch aggregate="true">
+  <entity name="new_h5pprogress">
+    <attribute name="new_h5pcontent" groupby="true" alias="cid" />
+    <attribute name="new_h5pprogressid" aggregate="count" alias="passed" />
+    <filter><condition attribute="new_completion" operator="eq" value="1" /></filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Глобальное число сдач (KPI-плитка) — тоже COUNT, не SUM ──{% endcomment %}
+{% fetchxml tst_passed_total %}
+<fetch aggregate="true">
+  <entity name="new_h5pprogress">
+    <attribute name="new_h5pprogressid" aggregate="count" alias="total" />
+    <filter><condition attribute="new_completion" operator="eq" value="1" /></filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
 {% assign t_count = 0 %}
 {% assign t_att = 0 %}
-{% assign t_passed = 0 %}
 {% for r in tst.results.entities %}
   {% assign t_count = t_count | plus: 1 %}
   {% assign t_att = t_att | plus: r.att %}
-  {% assign t_passed = t_passed | plus: r.passed %}
 {% endfor %}
+{% assign t_passed = 0 %}
+{% for r in tst_passed_total.results.entities %}{% assign t_passed = r.total %}{% endfor %}
 {% assign t_rate = 0 %}
 {% if t_att > 0 %}{% assign t_rate = t_passed | times: 100 | divided_by: t_att %}{% endif %}
 
@@ -94,11 +122,20 @@
         </thead>
         <tbody id="admtBody">
           {% for r in tst.results.entities %}
-            {% assign cname = r['hc.cname'] | default: 'Без названия' %}
+            {% comment %}escape при assign: значение идёт и в ячейку, и в data-search.
+               В агрегатном fetchxml поле из link-entity читается только как r.cname:
+               r['hc.cname'] всегда nil, и все тесты назывались «Без названия».{% endcomment %}
+            {% assign cname = r.cname | default: 'Без названия' | escape %}
             {% assign att = r.att | plus: 0 %}
-            {% assign passed = r.passed | plus: 0 %}
-            {% assign ssum = r.ssum | plus: 0 %}
-            {% assign avg = 0 %}{% if att > 0 %}{% assign avg = ssum | times: 100 | divided_by: att %}{% endif %}
+            {% assign r_cid = r.cid.id | default: r.cid %}
+            {% assign passed = 0 %}
+            {% for pc in tst_passed.results.entities %}
+              {% assign pc_cid = pc.cid.id | default: pc.cid %}
+              {% if pc_cid == r_cid %}{% assign passed = pc.passed | plus: 0 %}{% endif %}
+            {% endfor %}
+            {% comment %}round: без него в ячейку попадала дробь вида 66.66666666667 и ломала колонку{% endcomment %}
+            {% assign savg = r.savg | default: 0 %}
+            {% assign avg = savg | times: 100 | round: 0 %}
             {% assign rate = 0 %}{% if att > 0 %}{% assign rate = passed | times: 100 | divided_by: att %}{% endif %}
             {% if rate >= 75 %}{% assign rc = 'var(--adm-success)' %}{% elsif rate < 50 %}{% assign rc = 'var(--adm-danger)' %}{% else %}{% assign rc = 'var(--adm-accent)' %}{% endif %}
           <tr data-search="{{ cname | downcase }}">

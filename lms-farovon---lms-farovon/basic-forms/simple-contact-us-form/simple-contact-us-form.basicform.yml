@@ -1,3 +1,14 @@
+# Форма намеренно оставлена ВЫКЛЮЧЕННОЙ (statecode 1) — это не забытая настройка.
+# Её единственный потребитель — страница /contact-us (web-pages/обратная-связь_1c4dca9d, тег
+# entityform 'simple contact us form'), а она сама деактивирована целиком: и корневая запись
+# (15cfddf9-...), и её content-page (925fe5f3-...). Страница из sitemap недоступна, ссылок на
+# /contact-us в шаблонах и weblink-наборах нет — «формы на живой странице» здесь не пропало.
+# Живая страница обратной связи в портале другая: /user-feedback (web-pages/обратная-связь_b2adcb21).
+# Включать форму в одиночку бессмысленно: без активации самой страницы её всё равно никто не увидит,
+# а вместе с ней пришлось бы включать Feedback.tablepermission (сейчас тоже выключено осознанно —
+# см. комментарий в table-permissions/Feedback.tablepermission.yml), то есть открыть Global-чтение
+# всех обращений. Активацию делать одним решением: страница + форма + право, — и это уже правка
+# web-pages, а не basic form.
 adx_appendquerystring: false
 adx_associatecurrentportaluser: false
 adx_attachfile: false

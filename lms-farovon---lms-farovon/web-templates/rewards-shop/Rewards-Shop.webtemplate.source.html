@@ -21,8 +21,9 @@
 {% else %}
 
 {% comment %}── 1. Reward items ──{% endcomment %}
+{% comment %}top=100 — каталог растёт, без ограничения страница тянула бы всю таблицу целиком{% endcomment %}
 {% fetchxml reward_items %}
-<fetch>
+<fetch top="100">
   <entity name="new_rewarditem">
     <attribute name="new_rewarditemid" />
     <attribute name="new_column_6348fe57" />
@@ -34,6 +35,8 @@
     <attribute name="new_stock" />
     <filter>
       <condition attribute="new_isactive" operator="eq" value="1" />
+      <!-- цена не заполнена или 0 => награда ушла бы бесплатно, поэтому такие не показываем -->
+      <condition attribute="new_pointscost" operator="gt" value="0" />
     </filter>
     <order attribute="new_pointscost" descending="false" />
   </entity>
@@ -41,6 +44,19 @@
 {% endfetchxml %}
 
 {% comment %}── 2. User's purchases ──{% endcomment %}
+{% comment %}spent_all — БЕЗ top: баланс обязан считаться по ВСЕМ покупкам, иначе потраченное недосчитывается и баланс завышен{% endcomment %}
+{% fetchxml spent_all %}
+<fetch>
+  <entity name="new_rewardpurchase">
+    <attribute name="new_pointsspent" />
+    <filter>
+      <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}my_purchases — только для списка «История покупок» (последние 20){% endcomment %}
 {% fetchxml my_purchases %}
 <fetch top="20">
   <entity name="new_rewardpurchase">
@@ -83,15 +99,20 @@
 
 {% assign total_spent = 0 %}
 {% assign purchase_count = 0 %}
-{% for pur in my_purchases.results.entities %}
-  {% assign total_spent = total_spent | plus: pur.new_pointsspent %}
+{% comment %}считаем по полной выборке spent_all, а не по обрезанной top=20 — иначе списанное теряется{% endcomment %}
+{% for pur in spent_all.results.entities %}
   {% assign purchase_count = purchase_count | plus: 1 %}
+  {% if pur.new_pointsspent %}
+    {% comment %}| integer, а не | plus: 0 — на строке plus даёт конкатенацию{% endcomment %}
+    {% assign spent_one = pur.new_pointsspent | integer %}
+    {% assign total_spent = total_spent | plus: spent_one %}
+  {% endif %}
 {% endfor %}
 
 {% assign current_balance = total_earned | minus: total_spent %}
 
 {% assign is_admin = false %}
-{% if user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Administrators' %}
+{% if user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
   {% assign is_admin = true %}
 {% endif %}
 
@@ -285,43 +306,50 @@
   {% else %}
   <div class="fv-shop-grid" id="fvShopGrid">
     {% for item in reward_items.results.entities %}
-    {% assign item_cost = item.new_pointscost | plus: 0 %}
+    {% comment %}| integer, а не | plus: 0 — на строке plus даёт конкатенацию, а сравнение строки с числом падает{% endcomment %}
+    {% assign item_cost = item.new_pointscost | integer %}
     {% assign can_afford = false %}
     {% if current_balance >= item_cost %}{% assign can_afford = true %}{% endif %}
     {% assign in_stock = true %}
     {% if item.new_stock != null and item.new_stock != '' %}
-      {% assign stock_num = item.new_stock | plus: 0 %}
+      {% assign stock_num = item.new_stock | integer %}
       {% if stock_num <= 0 %}{% assign in_stock = false %}{% endif %}
     {% endif %}
     {% assign item_emoji = item.new_emoji | default: '🎁' %}
     {% assign item_cat = item.new_category | default: 'Награда' %}
+    {% comment %}картинку пускаем в src только если это путь/URL и не javascript:/data: — поле заполняется вручную и иначе становится вектором XSS{% endcomment %}
+    {% assign img_url = item.new_imageurl | default: '' %}
+    {% assign img_lc = img_url | downcase %}
+    {% assign img_ok = false %}
+    {% if img_url != '' and img_lc contains '/' %}{% assign img_ok = true %}{% endif %}
+    {% if img_lc contains 'javascript:' or img_lc contains 'data:' or img_lc contains 'vbscript:' %}{% assign img_ok = false %}{% endif %}
 
     <div class="fv-reward-card{% if can_afford and in_stock %} affordable{% endif %}{% unless in_stock %} sold-out{% endunless %}"
-         data-cat="{{ item_cat | downcase }}"
+         data-cat="{{ item_cat | downcase | escape }}"
          data-item-id="{{ item.id }}"
          data-item-name="{{ item.new_column_6348fe57 | escape }}"
          data-item-cost="{{ item_cost }}"
-         data-item-emoji="{{ item_emoji }}"
+         data-item-emoji="{{ item_emoji | escape }}"
          data-in-stock="{{ in_stock }}">
       <div class="fv-reward-img">
-        {% if item.new_imageurl and item.new_imageurl != '' %}
-        <img src="{{ item.new_imageurl }}" alt="{{ item.new_column_6348fe57 }}" onerror="this.style.display='none'">
+        {% if img_ok %}
+        <img src="{{ img_url | escape }}" alt="{{ item.new_column_6348fe57 | escape }}" onerror="this.style.display='none'">
         {% endif %}
-        <span style="z-index:1;">{{ item_emoji }}</span>
-        <span class="fv-cat-badge">{{ item_cat }}</span>
+        <span style="z-index:1;">{{ item_emoji | escape }}</span>
+        <span class="fv-cat-badge">{{ item_cat | escape }}</span>
         {% if in_stock == false %}
         <span class="fv-stock-out">Нет в наличии</span>
         {% elsif item.new_stock != null and item.new_stock != '' %}
-          {% assign stock_num = item.new_stock | plus: 0 %}
+          {% assign stock_num = item.new_stock | integer %}
           {% if stock_num <= 5 %}
           <span class="fv-stock-low">Осталось: {{ stock_num }}</span>
           {% endif %}
         {% endif %}
       </div>
       <div class="fv-reward-body">
-        <div class="fv-reward-name">{{ item.new_column_6348fe57 }}</div>
+        <div class="fv-reward-name">{{ item.new_column_6348fe57 | escape }}</div>
         {% if item.new_description and item.new_description != '' %}
-        <div class="fv-reward-desc">{{ item.new_description }}</div>
+        <div class="fv-reward-desc">{{ item.new_description | escape }}</div>
         {% else %}
         <div class="fv-reward-desc" style="color:#CBD5E1;font-style:italic;">Описание отсутствует</div>
         {% endif %}
@@ -354,8 +382,8 @@
     <div class="fv-history-row">
       <div class="fv-history-ico">🎁</div>
       <div class="fv-history-info">
-        <div class="fv-history-name">{{ pur.new_rewarditem.name | default: 'Награда' }}</div>
-        <div class="fv-history-date">{{ pur.createdon | date: 'dd.MM.yyyy, HH:mm' }}</div>
+        <div class="fv-history-name">{{ pur.new_rewarditem.name | default: 'Награда' | escape }}</div>
+        <div class="fv-history-date">{{ pur.createdon | date_add_hours: 5 | date: 'dd.MM.yyyy, HH:mm' }}</div>
       </div>
       <div class="fv-history-cost">-<i class="bi bi-award-fill fv-coin-img-sm" aria-hidden="true"></i> {{ pur.new_pointsspent }}</div>
     </div>
@@ -366,7 +394,8 @@
   {% if is_admin %}
   <div style="margin-top:20px;padding:14px 18px;background:#F8FAFF;border:1px solid #DBEAFE;border-radius:10px;font-size:12px;color:#1E40AF;display:flex;align-items:center;gap:10px;">
     <i class="bi bi-shield-check" style="font-size:15px;"></i>
-    <span><strong>Режим администратора.</strong> Управляйте товарами в каталоге через Power Apps / Dataverse (таблица <code>new_rewarditem</code>).</span>
+    <span><strong>Режим администратора.</strong> Управляйте товарами в каталоге через Power Apps / Dataverse (таблица <code>new_rewarditem</code>).
+      <br><strong>Важно:</strong> поле <code>new_stock</code> не уменьшается автоматически при покупке — списывайте остаток вручную, пока не подключён серверный обработчик покупки.</span>
   </div>
   {% endif %}
 
@@ -403,6 +432,12 @@
   var pendingItemCost = 0;
   var pendingItemName = '';
   var pendingCard = null;
+  /* транзакции на сервере нет: без этого флага двойной клик создаёт две покупки */
+  var isSubmitting = false;
+
+  function fvSetBuyDisabled(state) {
+    document.querySelectorAll('.fv-buy-btn-can').forEach(function (b) { b.disabled = state; });
+  }
 
   /* ── Category filters ── */
   var grid = document.getElementById('fvShopGrid');
@@ -492,10 +527,23 @@
 
   /* ── Confirm purchase ── */
   window.fvConfirmPurchase = function () {
+    if (isSubmitting) return;
     if (!pendingItemId) return;
+    /* перепроверяем цену и баланс: сервер их не проверяет (см. комментарий у POST),
+       это страховка от рассинхрона UI, а не защита */
+    if (pendingItemCost <= 0) {
+      fvToast('error', 'bi-exclamation-circle-fill', 'У награды не указана цена — покупка недоступна');
+      return;
+    }
+    if (balance < pendingItemCost) {
+      fvToast('error', 'bi-exclamation-circle-fill', 'Недостаточно монет для этой покупки');
+      return;
+    }
+    isSubmitting = true;
     var btn = document.getElementById('fvModalConfirm');
     btn.disabled = true;
     btn.textContent = 'Оформление…';
+    fvSetBuyDisabled(true);
 
     getToken().then(function (token) {
       var body = {
@@ -512,6 +560,9 @@
       };
       if (token) headers['__RequestVerificationToken'] = token;
 
+      /* ВНИМАНИЕ: цена, наличие и баланс проверены только на клиенте — запись создаётся
+         напрямую через Web API. Настоящая проверка требует серверного обработчика (находка B13);
+         он же должен декрементить new_stock — сейчас остаток в Dataverse не уменьшается. */
       return fetch('/_api/new_rewardpurchases', {
         method: 'POST',
         headers: headers,
@@ -519,15 +570,19 @@
       });
     })
     .then(function (res) {
+      /* fvCloseModal() обнуляет pendingCard/pendingItemId — копируем ссылки ДО закрытия,
+         иначе купленная карточка никогда не перерисовывается */
+      var card = pendingCard;
+      var cost = pendingItemCost;
       fvCloseModal();
       if (res.ok || res.status === 204 || res.status === 201) {
-        balance -= pendingItemCost;
+        balance -= cost;
         document.getElementById('fv-balance-val').textContent = balance;
-            document.getElementById('fvModalCost').textContent = pendingItemCost;
-            document.getElementById('fvModalAfter').textContent = balance >= 0 ? balance : 0;
+        document.getElementById('fvModalCost').textContent = cost;
+        document.getElementById('fvModalAfter').textContent = balance >= 0 ? balance : 0;
         fvToast('success', 'bi-check-circle-fill', 'Награда успешно приобретена! 🎉');
         /* Disable the buy button on this card if balance now too low */
-        if (pendingCard) {
+        if (card) {
           var allCards = document.querySelectorAll('.fv-reward-card');
           allCards.forEach(function (c) {
             var cost = parseInt(c.getAttribute('data-item-cost'), 10) || 0;
@@ -543,7 +598,7 @@
             });
           });
           /* Mark purchased card button */
-          var pb = pendingCard.querySelector('.fv-buy-btn');
+          var pb = card.querySelector('.fv-buy-btn');
           if (pb) {
             pb.className = 'fv-buy-btn fv-buy-btn-out';
             pb.disabled = true;
@@ -551,12 +606,17 @@
             pb.onclick = null;
           }
         }
+        /* остальные кнопки покупки намеренно остаются заблокированными до перезагрузки:
+           баланс пересчитывается только на сервере при рендере, повторный клик даст лишнюю покупку */
         /* Reload history after 1.5s */
         setTimeout(function () { location.reload(); }, 2200);
       } else {
         return res.text().then(function (t) {
-          fvToast('error', 'bi-exclamation-circle-fill', 'Ошибка при покупке (HTTP ' + res.status + ')');
+          fvToast('error', 'bi-exclamation-circle-fill', 'Не удалось оформить покупку (HTTP ' + res.status + '). Монеты не списаны.');
           console.error('[fv-shop] purchase error:', t.slice(0, 300));
+          /* покупка не прошла — возвращаем магазин в рабочее состояние */
+          isSubmitting = false;
+          fvSetBuyDisabled(false);
           document.getElementById('fvModalConfirm').disabled = false;
           document.getElementById('fvModalConfirm').textContent = 'Подтвердить';
         });
@@ -564,7 +624,11 @@
     })
     .catch(function (err) {
       fvCloseModal();
-      fvToast('error', 'bi-exclamation-circle-fill', 'Ошибка сети: ' + err.message);
+      isSubmitting = false;
+      fvSetBuyDisabled(false);
+      document.getElementById('fvModalConfirm').disabled = false;
+      document.getElementById('fvModalConfirm').textContent = 'Подтвердить';
+      fvToast('error', 'bi-exclamation-circle-fill', 'Ошибка сети: ' + err.message + '. Монеты не списаны.');
     });
   };
 

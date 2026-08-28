@@ -1,5 +1,20 @@
+# Scope Contact: пользователь читает и пишет ТОЛЬКО свой прогресс.
+# Схемное имя связи new_h5pprogress -> contact по полю new_user подтверждено в Power Apps
+# (Таблицы -> H5P Progress -> Связи -> многие-к-одному -> Contact -> «Имя отношения»).
+#
+# Чтение чужого прогресса намеренно НЕ отбирается совсем: лидерборд и блок лидеров на главной
+# агрегируют прогресс всех сотрудников и видны каждому. Под это заведено отдельное право
+# H5P-Progress-Read-All — Global, только чтение. Запись при этом закрыта, и накрутить чужой
+# прогресс через PATCH /_api/new_h5pprogresses(id) больше нельзя.
+#
+# ОСТАЁТСЯ ОТКРЫТЫМ: свой собственный прогресс пользователь всё ещё может подделать
+# (PATCH new_completion=true, new_scorescaled=1 = +150 монет за урок), потому что плеер пишет
+# результат с клиента. Лечится только переносом начисления в Power Automate — тогда adx_write
+# снимается совсем. Тот же класс задачи, что и оформление покупки в магазине.
+adx_accountrelationship:
 adx_append: true
 adx_appendto: true
+adx_contactrelationship: new_h5pprogress_user_contact
 adx_create: true
 adx_delete: false
 adx_entitylogicalname: new_h5pprogress
@@ -8,6 +23,8 @@ adx_entitypermission_webrole:
 - 2ccfddf9-a538-f111-88b5-7ced8d76b3cc
 - a1b2c3d4-1111-2222-3333-000000000004
 adx_entitypermissionid: dfed8e6c-dde6-4681-8be2-e8c7b00314c8
+adx_parententitypermission:
+adx_parentrelationship:
 adx_read: true
-adx_scope: 756150000
+adx_scope: 756150001
 adx_write: true

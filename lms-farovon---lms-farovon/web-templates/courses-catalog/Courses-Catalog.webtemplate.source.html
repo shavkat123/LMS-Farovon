@@ -15,8 +15,10 @@
 {% else %}
 
 {% comment %}── Курсы ──{% endcomment %}
+{% comment %}top обязателен: без него растущий каталог тянет всю таблицу одним запросом.
+   Упрётся в лимит — нужна пагинация, а не увеличение top.{% endcomment %}
 {% fetchxml crs %}
-<fetch>
+<fetch top="200">
   <entity name="msdynce_course">
     <attribute name="msdynce_courseid" />
     <attribute name="msdynce_coursename" />
@@ -30,7 +32,7 @@
 
 {% comment %}── Привязанные к курсам H5P-уроки ──{% endcomment %}
 {% fetchxml linked %}
-<fetch>
+<fetch top="1000">
   <entity name="new_h5pcontent">
     <attribute name="new_h5pcontentid" />
     <attribute name="new_relatedcourse" />
@@ -44,7 +46,7 @@
 
 {% comment %}── Завершённые уроки пользователя ──{% endcomment %}
 {% fetchxml mydone %}
-<fetch>
+<fetch top="1000">
   <entity name="new_h5pprogress">
     <attribute name="new_h5pcontent" />
     <filter>
@@ -61,13 +63,13 @@
 {% assign n_courses = 0 %}
 {% assign n_progress = 0 %}
 {% assign n_mandatory = 0 %}
-{% assign covers = 'paper,navy,warm,slate' | split: ',' %}
 {% capture cards_html %}
 {% for c in crs.results.entities %}
   {% assign cid = c.msdynce_courseid %}
-  {% assign cname = c.msdynce_coursename | default: 'Курс' %}
-  {% assign cdesc = c.msdynce_coursedescription | default: '' %}
-  {% assign catlabel = '' %}{% if c.msdynce_coursecategory %}{% assign catlabel = c.msdynce_coursecategory.label | default: '' %}{% endif %}
+  {% comment %}escape при assign: значения идут и в текст карточки, и в data-search{% endcomment %}
+  {% assign cname = c.msdynce_coursename | default: 'Курс' | escape %}
+  {% assign cdesc = c.msdynce_coursedescription | default: '' | escape %}
+  {% assign catlabel = '' %}{% if c.msdynce_coursecategory %}{% assign catlabel = c.msdynce_coursecategory.label | default: '' | escape %}{% endif %}
   {% assign ctot = 0 %}{% assign cdone = 0 %}
   {% for h in linked.results.entities %}
     {% if h.new_relatedcourse.id == cid %}
@@ -80,7 +82,11 @@
   {% assign cstatus = 'notstarted' %}{% if cpct == 100 and ctot > 0 %}{% assign cstatus = 'done' %}{% elsif cdone > 0 %}{% assign cstatus = 'progress' %}{% endif %}
   {% assign is_mand = false %}
   {% if catlabel contains 'Compliance' or catlabel contains 'Безопас' or catlabel contains 'Обязат' or catlabel contains 'Complience' %}{% assign is_mand = true %}{% endif %}
-  {% assign cover = covers[forloop.index0 | modulo: 4] %}
+  {% comment %}индексация массива переменной (covers[...]) в Power Pages Liquid даёт
+     «Parameter count mismatch» — чередование обложек разворачиваем в явные ветки.{% endcomment %}
+  {% assign cidx = forloop.index0 | modulo: 4 %}
+  {% assign cover = 'paper' %}
+  {% if cidx == 1 %}{% assign cover = 'navy' %}{% elsif cidx == 2 %}{% assign cover = 'warm' %}{% elsif cidx == 3 %}{% assign cover = 'slate' %}{% endif %}
   {% assign n_courses = n_courses | plus: 1 %}
   {% if cstatus == 'progress' %}{% assign n_progress = n_progress | plus: 1 %}{% endif %}
   {% if is_mand %}{% assign n_mandatory = n_mandatory | plus: 1 %}{% endif %}

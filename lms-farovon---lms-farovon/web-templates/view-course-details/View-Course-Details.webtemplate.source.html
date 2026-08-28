@@ -26,6 +26,7 @@
     <attribute name="msdynce_coursedescription" />
     <attribute name="msdynce_coursecategory" />
     <attribute name="msdynce_instructor" />
+    <attribute name="msdynce_instructorname" />
     <attribute name="msdynce_registerationdeadline" />
     <filter>
       <condition attribute="msdynce_courseid" operator="eq" value="{{ courseid }}" />
@@ -34,7 +35,9 @@
 </fetch>
 {% endfetchxml %}
 
-{% if courseselected.results.entities.size == 0 %}
+{% comment %}results == blank ловит некорректный id: у такого fetch results вообще нет,
+   и проверка только по .size уводила в else — пользователь видел пустую страницу.{% endcomment %}
+{% if courseselected.results == blank or courseselected.results.entities.size == 0 %}
 <div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
   <i class="bi bi-search" style="font-size:52px;color:#64748B;display:block;margin-bottom:16px;"></i>
   <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin-bottom:6px;">Курс не найден</h2>
@@ -43,16 +46,27 @@
 {% else %}
 
 {% assign course = courseselected.results.entities[0] %}
-{% assign cname = course.msdynce_coursename | default: 'Курс' %}
-{% assign cdesc = course.msdynce_coursedescription | default: '' %}
-{% assign catlabel = '' %}{% if course.msdynce_coursecategory %}{% assign catlabel = course.msdynce_coursecategory.label | default: '' %}{% endif %}
+{% comment %}escape при assign: значения выводятся в HTML-текст — без него любой, кто правит курс,
+   протаскивает stored XSS. На сравнения contains ниже escape не влияет (латиница/кириллица целы).{% endcomment %}
+{% assign cname = course.msdynce_coursename | default: 'Курс' | escape %}
+{% assign cdesc = course.msdynce_coursedescription | default: '' | escape %}
+{% assign catlabel = '' %}{% if course.msdynce_coursecategory %}{% assign catlabel = course.msdynce_coursecategory.label | default: '' | escape %}{% endif %}
 {% assign is_mand = false %}
 {% if catlabel contains 'Compliance' or catlabel contains 'Complience' or catlabel contains 'Безопас' or catlabel contains 'Обязат' %}{% assign is_mand = true %}{% endif %}
-{% assign author_name = course.msdynce_instructor.name | default: 'Отдел обучения' %}
-{% assign author_initials = author_name | slice: 0, 2 | upcase %}
+{% comment %}msdynce_instructor — текстовое поле, .name у него всегда nil, поэтому раньше у всех
+   курсов был «Отдел обучения». Контакт-преподаватель лежит в лукапе msdynce_instructorname.
+   Инициалы режем от сырого значения: slice по экранированной строке рвёт HTML-сущность пополам.{% endcomment %}
+{% assign author_raw = '' %}
+{% if course.msdynce_instructorname %}{% assign author_raw = course.msdynce_instructorname.name %}{% endif %}
+{% if author_raw == blank %}{% assign author_raw = course.msdynce_instructor %}{% endif %}
+{% if author_raw == blank %}{% assign author_raw = 'Отдел обучения' %}{% endif %}
+{% assign author_name = author_raw | escape %}
+{% assign author_initials = author_raw | slice: 0, 2 | upcase | escape %}
 {% assign cover = 'paper' %}{% if is_mand %}{% assign cover = 'warm' %}{% endif %}
 
-{% comment %}── Этапы курса ──{% endcomment %}
+{% comment %}── Этапы курса ──
+   Порядок — по new_name: целочисленного поля порядка (аналог new_trajectoryorder) в new_h5pcontent
+   нет, а заводить столбцы в этой правке нельзя. Пока порядок задаётся префиксом в названии: «01. …».{% endcomment %}
 {% fetchxml crs_steps %}
 <fetch>
   <entity name="new_h5pcontent">
@@ -60,6 +74,7 @@
     <attribute name="new_name" />
     <attribute name="new_librarytype" />
     <attribute name="new_durationseconds" />
+    <attribute name="modifiedon" />
     <filter type="and">
       <condition attribute="new_relatedcourse" operator="eq" value="{{ courseid }}" />
       <condition attribute="new_isactive" operator="eq" value="1" />
@@ -221,7 +236,7 @@
         <div class="fv-cd-divider"></div>
         <div>
           <div class="fv-cd-metric-lbl">Дедлайн</div>
-          <div class="fv-cd-deadline"><i class="bi bi-alarm"></i> до {{ course.msdynce_registerationdeadline | date: 'dd.MM.yyyy' }}</div>
+          <div class="fv-cd-deadline"><i class="bi bi-alarm"></i> до {{ course.msdynce_registerationdeadline | date_add_hours: 5 | date: 'dd.MM.yyyy' }}</div>
         </div>
         {% endif %}
       </div>
@@ -254,7 +269,7 @@
           {% for s in crs_steps.results.entities %}
             {% assign step_n = step_n | plus: 1 %}
             {% assign sid = s.new_h5pcontentid %}
-            {% assign sname = s.new_name | default: 'Этап' %}
+            {% assign sname = s.new_name | default: 'Этап' | escape %}{% comment %}escape: выводится в HTML-текст{% endcomment %}
             {% assign slt = s.new_librarytype | default: '' %}
             {% assign sdur = s.new_durationseconds | plus: 0 %}
             {% assign is_done = false %}{% if done_ids contains sid %}{% assign is_done = true %}{% endif %}
@@ -331,6 +346,85 @@
     </div>
   </div>
 </div>
+
+{% comment %}── Префетч уроков в фоне (как у больших сервисов): пока пользователь читает
+   страницу курса, ближайшие непройденные уроки тихо скачиваются в кэш браузера
+   (IndexedDB, тот же, что читает плеер) — клик по уроку открывает его мгновенно. ──{% endcomment %}
+<script>
+(function () {
+  if (!window.indexedDB || !window.fetch) return;
+  var steps = [
+    {% for s in crs_steps.results.entities %}
+    { id: '{{ s.new_h5pcontentid }}', ver: '{{ s.modifiedon }}', done: {% if done_ids contains s.new_h5pcontentid %}true{% else %}false{% endif %} }{% unless forloop.last %},{% endunless %}
+    {% endfor %}
+  ];
+  if (!steps.length) return;
+  // порядок: сначала непройденные (текущий — первый), максимум 4 за визит
+  var queue = steps.filter(function (s) { return !s.done; }).slice(0, 4);
+  if (!queue.length) return;
+
+  function idbOpen() {
+    return new Promise(function (resolve, reject) {
+      var rq = indexedDB.open('fv-h5p-cache', 1);
+      rq.onupgradeneeded = function () { rq.result.createObjectStore('files'); };
+      rq.onsuccess = function () { resolve(rq.result); };
+      rq.onerror = function () { reject(rq.error); };
+    });
+  }
+  function idbGet(key) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (resolve) {
+        var tx = db.transaction('files', 'readonly').objectStore('files').get(key);
+        tx.onsuccess = function () { resolve(tx.result || null); };
+        tx.onerror = function () { resolve(null); };
+      });
+    }).catch(function () { return null; });
+  }
+  function idbPut(key, value) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (resolve) {
+        var tx = db.transaction('files', 'readwrite').objectStore('files').put(value, key);
+        tx.onsuccess = function () { resolve(true); };
+        tx.onerror = function () { resolve(false); };
+      });
+    }).catch(function () { return false; });
+  }
+
+  function prefetchOne(i) {
+    if (i >= queue.length) return;
+    var s = queue[i];
+    idbGet(s.id).then(function (cached) {
+      if (cached && cached.ver === s.ver && cached.buf && cached.buf.byteLength > 100) {
+        return; // уже в кэше актуальной версии
+      }
+      return fetch('/_api/new_h5pcontents(' + s.id + ')/new_h5pfile/$value', {
+        headers: { 'Accept': 'application/octet-stream' }, credentials: 'same-origin'
+      }).then(function (res) {
+        if (!res.ok) return null;
+        return res.arrayBuffer();
+      }).then(function (buf) {
+        // кэшируем только валидный ZIP (сигнатура PK) — битые копии не сохраняем
+        if (buf && buf.byteLength > 100) {
+          var v = new Uint8Array(buf, 0, 4);
+          if (v[0] === 0x50 && v[1] === 0x4B && v[2] === 0x03 && v[3] === 0x04) {
+            console.log('[prefetch] урок закэширован:', s.id, '(' + (buf.byteLength / 1048576).toFixed(1) + ' МБ)');
+            return idbPut(s.id, { ver: s.ver, buf: buf });
+          }
+          console.warn('[prefetch] копия урока повреждена (не ZIP), пропуск:', s.id);
+        }
+      }).catch(function () {});
+    }).then(function () {
+      setTimeout(function () { prefetchOne(i + 1); }, 1200); // пауза между уроками
+    });
+  }
+
+  // стартуем тихо, когда страница отрисована и браузер свободен
+  var start = function () { setTimeout(function () { prefetchOne(0); }, 1500); };
+  if ('requestIdleCallback' in window) { requestIdleCallback(start, { timeout: 4000 }); }
+  else if (document.readyState === 'complete') { start(); }
+  else { window.addEventListener('load', start); }
+})();
+</script>
 
 {% endif %}
 {% endunless %}

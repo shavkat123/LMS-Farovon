@@ -21,6 +21,7 @@
     <attribute name="new_name" />
     <attribute name="new_description" />
     <attribute name="new_department" />
+    <attribute name="new_targetrole" />
     <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
     <order attribute="new_name" />
   </entity>
@@ -76,10 +77,36 @@
   {% endif %}
 {% endfor %}
 
-{% comment %}── Статистика ──{% endcomment %}
-{% assign n_traj = trajs.results.entities.size %}
+{% comment %}── Видимость по целевой роли (new_targetrole): 100000000=Все, 100000001=Новый сотрудник,
+   100000002=Наставник, 100000003=Руководитель, 100000004=HR. Роль записывали, но не применяли —
+   пользователь видел чужие пути. Choice читаем через .value: сравнение самого объекта с числом
+   всегда false. Пустое поле = «Все», чтобы старые записи не пропали. ──{% endcomment %}
+{% assign vis_ids = '|' %}
+{% assign n_traj = 0 %}
+{% for tj in trajs.results.entities %}
+  {% assign trole = 100000000 %}
+  {% if tj.new_targetrole %}{% assign trole = tj.new_targetrole.value %}{% endif %}
+  {% assign tj_vis = false %}
+  {% if trole == 100000000 %}{% assign tj_vis = true %}
+  {% elsif trole == 100000001 and user.roles contains 'Новый сотрудник' %}{% assign tj_vis = true %}
+  {% elsif trole == 100000002 and user.roles contains 'Наставник' %}{% assign tj_vis = true %}
+  {% elsif trole == 100000003 and user.roles contains 'Руководитель' %}{% assign tj_vis = true %}
+  {% elsif trole == 100000004 and user.roles contains 'HR' %}{% assign tj_vis = true %}
+  {% endif %}
+  {% comment %}── Администратор видит все траектории: иначе он не проверит то, что сам настроил ──{% endcomment %}
+  {% if user.roles contains 'Administrators' %}{% assign tj_vis = true %}{% endif %}
+  {% if tj_vis %}
+    {% assign n_traj = n_traj | plus: 1 %}
+    {% assign vis_ids = vis_ids | append: tj.new_trajectoryid | append: '|' %}
+  {% endif %}
+{% endfor %}
+
+{% comment %}── Статистика. KPI считаем только по видимым активным траекториям: раньше сюда попадали
+   курсы отключённых (new_isactive=0) траекторий, и цифра расходилась со списком ниже.
+   Проверки вложены, а не через and: у Liquid операнды вычисляются справа налево,
+   и c.new_trajectory.id читалось бы раньше проверки на null. ──{% endcomment %}
 {% assign stat_courses = 0 %}
-{% for c in courses.results.entities %}{% if c.new_trajectory %}{% assign stat_courses = stat_courses | plus: 1 %}{% endif %}{% endfor %}
+{% for c in courses.results.entities %}{% if c.new_trajectory %}{% if vis_ids contains c.new_trajectory.id %}{% assign stat_courses = stat_courses | plus: 1 %}{% endif %}{% endif %}{% endfor %}
 
 <style>
   .fv-paths { padding: 12px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
@@ -165,12 +192,14 @@
   <div class="fv-paths-blank">
     <i class="bi bi-signpost-2"></i>
     <h3>Траекторий пока нет</h3>
-    <p>Создайте траектории в админке (или Power Apps), привяжите к ним курсы через поле «Траектория» — и здесь появятся пути развития с прогрессом.</p>
+    <p>Для вашей роли пока не назначено ни одной траектории. Создайте траекторию в админке (или Power Apps), укажите целевую роль и привяжите курсы через поле «Траектория» — путь развития появится здесь.</p>
   </div>
   {% else %}
 
   {% for tj in trajs.results.entities %}
     {% assign tjid = tj.new_trajectoryid %}
+    {% comment %}── Показываем только траектории, прошедшие фильтр по new_targetrole выше ──{% endcomment %}
+    {% if vis_ids contains tjid %}
     {% assign tj_idx = forloop.index0 | modulo: 6 %}
     {% case tj_idx %}
       {% when 0 %}{% assign tcol = '#15803D' %}{% assign ttint = '#ECF6EF' %}{% assign tico = 'bi-signpost-2' %}
@@ -202,7 +231,8 @@
       <a href="/course-details?id={{ cid }}" class="fv-traj-step fv-traj-step--{{ cstatus }}">
         <span class="fv-traj-num">{% if cstatus == 'done' %}<i class="bi bi-check-lg"></i>{% else %}{{ tj_courses }}{% endif %}</span>
         <span class="fv-traj-step-body">
-          <span class="fv-traj-step-name">{{ cname }}</span>
+          {% comment %}── escape: имя курса приходит из Dataverse и попадает в HTML — без экранирования это хранимый XSS ──{% endcomment %}
+          <span class="fv-traj-step-name">{{ cname | escape }}</span>
           <span class="fv-traj-step-prog">{% if ctotal > 0 %}{{ cdone }}/{{ ctotal }} уроков · {{ cpct }}%{% else %}уроки не привязаны{% endif %}</span>
         </span>
       </a>
@@ -210,14 +240,24 @@
       {% endfor %}
     {% endcapture %}
     {% assign tj_pct = 0 %}{% if tj_total > 0 %}{% assign tj_pct = tj_done | times: 100 | divided_by: tj_total %}{% endif %}
+    {% comment %}── Русское склонение «курс/курса/курсов»: 11-14 всегда «курсов» (11 курсов, а не «11 курс»),
+       иначе решает последняя цифра. Прежнее правило по самому числу врало на 11-14 и на 21, 22... ──{% endcomment %}
+    {% assign m100 = tj_courses | modulo: 100 %}
+    {% assign m10 = tj_courses | modulo: 10 %}
+    {% assign c_sfx = 'ов' %}
+    {% if m100 >= 11 and m100 <= 14 %}{% assign c_sfx = 'ов' %}
+    {% elsif m10 == 1 %}{% assign c_sfx = '' %}
+    {% elsif m10 >= 2 and m10 <= 4 %}{% assign c_sfx = 'а' %}
+    {% endif %}
 
     <div class="fv-traj">
       <div class="fv-traj-head">
         <span class="fv-traj-icon" style="background:{{ ttint }};color:{{ tcol }};"><i class="bi {{ tico }}"></i></span>
         <div class="fv-traj-info">
-          <h3 class="fv-traj-name">{{ tj.new_name | default: 'Траектория' }}</h3>
-          <div class="fv-traj-meta">{% if tj.new_department %}{{ tj.new_department }} · {% endif %}{{ tj_courses }} курс{% if tj_courses == 1 %}{% elsif tj_courses >= 2 and tj_courses < 5 %}а{% else %}ов{% endif %}</div>
-          {% if tj.new_description %}<p class="fv-traj-desc">{{ tj.new_description }}</p>{% endif %}
+          {% comment %}── escape на всех текстовых полях траектории: их правят из админки, HTML оттуда исполнялся бы у всех ──{% endcomment %}
+          <h3 class="fv-traj-name">{{ tj.new_name | default: 'Траектория' | escape }}</h3>
+          <div class="fv-traj-meta">{% if tj.new_department %}{{ tj.new_department | escape }} · {% endif %}{{ tj_courses }} курс{{ c_sfx }}</div>
+          {% if tj.new_description %}<p class="fv-traj-desc">{{ tj.new_description | escape }}</p>{% endif %}
         </div>
         <div class="fv-traj-prog-box">
           <div class="fv-traj-pct" style="color:{{ tcol }};">{{ tj_pct }}%</div>
@@ -229,6 +269,7 @@
         {% if tj_courses == 0 %}<div class="fv-traj-empty">Курсы к этой траектории ещё не привязаны.</div>{% else %}{{ steps_html }}{% endif %}
       </div>
     </div>
+    {% endif %}
   {% endfor %}
 
   {% endif %}

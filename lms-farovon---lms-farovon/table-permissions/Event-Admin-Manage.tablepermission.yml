@@ -1,7 +1,12 @@
+# Права на запись сняты: экрана администрирования мероприятий нет, new_event нигде не пишется
+# (только чтение через FetchXML на /events и главной), а Web API для new_event не включён —
+# в sitesetting.yml нет пар Webapi/new_event/enabled и Webapi/new_event/fields.
+# Держать create/write/delete включёнными без единого потребителя — лишняя поверхность атаки.
+# Если админ-экран мероприятий появится, вернуть флаги вместе с записями Webapi/new_event/*.
 adx_append: true
 adx_appendto: true
-adx_create: true
-adx_delete: true
+adx_create: false
+adx_delete: false
 adx_entitylogicalname: new_event
 adx_entityname: Event Admin Manage
 adx_entitypermission_webrole:
@@ -12,4 +17,4 @@ adx_entitypermission_webrole:
 adx_entitypermissionid: a1b2c3d4-3333-4444-5555-000000000003
 adx_read: true
 adx_scope: 756150000
-adx_write: true
+adx_write: false

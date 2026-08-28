@@ -1,8 +1,10 @@
 {% comment %}
   Admin Users — Сотрудники (/admin/users). Дизайн: Users.jsx. Примитивы .adm-* — customtheme.css.
-  РЕАЛЬНЫЕ данные: aggregate new_h5pprogress по new_user + contact (паттерн лидерборда — надёжно).
-  Показывает сотрудников с учебной активностью (завершённые уроки).
-  Баллы = completed*100 + round(sum(scorescaled)*50). Прогресс = completed / активные уроки каталога.
+  Источник списка — СПРАВОЧНИК КОНТАКТОВ (все активные), а не записи прогресса:
+  зарегистрированный сотрудник виден сразу, даже если ещё не открыл ни одного урока.
+  Прогресс подмешивается агрегатом new_h5pprogress по парам (сотрудник, урок) с max(scorescaled) —
+  дубли записей одного урока (новая запись на каждый сеанс плеера) не раздувают баллы и средний.
+  Баллы = завершённых_уроков*100 + round(sum(best_score)*50). Прогресс = завершённые / активные уроки каталога.
 {% endcomment %}
 
 {% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
@@ -14,19 +16,41 @@
 </div>
 {% else %}
 
-{% comment %}── Прогресс по пользователям (aggregate + contact link) ──{% endcomment %}
+{% comment %}── Все активные контакты — справочник сотрудников ──{% endcomment %}
+{% fetchxml emps %}
+<fetch top="250">
+  <entity name="contact">
+    <attribute name="contactid" />
+    <attribute name="fullname" />
+    <attribute name="jobtitle" />
+    <attribute name="department" />
+    <attribute name="emailaddress1" />
+    <attribute name="createdon" />
+    <filter><condition attribute="statecode" operator="eq" value="0" /></filter>
+    <order attribute="createdon" descending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Реальное число активных контактов: список выше обрезан top=250, а KPI «Всего» должен быть честным ──{% endcomment %}
+{% fetchxml emp_cnt %}
+<fetch aggregate="true">
+  <entity name="contact">
+    <attribute name="contactid" aggregate="count" alias="tc" />
+    <filter><condition attribute="statecode" operator="eq" value="0" /></filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign emp_total = 0 %}
+{% for r in emp_cnt.results.entities %}{% assign emp_total = r.tc | default: 0 | plus: 0 %}{% endfor %}
+
+{% comment %}── Прогресс: лучший балл по каждой паре (сотрудник, урок) — устойчиво к дублям ──{% endcomment %}
 {% fetchxml up %}
 <fetch aggregate="true">
   <entity name="new_h5pprogress">
     <attribute name="new_user" groupby="true" alias="uid" />
-    <attribute name="new_h5pprogressid" aggregate="count" alias="cnt" />
-    <attribute name="new_scorescaled" aggregate="sum" alias="ssum" />
-    <link-entity name="contact" from="contactid" to="new_user" alias="c" link-type="outer">
-      <attribute name="fullname" groupby="true" alias="fn" />
-      <attribute name="jobtitle" groupby="true" alias="jt" />
-      <attribute name="department" groupby="true" alias="dp" />
-      <attribute name="emailaddress1" groupby="true" alias="em" />
-    </link-entity>
+    <attribute name="new_h5pcontent" groupby="true" alias="cid" />
+    <attribute name="new_scorescaled" aggregate="max" alias="smax" />
     <filter>
       <condition attribute="new_completion" operator="eq" value="1" />
     </filter>
@@ -47,15 +71,23 @@
 {% for r in les_cnt.results.entities %}{% assign cat_total = r.lc | plus: 0 %}{% endfor %}
 {% if cat_total == 0 %}{% assign cat_total = 1 %}{% endif %}
 
-{% comment %}── KPI ──{% endcomment %}
+{% comment %}── KPI: всего в справочнике / с активностью / завершений (уникальных уроков) ──{% endcomment %}
+{% assign g_total = emps.results.entities.size %}
 {% assign g_users = 0 %}
 {% assign g_done = 0 %}
-{% for r in up.results.entities %}
-  {% assign uid = r.uid.id | default: r.uid %}
-  {% if uid == '' or uid == null %}{% continue %}{% endif %}
-  {% assign g_users = g_users | plus: 1 %}
-  {% assign g_done = g_done | plus: r.cnt %}
+{% for c in emps.results.entities %}
+  {% assign has_act = false %}
+  {% for r in up.results.entities %}
+    {% assign ruid = r.uid.id | default: r.uid %}
+    {% if ruid == c.id %}
+      {% assign has_act = true %}
+      {% assign g_done = g_done | plus: 1 %}
+    {% endif %}
+  {% endfor %}
+  {% if has_act %}{% assign g_users = g_users | plus: 1 %}{% endif %}
 {% endfor %}
+{% comment %}страховка: если агрегат не отдал число, «Всего» не должно быть меньше уже показанных строк{% endcomment %}
+{% if emp_total < g_total %}{% assign emp_total = g_total %}{% endif %}
 
 <style>
   .admu { padding: 24px 0 56px; }
@@ -69,6 +101,7 @@
   .admu-name { font-weight: 600; color: var(--adm-fg-1); }
   .admu-mail { font-size: 11px; color: var(--adm-fg-3); }
   .admu-foot { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--adm-border-1); }
+  .admu-zero { color: var(--adm-fg-3); font-weight: 500; }
 </style>
 
 <div class="container adm-scope admu">
@@ -76,7 +109,7 @@
   <div class="admu-head">
     <span class="adm-eyebrow">Люди</span>
     <h1>Сотрудники</h1>
-    <p>Сотрудников с учебной активностью: <b class="adm-num">{{ g_users }}</b> · завершений уроков: <b class="adm-num">{{ g_done }}</b></p>
+    <p>Всего: <b class="adm-num">{{ emp_total }}</b> · с учебной активностью: <b class="adm-num">{{ g_users }}</b> · завершений уроков: <b class="adm-num">{{ g_done }}</b>{% if emp_total > g_total %} <span style="color:var(--adm-fg-3);">(активность — по первым {{ g_total }})</span>{% endif %}</p>
   </div>
 
   {% comment %}── Toolbar ──{% endcomment %}
@@ -92,10 +125,10 @@
 
   {% comment %}── Table ──{% endcomment %}
   <div class="adm-card" style="overflow:hidden;">
-    {% if g_users == 0 %}
+    {% if g_total == 0 %}
     <div style="padding:48px 24px;text-align:center;color:var(--adm-fg-3);">
       <i class="bi bi-people" style="display:block;font-size:40px;color:#CBD5E1;margin-bottom:12px;"></i>
-      Пока нет сотрудников с завершёнными уроками.
+      Пока нет зарегистрированных сотрудников.
     </div>
     {% else %}
     <div class="admu-tbl-wrap">
@@ -111,26 +144,34 @@
           </tr>
         </thead>
         <tbody id="admuBody">
-          {% for r in up.results.entities %}
-            {% assign uid = r.uid.id | default: r.uid %}
-            {% if uid == '' or uid == null %}{% continue %}{% endif %}
-            {% assign fn = r['c.fn'] | default: 'Без имени' %}
-            {% assign em = r['c.em'] | default: '' %}
-            {% assign jb = r['c.jt'] | default: '' %}
-            {% assign dp = r['c.dp'] | default: '' %}
-            {% assign cnt = r.cnt | plus: 0 %}
-            {% assign ssum = r.ssum | plus: 0 %}
-            {% assign bonus = ssum | times: 50 | round %}
+          {% for c in emps.results.entities %}
+            {% assign cnt = 0 %}
+            {% assign bsum = 0 %}
+            {% for r in up.results.entities %}
+              {% assign ruid = r.uid.id | default: r.uid %}
+              {% if ruid == c.id %}
+                {% assign cnt = cnt | plus: 1 %}
+                {% assign s = r.smax | plus: 0 %}
+                {% assign bsum = bsum | plus: s %}
+              {% endif %}
+            {% endfor %}
+            {% comment %}escape при assign: значение уходит и в HTML-текст, и в data-атрибуты — кавычка в имени рвала бы разметку{% endcomment %}
+            {% assign fn = c.fullname | default: 'Без имени' | escape %}
+            {% assign em = c.emailaddress1 | default: '' | escape %}
+            {% assign jb = c.jobtitle | default: '' | escape %}
+            {% assign dp = c.department | default: '' | escape %}
+            {% assign bonus = bsum | times: 50 | round %}
             {% assign pts = cnt | times: 100 | plus: bonus %}
-            {% assign avg = 0 %}{% if cnt > 0 %}{% assign avg = ssum | times: 100 | divided_by: cnt %}{% endif %}
+            {% assign avg = 0 %}{% if cnt > 0 %}{% assign avg = bsum | times: 100 | divided_by: cnt | round %}{% endif %}
             {% assign pct = cnt | times: 100 | divided_by: cat_total %}
             {% if pct > 100 %}{% assign pct = 100 %}{% endif %}
             {% assign parts = fn | split: ' ' %}
             {% assign in1 = parts[0] | slice: 0, 1 | upcase %}
             {% assign in2 = '' %}
             {% if parts.size > 1 %}{% assign in2 = parts[1] | slice: 0, 1 | upcase %}{% endif %}
+          {% comment %}отдельные data-* вместо склейки через «|»: символ | в имени/должности разъезжал колонки CSV{% endcomment %}
           <tr data-search="{{ fn | downcase }} {{ em | downcase }} {{ dp | downcase }} {{ jb | downcase }}"
-              data-row="{{ fn | escape }}|{{ em | escape }}|{{ dp | escape }}|{{ jb | escape }}|{{ cnt }}|{{ pts }}">
+              data-fn="{{ fn }}" data-em="{{ em }}" data-dp="{{ dp }}" data-jb="{{ jb }}" data-cnt="{{ cnt }}" data-pts="{{ pts }}">
             <td>
               <div style="display:flex;align-items:center;gap:10px;">
                 <span class="adm-avatar">{{ in1 }}{{ in2 }}</span>
@@ -143,18 +184,26 @@
             <td>{% if dp != '' %}{{ dp }}{% else %}<span style="color:var(--adm-fg-3);">—</span>{% endif %}</td>
             <td>{% if jb != '' %}{{ jb }}{% else %}<span style="color:var(--adm-fg-3);">—</span>{% endif %}</td>
             <td>
+              {% if cnt > 0 %}
               <div style="display:flex;align-items:center;gap:8px;">
                 <div class="adm-bar" style="flex:1;"><div style="width:{{ pct }}%;background:{% if pct == 100 %}var(--adm-success){% else %}var(--adm-primary){% endif %};"></div></div>
                 <span class="adm-num" style="font-size:11px;font-weight:600;color:var(--adm-fg-2);min-width:36px;">{{ cnt }}/{{ cat_total }}</span>
               </div>
+              {% else %}
+              <span class="admu-zero">Не начинал(а)</span>
+              {% endif %}
             </td>
-            <td class="adm-r adm-num">{{ avg }}%</td>
+            <td class="adm-r adm-num">{% if cnt > 0 %}{{ avg }}%{% else %}<span class="admu-zero">—</span>{% endif %}</td>
             <td class="adm-r adm-num" style="font-weight:600;">{{ pts }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% comment %}честно говорим про обрезку top=250: иначе поиск/экспорт «не находят» существующего сотрудника{% endcomment %}
+    {% if emp_total > g_total %}
+    <div class="admu-foot"><span class="adm-eyebrow">Показаны первые {{ g_total }} из {{ emp_total }}</span><span class="adm-eyebrow">Поиск и экспорт работают только по показанным</span></div>
+    {% endif %}
     {% endif %}
   </div>
 
@@ -180,7 +229,12 @@
         var lines = [head.join(';')];
         rows().forEach(function (r) {
           if (r.style.display === 'none') return;
-          var d = (r.getAttribute('data-row') || '').split('|').map(function (c) { return '"' + c.replace(/"/g, '""') + '"'; });
+          var d = ['fn', 'em', 'dp', 'jb', 'cnt', 'pts'].map(function (k) {
+            var c = r.getAttribute('data-' + k) || '';
+            // ведущий апостроф: иначе Excel исполнит значение как формулу (CSV injection)
+            if (/^[=+\-@]/.test(c)) { c = "'" + c; }
+            return '"' + c.replace(/"/g, '""') + '"';
+          });
           lines.push(d.join(';'));
         });
         var blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });

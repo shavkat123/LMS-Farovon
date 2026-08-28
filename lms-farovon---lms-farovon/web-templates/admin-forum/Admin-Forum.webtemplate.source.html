@@ -13,23 +13,47 @@
 </div>
 {% else %}
 
-{% comment %}── KPI aggregate ──{% endcomment %}
+{% comment %}
+  ── KPI aggregate ──
+  statecode=0 обязателен: без него KPI считал и деактивированные темы, а таблица ниже
+  (тот же фильтр) их не показывала — числа в шапке расходились со списком.
+{% endcomment %}
 {% fetchxml fm_kpi %}
 <fetch aggregate="true">
   <entity name="new_forumthread">
     <attribute name="new_forumthreadid" aggregate="count" alias="tcnt" />
-    <attribute name="new_replycount" aggregate="sum" alias="rsum" />
     <attribute name="new_votes" aggregate="sum" alias="vsum" />
     <attribute name="new_author" aggregate="countcolumn" distinct="true" alias="acnt" />
+    <filter>
+      <condition attribute="statecode" operator="eq" value="0" />
+    </filter>
   </entity>
 </fetch>
 {% endfetchxml %}
-{% assign k_threads = 0 %}{% assign k_replies = 0 %}{% assign k_votes = 0 %}{% assign k_authors = 0 %}
+
+{% comment %}
+  Ответы считаются из new_forumreply, а не из поля new_forumthread.new_replycount:
+  поле вело клиентский PATCH, который требовал права записи на чужие темы и терял
+  ответы в гонке. Поле больше не поддерживается и не читается нигде.
+{% endcomment %}
+{% fetchxml fm_replies %}
+<fetch aggregate="true">
+  <entity name="new_forumreply">
+    <attribute name="new_thread" groupby="true" alias="rtid" />
+    <attribute name="new_forumreplyid" aggregate="count" alias="rcnt" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign k_threads = 0 %}{% assign k_votes = 0 %}{% assign k_authors = 0 %}
 {% for r in fm_kpi.results.entities %}
   {% assign k_threads = r.tcnt | plus: 0 %}
-  {% assign k_replies = r.rsum | plus: 0 %}
   {% assign k_votes = r.vsum | plus: 0 %}
   {% assign k_authors = r.acnt | plus: 0 %}
+{% endfor %}
+{% assign k_replies = 0 %}
+{% for r in fm_replies.results.entities %}
+  {% assign k_replies = k_replies | plus: r.rcnt %}
 {% endfor %}
 
 {% comment %}── Список тем (закреплённые сверху, затем свежие) ──{% endcomment %}
@@ -40,12 +64,14 @@
     <attribute name="new_name" />
     <attribute name="new_tag" />
     <attribute name="new_votes" />
-    <attribute name="new_replycount" />
     <attribute name="new_ispinned" />
     <attribute name="createdon" />
     <link-entity name="contact" from="contactid" to="new_author" alias="au" link-type="outer">
       <attribute name="fullname" />
     </link-entity>
+    <filter>
+      <condition attribute="statecode" operator="eq" value="0" />
+    </filter>
     <order attribute="new_ispinned" descending="true" />
     <order attribute="createdon" descending="true" />
   </entity>
@@ -63,7 +89,8 @@
   .admf-search i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--adm-fg-3); font-size: 14px; pointer-events: none; }
   .admf-search .adm-input { padding-left: 32px; }
   .admf-tbl-wrap { overflow-x: auto; }
-  .admf-title { font-weight: 600; color: var(--adm-fg-1); }
+  .admf-title { font-weight: 600; color: var(--adm-fg-1) !important; text-decoration: none !important; }
+  .admf-title:hover { color: var(--adm-primary) !important; text-decoration: underline !important; }
 </style>
 
 <div class="container adm-scope admf">
@@ -110,14 +137,23 @@
 
   {% comment %}── Таблица тем ──{% endcomment %}
   <div class="adm-card" style="overflow:hidden;">
-    {% assign lcount = 0 %}
-    {% for t in fm_list.results.entities %}{% assign lcount = lcount | plus: 1 %}{% endfor %}
+    {% comment %} .size даёт длину коллекции сразу — лишний проход циклом не нужен {% endcomment %}
+    {% assign lcount = fm_list.results.entities.size %}
     {% if lcount == 0 %}
     <div style="padding:48px 24px;text-align:center;color:var(--adm-fg-3);">
       <i class="bi bi-chat-square" style="display:block;font-size:40px;color:#CBD5E1;margin-bottom:12px;"></i>
       Тем пока нет.
     </div>
     {% else %}
+    {% comment %}
+      Список ограничен top="50" — молчаливая обрезка вводила модератора в заблуждение
+      (KPI «Тем» показывает всё). lcount берём из .size (точно число), k_threads не сравниваем.
+    {% endcomment %}
+    {% if lcount >= 50 %}
+    <div style="padding:10px 16px;font-size:12px;color:var(--adm-fg-3);border-bottom:1px solid var(--adm-border-1);">
+      <i class="bi bi-info-circle"></i> Показаны последние 50 тем из {{ k_threads }}. Остальные — в Dataverse или на <a href="/forum">самом форуме</a>.
+    </div>
+    {% endif %}
     <div class="admf-tbl-wrap">
       <table class="adm-table" id="admfTable">
         <thead>
@@ -132,10 +168,15 @@
         </thead>
         <tbody id="admfBody">
           {% for t in fm_list.results.entities %}
-            {% assign ttl = t.new_name | default: 'Без названия' %}
-            {% assign au = t['au.fullname'] | default: 'Аноним' %}
-            {% assign tag = t.new_tag | default: '' %}
-            {% assign rc = t.new_replycount | default: 0 %}
+            {% assign ttl = t.new_name | default: 'Без названия' | escape %}
+            {% assign au = t['au.fullname'] | default: 'Аноним' | escape %}
+            {% assign tag = t.new_tag | default: '' | escape %}
+            {% assign rc = 0 %}
+            {% assign t_key = t.new_forumthreadid | downcase %}
+            {% for r in fm_replies.results.entities %}
+              {% assign r_key = r.rtid.id | default: r.rtid | downcase %}
+              {% if r_key == t_key %}{% assign rc = r.rcnt %}{% endif %}
+            {% endfor %}
             {% assign vc = t.new_votes | default: 0 %}
             {% assign pinned = t.new_ispinned %}
             {% case tag %}
@@ -151,14 +192,15 @@
             <td>
               <div style="display:flex;align-items:center;gap:8px;">
                 {% if pinned %}<i class="bi bi-pin-angle-fill" style="color:var(--adm-success);font-size:13px;" title="Закреплено"></i>{% endif %}
-                <span class="admf-title">{{ ttl }}</span>
+                {% comment %} Заголовок — ссылка на саму тему: единственное действие модерации, доступное без прав записи на new_forumthread {% endcomment %}
+                <a class="admf-title" href="/forum-thread?id={{ t.new_forumthreadid }}">{{ ttl }}</a>
               </div>
             </td>
             <td style="color:var(--adm-fg-2);">{{ au }}</td>
             <td>{% if tag != '' %}<span class="adm-pill {{ pill }}">{{ tag }}</span>{% else %}<span style="color:var(--adm-fg-3);">—</span>{% endif %}</td>
             <td class="adm-r adm-num">{{ rc }}</td>
             <td class="adm-r adm-num">{{ vc }}</td>
-            <td style="font-size:12px;color:var(--adm-fg-3);">{{ t.createdon | date: 'dd.MM.yyyy' }}</td>
+            <td style="font-size:12px;color:var(--adm-fg-3);">{{ t.createdon | date_add_hours: 5 | date: 'dd.MM.yyyy' }}</td>
           </tr>
           {% endfor %}
         </tbody>

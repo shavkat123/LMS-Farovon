@@ -35,18 +35,21 @@
 </fetch>
 {% endfetchxml %}
 
-{% comment %}── now как число yyyyMMddHHmm для сравнения дат (DotLiquid не сравнивает даты напрямую) ──{% endcomment %}
-{% assign now_num   = 'now' | date: 'yyyyMMddHHmm' | plus: 0 %}
+{% comment %}── now как СТРОКА yyyyMMddHHmm: DotLiquid не сравнивает даты напрямую, а равнодлинные
+   строки из цифр сравниваются в том же порядке, что и числа. В число приводить НЕЛЬЗЯ:
+   фильтр integer не возьмёт 12 знаков (переполнение Int32), а plus:0 на строке — конкатенация ──{% endcomment %}
+{% assign now_num   = 'now' | date: 'yyyyMMddHHmm' %}
 {% assign ru_months = 'янв,фев,мар,апр,мая,июн,июл,авг,сен,окт,ноя,дек' | split: ',' %}
 
 {% comment %}── Первый проход: ближайшее не-прошедшее событие = featured; счётчик активных ──{% endcomment %}
 {% assign feat_id      = '' %}
 {% assign active_count = 0 %}
 {% for e in evt_list.results.entities %}
-  {% assign snum = e.new_startdatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
-  {% assign enum = e.new_enddatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+  {% assign snum = e.new_startdatetime | date: 'yyyyMMddHHmm' %}
+  {% assign enum = e.new_enddatetime | date: 'yyyyMMddHHmm' %}
   {% assign past = false %}
-  {% if enum > 0 %}{% if now_num > enum %}{% assign past = true %}{% endif %}{% else %}{% if now_num > snum %}{% assign past = true %}{% endif %}{% endif %}
+  {% comment %}наличие конца проверяем по самому полю, а не по enum: enum теперь строка, сравнивать её с 0 нечестно{% endcomment %}
+  {% if e.new_enddatetime %}{% if now_num > enum %}{% assign past = true %}{% endif %}{% else %}{% if now_num > snum %}{% assign past = true %}{% endif %}{% endif %}
   {% unless past %}
     {% assign active_count = active_count | plus: 1 %}
     {% if feat_id == '' %}{% assign feat_id = e.new_eventid %}{% endif %}
@@ -143,9 +146,9 @@
   {% if feat_id != '' %}
   {% for e in evt_list.results.entities %}{% if e.new_eventid == feat_id %}
     {% assign f_type   = e.new_eventtype.label | default: 'Событие' %}
-    {% assign f_snum   = e.new_startdatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
-    {% assign f_enum   = e.new_enddatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
-    {% assign f_live   = false %}{% if f_enum > 0 and now_num >= f_snum and now_num <= f_enum %}{% assign f_live = true %}{% endif %}
+    {% assign f_snum   = e.new_startdatetime | date: 'yyyyMMddHHmm' %}
+    {% assign f_enum   = e.new_enddatetime | date: 'yyyyMMddHHmm' %}
+    {% assign f_live   = false %}{% if e.new_enddatetime and now_num >= f_snum and now_num <= f_enum %}{% assign f_live = true %}{% endif %}
     {% assign f_day    = e.new_startdatetime | date: 'dd' %}
     {% assign f_mon_s  = e.new_startdatetime | date: 'MM' %}
     {% case f_mon_s %}{% when '01' %}{% assign f_mon = 'янв' %}{% when '02' %}{% assign f_mon = 'фев' %}{% when '03' %}{% assign f_mon = 'мар' %}{% when '04' %}{% assign f_mon = 'апр' %}{% when '05' %}{% assign f_mon = 'мая' %}{% when '06' %}{% assign f_mon = 'июн' %}{% when '07' %}{% assign f_mon = 'июл' %}{% when '08' %}{% assign f_mon = 'авг' %}{% when '09' %}{% assign f_mon = 'сен' %}{% when '10' %}{% assign f_mon = 'окт' %}{% when '11' %}{% assign f_mon = 'ноя' %}{% else %}{% assign f_mon = 'дек' %}{% endcase %}
@@ -179,11 +182,13 @@
       <div class="fv-feat-cover">
         <div class="fv-feat-cover-in">
           {% if f_cap > 0 %}<span class="fv-seat-chip"><i class="bi bi-people"></i> {{ f_cap }} мест</span>{% else %}<span></span>{% endif %}
+          {% if f_pts > 0 %}
           <div>
             <div class="fv-seat-lbl">Награда за участие</div>
             <div class="fv-seat-num">+{{ f_pts }}</div>
             <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:2px;">баллов в магазин наград</div>
           </div>
+          {% else %}<span></span>{% endif %}
         </div>
       </div>
     </div>
@@ -204,13 +209,13 @@
   <div class="fv-card" style="overflow:hidden;">
     <div id="fv-ev-list">
       {% for e in evt_list.results.entities %}
-        {% assign snum = e.new_startdatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
-        {% assign enum = e.new_enddatetime | date: 'yyyyMMddHHmm' | plus: 0 %}
+        {% assign snum = e.new_startdatetime | date: 'yyyyMMddHHmm' %}
+        {% assign enum = e.new_enddatetime | date: 'yyyyMMddHHmm' %}
         {% assign past = false %}
-        {% if enum > 0 %}{% if now_num > enum %}{% assign past = true %}{% endif %}{% else %}{% if now_num > snum %}{% assign past = true %}{% endif %}{% endif %}
+        {% if e.new_enddatetime %}{% if now_num > enum %}{% assign past = true %}{% endif %}{% else %}{% if now_num > snum %}{% assign past = true %}{% endif %}{% endif %}
         {% unless past %}
           {% assign r_type  = e.new_eventtype.label | default: 'Событие' %}
-          {% assign r_live  = false %}{% if enum > 0 and now_num >= snum and now_num <= enum %}{% assign r_live = true %}{% endif %}
+          {% assign r_live  = false %}{% if e.new_enddatetime and now_num >= snum and now_num <= enum %}{% assign r_live = true %}{% endif %}
           {% assign r_day   = e.new_startdatetime | date: 'dd' %}
           {% assign r_mon_s = e.new_startdatetime | date: 'MM' %}
           {% case r_mon_s %}{% when '01' %}{% assign r_mon = 'янв' %}{% when '02' %}{% assign r_mon = 'фев' %}{% when '03' %}{% assign r_mon = 'мар' %}{% when '04' %}{% assign r_mon = 'апр' %}{% when '05' %}{% assign r_mon = 'мая' %}{% when '06' %}{% assign r_mon = 'июн' %}{% when '07' %}{% assign r_mon = 'июл' %}{% when '08' %}{% assign r_mon = 'авг' %}{% when '09' %}{% assign r_mon = 'сен' %}{% when '10' %}{% assign r_mon = 'окт' %}{% when '11' %}{% assign r_mon = 'ноя' %}{% else %}{% assign r_mon = 'дек' %}{% endcase %}

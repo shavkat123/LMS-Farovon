@@ -1,20 +1,24 @@
 {% comment %}
   Forum — Обсуждения и Q&A
   Table: new_forumthread
-  Columns: new_Name, new_body, new_tag, new_votes, new_replycount, new_ispinned, new_author (Lookup→Contact)
+  Columns: new_Name, new_body, new_tag, new_votes, new_ispinned, new_author (Lookup→Contact)
+  Поле new_replycount НЕ используется: число ответов — агрегат по new_forumreply.
   Author name via link-entity alias "auth" → thread['auth.fullname']
   Demo mode activates when 0 threads found (no Table Permissions yet or empty table).
 {% endcomment %}
 
+{% comment %}
+  top="100" — коллекция тем растёт, без ограничения страница тянула бы всю таблицу
+  и раздувала HTML. Фильтр/поиск ниже клиентские, т.е. работают в пределах этих 100 тем.
+{% endcomment %}
 {% fetchxml forum_threads %}
-<fetch>
+<fetch top="100">
   <entity name="new_forumthread">
     <attribute name="new_forumthreadid" />
     <attribute name="new_name" />
     <attribute name="new_body" />
     <attribute name="new_tag" />
     <attribute name="new_votes" />
-    <attribute name="new_replycount" />
     <attribute name="new_ispinned" />
     <attribute name="createdon" />
     <link-entity name="contact" from="contactid" to="new_author" alias="auth" link-type="outer">
@@ -29,12 +33,48 @@
 </fetch>
 {% endfetchxml %}
 
+{% comment %}
+  Число ответов считается из new_forumreply, а НЕ из поля new_forumthread.new_replycount.
+  Поле вело клиентский PATCH из /forum-thread, который требовал права записи на чужие темы
+  и терял ответы в гонке read-modify-write. Теперь тема доступна на запись только автору
+  через create, а счётчик — производная величина.
+{% endcomment %}
+{% fetchxml forum_reply_counts %}
+<fetch aggregate="true">
+  <entity name="new_forumreply">
+    <attribute name="new_thread" groupby="true" alias="rtid" />
+    <attribute name="new_forumreplyid" aggregate="count" alias="rcnt" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
 {% assign total_threads = 0 %}
-{% assign total_replies = 0 %}
 {% for t in forum_threads.results.entities %}
   {% assign total_threads = total_threads | plus: 1 %}
-  {% assign t_r = t.new_replycount | default: 0 %}
-  {% assign total_replies = total_replies | plus: t_r %}
+{% endfor %}
+{% assign total_replies = 0 %}
+{% for rc in forum_reply_counts.results.entities %}
+  {% assign total_replies = total_replies | plus: rc.rcnt %}
+{% endfor %}
+
+{% comment %}
+  «Участников» = число разных авторов тем. Считаем агрегатом, а не по выборке forum_threads:
+  там стоит top="100", и KPI врал бы на большой таблице. Отдельный fetch, потому что
+  countcolumn distinct нельзя смешивать с обычными атрибутами в одном запросе.
+{% endcomment %}
+{% fetchxml forum_authors %}
+<fetch aggregate="true">
+  <entity name="new_forumthread">
+    <attribute name="new_author" aggregate="countcolumn" distinct="true" alias="acnt" />
+    <filter>
+      <condition attribute="statecode" operator="eq" value="0" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign total_authors = 0 %}
+{% for r in forum_authors.results.entities %}
+  {% assign total_authors = r.acnt %}
 {% endfor %}
 
 {% assign demo_mode = false %}
@@ -169,7 +209,9 @@
 
   {% assign stat_threads = total_threads %}
   {% assign stat_replies = total_replies %}
-  {% if demo_mode %}{% assign stat_threads = 8 %}{% assign stat_replies = 90 %}{% endif %}
+  {% assign stat_authors = total_authors %}
+  {% comment %} Круглые числа только в демо-режиме: на реальных данных все три KPI — из Dataverse {% endcomment %}
+  {% if demo_mode %}{% assign stat_threads = 8 %}{% assign stat_replies = 90 %}{% assign stat_authors = 24 %}{% endif %}
 
   <div class="fv-forum-stats">
     <div class="fv-fstat">
@@ -182,7 +224,7 @@
     </div>
     <div class="fv-fstat">
       <div class="fv-fstat-icon" style="background:#F0FDF4;color:#22C55E;"><i class="bi bi-people"></i></div>
-      <div><div class="fv-fstat-val">24</div><div class="fv-fstat-lbl">Участников</div></div>
+      <div><div class="fv-fstat-val">{{ stat_authors }}</div><div class="fv-fstat-lbl">Участников</div></div>
     </div>
   </div>
 
@@ -299,11 +341,17 @@
     {% comment %}── Real data from new_forumthread ──{% endcomment %}
     {% for thread in forum_threads.results.entities %}
       {% assign t_id     = thread.new_forumthreadid %}
-      {% assign t_title  = thread.new_name %}
+      {% assign t_title  = thread.new_name | escape %}
       {% assign t_votes  = thread.new_votes  | default: 0 %}
-      {% assign t_replies = thread.new_replycount | default: 0 %}
-      {% assign t_date   = thread.createdon | date: "%d.%m.%Y" %}
-      {% assign t_author = thread['auth.fullname'] | default: 'Аноним' %}
+      {% comment %} Ответы — из агрегата по new_forumreply (вложенный поиск, без индексации массива) {% endcomment %}
+      {% assign t_replies = 0 %}
+      {% assign t_id_key = t_id | downcase %}
+      {% for rc in forum_reply_counts.results.entities %}
+        {% assign rc_tid = rc.rtid.id | default: rc.rtid | downcase %}
+        {% if rc_tid == t_id_key %}{% assign t_replies = rc.rcnt %}{% endif %}
+      {% endfor %}
+      {% assign t_date   = thread.createdon | date_add_hours: 5 | date: "%d.%m.%Y" %}
+      {% assign t_author = thread['auth.fullname'] | default: 'Аноним' | escape %}
       {% assign t_avatar = t_author | slice: 0, 1 | upcase %}
       {% assign t_pinned = thread.new_ispinned %}
       {% assign t_tag    = thread.new_tag | default: 'Общее' %}
@@ -315,7 +363,9 @@
       {% if t_pinned %}
         {% assign t_tag_display = 'Закреплено' %}
         {% assign t_class = 'fv-tag-pinned' %}
-        {% assign t_filter = 'Закреплено' %}
+        {% comment %} data-tag хранит НАБОР меток: закреплённая тема должна оставаться видимой
+             и в своей категории, иначе «Помощь» теряет закреплённый вопрос {% endcomment %}
+        {% assign t_filter = 'Закреплено ' | append: t_tag %}
       {% else %}
         {% if t_tag == 'Помощь' %}{% assign t_class = 'fv-tag-help' %}{% endif %}
         {% if t_tag == 'Дискуссия' %}{% assign t_class = 'fv-tag-disc' %}{% endif %}
@@ -325,7 +375,7 @@
         {% if t_tag == 'Закреплено' %}{% assign t_class = 'fv-tag-pinned' %}{% assign t_filter = 'Закреплено' %}{% endif %}
       {% endif %}
 
-      <div class="fv-thread-card" data-tag="{{ t_filter }}" data-id="{{ t_id }}">
+      <div class="fv-thread-card" data-tag="{{ t_filter | escape }}" data-id="{{ t_id }}">
         <div class="fv-vote">
           <button type="button" class="fv-vote-btn" title="Голосовать за" data-vote="{{ t_id }}" data-dir="1"><i class="bi bi-chevron-up"></i></button>
           <span class="fv-vote-num" id="fv-v-{{ t_id }}">{{ t_votes }}</span>
@@ -334,7 +384,7 @@
         <div class="fv-avatar">{{ t_avatar }}</div>
         <div class="fv-thread-body">
           <div class="fv-thread-meta">
-            <span class="fv-tag {{ t_class }}">{{ t_tag_display }}</span>
+            <span class="fv-tag {{ t_class }}">{{ t_tag_display | escape }}</span>
             <span class="fv-thread-when">{{ t_date }} · автор {{ t_author }}</span>
           </div>
           <h3 class="fv-thread-title">{{ t_title }}</h3>
@@ -406,7 +456,8 @@
     return allCards().filter(function (c) {
       var tag   = c.getAttribute('data-tag') || '';
       var title = c.querySelector('.fv-thread-title').textContent.toLowerCase();
-      return (curFilter === 'all' || tag === curFilter) &&
+      /* data-tag — набор меток через пробел ("Закреплено Помощь"), сравниваем по токену */
+      return (curFilter === 'all' || (' ' + tag + ' ').indexOf(' ' + curFilter + ' ') !== -1) &&
              (curSearch === '' || title.indexOf(curSearch) !== -1);
     });
   }
@@ -469,13 +520,23 @@
   document.getElementById('fvPrevBtn').addEventListener('click', function () { curPage = Math.max(1, curPage - 1); render(); });
   document.getElementById('fvNextBtn').addEventListener('click', function () { curPage = curPage + 1; render(); });
 
-  /* Голоса — делегирование по data-атрибутам */
-  document.addEventListener('click', function (e) {
-    var btn = e.target.closest('.fv-vote-btn[data-vote]');
-    if (!btn) return;
-    e.stopPropagation();
-    var el = document.getElementById('fv-v-' + btn.getAttribute('data-vote'));
-    if (el) el.textContent = Math.max(0, parseInt(el.textContent, 10) + parseInt(btn.getAttribute('data-dir'), 10));
+  /* Голосование выключено до появления таблицы голосов.
+     Историю вопроса стоит знать, чтобы не «починить» это обратно:
+     1) Изначально клик просто менял цифру в DOM — голос не сохранялся и пропадал при перезагрузке.
+     2) Затем это переписали на PATCH new_forumthread.new_votes. Так делать нельзя по двум причинам:
+        - PATCH чужой темы требует права записи на new_forumthread для всех авторизованных,
+          а это же право позволяет переписать заголовок, текст и «закрепить» чужую тему;
+        - в new_votes лежит только итоговое число, записи «кто голосовал» нет, поэтому один
+          человек мог накрутить сколько угодно, хоть циклом в консоли.
+     Право записи снято намеренно, поэтому PATCH возвращал бы 403 на каждый клик.
+     Правильное решение — отдельная таблица голосов (тема + пользователь + значение,
+     уникальность по паре); тогда голос считается агрегатом, как счётчик ответов.
+     До этого момента кнопки честно неактивны, а не притворяются рабочими. */
+  document.querySelectorAll('.fv-vote-btn[data-vote]').forEach(function (b) {
+    b.disabled = true;
+    b.title = 'Голосование скоро появится';
+    b.style.cursor = 'default';
+    b.style.opacity = '.45';
   });
 
   /* Клик по карточке темы → страница обсуждения (только реальные GUID) */
@@ -551,19 +612,22 @@
     var submitBtn = document.getElementById('fvSubmitBtn');
     submitBtn.disabled = true; submitBtn.textContent = 'Публикация…';
 
+    /* new_replycount не пишем: счётчик ответов — агрегат по new_forumreply, поле больше не ведётся */
     function post(navName, tok) {
-      var body = { new_name: title, new_body: bodyEl.value, new_tag: tag, new_votes: 0, new_replycount: 0, new_ispinned: false };
-      if (navName) body[navName + '@odata.bind'] = '/contacts(' + CURRENT_USER + ')';
+      var body = { new_name: title, new_body: bodyEl.value, new_tag: tag, new_votes: 0, new_ispinned: false };
+      body[navName + '@odata.bind'] = '/contacts(' + CURRENT_USER + ')';
       return fetch('/_api/new_forumthreads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', '__RequestVerificationToken': tok },
         body: JSON.stringify(body)
       });
     }
+    /* Третьего звена (POST без автора) быть не должно: оно создавало тему без new_author
+       и рапортовало об успехе. Пробуем только два регистра навигационного свойства;
+       если оба отказали — честная ошибка вместо безымянной темы. */
     fvGetToken().then(function (tok) {
       return post('new_author', tok)
-        .then(function (res) { return res.ok ? res : post('new_Author', tok); })
-        .then(function (res) { return res.ok ? res : post(null, tok); });
+        .then(function (res) { return res.ok ? res : post('new_Author', tok); });
     }).then(function (res) {
       if (res.ok) { location.reload(); return; }
       return res.text().then(function (t) { throw new Error('HTTP ' + res.status + ' — ' + t.slice(0, 220)); });

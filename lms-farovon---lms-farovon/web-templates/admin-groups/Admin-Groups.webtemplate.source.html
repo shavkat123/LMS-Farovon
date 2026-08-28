@@ -75,15 +75,20 @@
   </div>
   {% else %}
   <div class="admg-grid">
-    {% assign clrs = 'var(--adm-primary),var(--adm-accent),var(--adm-success),var(--adm-primary),var(--adm-accent),var(--adm-success)' | split: ',' %}
     {% assign ci = 0 %}
     {% for r in grp.results.entities %}
       {% assign dname = r.dept | default: '' %}
       {% if dname == '' %}{% continue %}{% endif %}
       {% assign cnt = r.cnt | plus: 0 %}
-      {% assign clr = clrs[ci] %}
+      {% comment %} Индекс массива переменной (clrs[ci]) в DotLiquid = "Parameter count mismatch" и падение страницы. Цвет выбираем case'ом. {% endcomment %}
+      {% case ci %}
+        {% when 0 %}{% assign clr = 'var(--adm-primary)' %}
+        {% when 1 %}{% assign clr = 'var(--adm-accent)' %}
+        {% when 2 %}{% assign clr = 'var(--adm-success)' %}
+        {% else %}{% assign clr = 'var(--adm-primary)' %}
+      {% endcase %}
       {% assign ci = ci | plus: 1 %}
-      {% if ci >= 6 %}{% assign ci = 0 %}{% endif %}
+      {% if ci >= 3 %}{% assign ci = 0 %}{% endif %}
     <div class="adm-card admg-card">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;">
         <span class="admg-ico" style="color:{{ clr }};"><i class="bi bi-people"></i></span>

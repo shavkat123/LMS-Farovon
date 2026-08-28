@@ -1,7 +1,8 @@
 {% comment %}
   Admin Settings — Настройки (/admin/settings). Примитивы .adm-* — customtheme.css.
   РЕАЛЬНО: имя сайта из website, домен из location (JS), язык/пояс — фактические.
-  Политики — текущая конфигурация обучения (описание поведения). Расширенное управление — Power Platform.
+  ДЕМО: список политик обучения захардкожен, механизмы под ним не подключены — блок помечен «демо».
+  Расширенное управление — Power Platform.
 {% endcomment %}
 
 {% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
@@ -22,6 +23,8 @@
   @media (max-width: 820px) { .adms-grid { grid-template-columns: 1fr; } }
   .adms-nav button { width: 100%; text-align: left; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; background: transparent; border: none; color: var(--adm-fg-2); cursor: default; display: block; margin-bottom: 2px; }
   .adms-nav button.active { background: var(--adm-primary-50); color: var(--adm-primary); font-weight: 600; }
+  .adms-nav button[disabled] { opacity: 0.5; cursor: not-allowed; }
+  .adms-nav-note { font-size: 11px; line-height: 1.4; color: var(--adm-fg-3); margin-top: 10px; padding: 0 12px; }
   .adms-card { padding: 24px; }
   .adms-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
   @media (max-width: 560px) { .adms-fields { grid-template-columns: 1fr; } }
@@ -46,12 +49,17 @@
 
   <div class="adms-grid">
     <nav class="adms-nav">
+      {% comment %}
+        Панелей под эти вкладки нет и обработчика клика тоже: кликабельная кнопка,
+        которая ничего не делает, читается как поломка. Помечаем disabled честно.
+      {% endcomment %}
       <button type="button" class="active">Общие</button>
-      <button type="button">Брендинг</button>
-      <button type="button">Уведомления</button>
-      <button type="button">Геймификация</button>
-      <button type="button">Безопасность</button>
-      <button type="button">Локализация</button>
+      <button type="button" disabled title="Раздел в разработке">Брендинг</button>
+      <button type="button" disabled title="Раздел в разработке">Уведомления</button>
+      <button type="button" disabled title="Раздел в разработке">Геймификация</button>
+      <button type="button" disabled title="Раздел в разработке">Безопасность</button>
+      <button type="button" disabled title="Раздел в разработке">Локализация</button>
+      <div class="adms-nav-note">Остальные разделы в разработке.</div>
     </nav>
 
     <div style="display:flex;flex-direction:column;gap:20px;">
@@ -67,8 +75,16 @@
       </div>
 
       <div class="adm-card adms-card">
-        <div style="font-size:15px;font-weight:700;color:var(--adm-fg-1);margin-bottom:2px;">Политики обучения</div>
-        <span class="adm-eyebrow">Текущая конфигурация платформы</span>
+        {% comment %}
+          Список политик захардкожен и ни на что не влияет — механизмы (напоминания,
+          сертификаты, автоназначение) не подключены. Помечаем «демо», чтобы экран
+          не выдавал этот список за реальные настройки платформы.
+        {% endcomment %}
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
+          <div style="font-size:15px;font-weight:700;color:var(--adm-fg-1);">Политики обучения</div>
+          <span class="adm-demo-chip">демо</span>
+        </div>
+        <span class="adm-eyebrow">Планируемая конфигурация (механизмы не подключены)</span>
         {% assign pols = 'Обязательный онбординг|Автоназначение welcome-курса новым сотрудникам|1;Дедлайны по умолчанию|30 дней на завершение обязательного курса|1;Автонапоминания|Уведомлять за 3 дня до дедлайна|1;Начисление баллов|За уроки, курсы и мероприятия — баллы в магазин наград|1;Сертификаты с QR|Генерировать QR-валидацию для сертификатов|0' | split: ';' %}
         {% for p in pols %}
           {% assign f = p | split: '|' %}
@@ -81,7 +97,7 @@
 
       <div class="adms-note">
         <i class="bi bi-info-circle-fill" style="flex-shrink:0;margin-top:1px;"></i>
-        <span>Параметры платформы и политики отражают текущую конфигурацию. Изменение доменов, языков и системных параметров выполняется в центре администрирования Power Platform / в настройках сайта (Site Settings). Переключатели политик — под интеграцию соответствующих механизмов (напоминания, сертификаты).</span>
+        <span>Параметры платформы отражают текущую конфигурацию; список политик — демонстрационный. Изменение доменов, языков и системных параметров выполняется в центре администрирования Power Platform / в настройках сайта (Site Settings). Переключатели политик — под интеграцию соответствующих механизмов (напоминания, сертификаты).</span>
       </div>
     </div>
   </div>
