@@ -514,13 +514,17 @@
     </entity>
   </fetch>
   {% endfetchxml %}
+  {% comment %}id и order — иначе минимальная выборка залипает в кеше и баланс в шапке
+     не уменьшается после покупки (2026-08-31){% endcomment %}
   {% fetchxml fv_hd_spent %}
   <fetch top="5000">
     <entity name="new_rewardpurchase">
+      <attribute name="new_rewardpurchaseid" />
       <attribute name="new_pointsspent" />
       <filter>
         <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
       </filter>
+      <order attribute="createdon" descending="true" />
     </entity>
   </fetch>
   {% endfetchxml %}

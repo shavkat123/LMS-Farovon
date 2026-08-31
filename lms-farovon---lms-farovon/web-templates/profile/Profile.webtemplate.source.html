@@ -41,13 +41,20 @@
 {% comment %}── 2. Purchases ──
    spent_all — БЕЗ top: баланс и «Покупок совершено» обязаны считаться по ВСЕМ покупкам.
    С top="10" потраченное недосчитывалось и баланс в профиле расходился с шапкой и магазином ──{% endcomment %}
+{% comment %}
+  new_rewardpurchaseid и order добавлены не для красоты: минимальная выборка (один атрибут,
+  без ключа и сортировки) залипала в кеше портала — история покупок видела свежие записи,
+  а эта сумма считалась по трём старым, и баланс не уменьшался после покупки (2026-08-31).
+{% endcomment %}
 {% fetchxml spent_all %}
 <fetch>
   <entity name="new_rewardpurchase">
+    <attribute name="new_rewardpurchaseid" />
     <attribute name="new_pointsspent" />
     <filter>
       <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
     </filter>
+    <order attribute="createdon" descending="true" />
   </entity>
 </fetch>
 {% endfetchxml %}

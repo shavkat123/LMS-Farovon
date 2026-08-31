@@ -45,13 +45,19 @@
 
 {% comment %}── 2. User's purchases ──{% endcomment %}
 {% comment %}spent_all — БЕЗ top: баланс обязан считаться по ВСЕМ покупкам, иначе потраченное недосчитывается и баланс завышен{% endcomment %}
+{% comment %}
+  new_rewardpurchaseid и order — обязательны: минимальная выборка залипала в кеше портала
+  и «Потрачено» не включало свежие покупки, баланс не уменьшался (2026-08-31).
+{% endcomment %}
 {% fetchxml spent_all %}
 <fetch>
   <entity name="new_rewardpurchase">
+    <attribute name="new_rewardpurchaseid" />
     <attribute name="new_pointsspent" />
     <filter>
       <condition attribute="new_user" operator="eq" value="{{ user.id }}" />
     </filter>
+    <order attribute="createdon" descending="true" />
   </entity>
 </fetch>
 {% endfetchxml %}
