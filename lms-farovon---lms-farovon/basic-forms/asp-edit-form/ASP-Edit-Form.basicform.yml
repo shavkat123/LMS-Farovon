@@ -42,3 +42,5 @@ adx_successmessage: >-
 adx_tabname: '{aac58a0c-b874-41f0-b887-c7dac19d7c07}'
 adx_tooltipenabled: false
 adx_validationsummarylinksenabled: true
+statecode: 1
+statuscode: 2
