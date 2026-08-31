@@ -289,7 +289,7 @@
   adx_sitesettingid: d530e0ff-a538-f111-88b5-7ced8d76b3cc
   adx_value: True
 - adx_description: "Список полей не подходит: плеер фильтрует по _new_user_value и _new_h5pcontent_value (форма lookup-значения), а в белом списке лежат new_user/new_h5pcontent — Web API отбивал GET с 403, из-за чего плеер не находил существующую запись прогресса и плодил дубли. Сузить обратно можно только проверив на живом портале, что GET с фильтром по _x_value проходит."
-- adx_name: Webapi/new_h5pprogress/fields
+  adx_name: Webapi/new_h5pprogress/fields
   adx_sitesettingid: d693edf3-ff10-46e7-af6d-2f51450a778d
   adx_value: '*'
 - adx_name: Webapi/new_h5pcontent/fields
