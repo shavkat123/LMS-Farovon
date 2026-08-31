@@ -395,7 +395,7 @@
   <div style="margin-top:20px;padding:14px 18px;background:#F8FAFF;border:1px solid #DBEAFE;border-radius:10px;font-size:12px;color:#1E40AF;display:flex;align-items:center;gap:10px;">
     <i class="bi bi-shield-check" style="font-size:15px;"></i>
     <span><strong>Режим администратора.</strong> Управляйте товарами в каталоге через Power Apps / Dataverse (таблица <code>new_rewarditem</code>).
-      <br><strong>Важно:</strong> поле <code>new_stock</code> не уменьшается автоматически при покупке — списывайте остаток вручную, пока не подключён серверный обработчик покупки.</span>
+      <br><strong>Остаток</strong> (<code>new_stock</code>) списывается автоматически потоком «Оформить покупку награды» при каждой покупке; пустое значение — награда без лимита.</span>
   </div>
   {% endif %}
 
@@ -432,7 +432,15 @@
   var pendingItemCost = 0;
   var pendingItemName = '';
   var pendingCard = null;
-  /* транзакции на сервере нет: без этого флага двойной клик создаёт две покупки */
+  /* Покупка оформляется серверным потоком «Оформить покупку награды» (Power Pages → Cloud flows):
+     он сам берёт цену и остаток из справочника, считает баланс по прогрессу пользователя
+     и только потом создаёт запись и списывает остаток. Портал передаёт в поток авторизованного
+     пользователя — подменить покупателя или цену из браузера нельзя.
+     Идентификатор — из URL потока на странице «Облачные потоки» (…/trigger/<guid>).
+     При пересоздании потока guid меняется — обновить здесь. */
+  var PURCHASE_FLOW_ID = 'd4142c4e-38a5-f111-b8de-000d3adcd7a2';
+  /* поток не терпит параллельных вызовов (Power Pages не даёт включить concurrency control
+     для потоков с ответом), поэтому двойной клик по-прежнему режем на клиенте */
   var isSubmitting = false;
 
   function fvSetBuyDisabled(state) {
@@ -529,8 +537,8 @@
   window.fvConfirmPurchase = function () {
     if (isSubmitting) return;
     if (!pendingItemId) return;
-    /* перепроверяем цену и баланс: сервер их не проверяет (см. комментарий у POST),
-       это страховка от рассинхрона UI, а не защита */
+    /* Клиентские проверки — только чтобы не гонять поток впустую и показать причину сразу.
+       Настоящая проверка цены, остатка и баланса делается в потоке на сервере. */
     if (pendingItemCost <= 0) {
       fvToast('error', 'bi-exclamation-circle-fill', 'У награды не указана цена — покупка недоступна');
       return;
@@ -545,89 +553,99 @@
     btn.textContent = 'Оформление…';
     fvSetBuyDisabled(true);
 
-    getToken().then(function (token) {
-      var body = {
-        'new_pointsspent': pendingItemCost,
-        'new_name': pendingItemName,
-        'new_rewarditem@odata.bind': '/new_rewarditems(' + pendingItemId + ')',
-        'new_user@odata.bind': '/contacts(' + userId + ')'
-      };
-      var headers = {
-        'Content-Type': 'application/json',
-        'OData-MaxVersion': '4.0',
-        'OData-Version': '4.0',
-        'Accept': 'application/json'
-      };
-      if (token) headers['__RequestVerificationToken'] = token;
+    /* fvCloseModal() обнуляет pendingCard/pendingItemId — запоминаем ДО закрытия,
+       иначе купленную карточку нечем перерисовать */
+    var card = pendingCard;
+    var cost = pendingItemCost;
 
-      /* ВНИМАНИЕ: цена, наличие и баланс проверены только на клиенте — запись создаётся
-         напрямую через Web API. Настоящая проверка требует серверного обработчика (находка B13);
-         он же должен декрементить new_stock — сейчас остаток в Dataverse не уменьшается. */
-      return fetch('/_api/new_rewardpurchases', {
+    function restore() {
+      isSubmitting = false;
+      fvSetBuyDisabled(false);
+      var b = document.getElementById('fvModalConfirm');
+      b.disabled = false;
+      b.textContent = 'Подтвердить';
+    }
+    function setBalance(v) {
+      var n = Number(v);
+      if (isNaN(n)) return;
+      balance = n;
+      document.getElementById('fv-balance-val').textContent = balance;
+    }
+
+    getToken().then(function (token) {
+      var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+      if (token) headers['__RequestVerificationToken'] = token;
+      /* Единственный вход потока — id награды. Кто покупает, поток узнаёт от портала сам. */
+      return fetch('/_api/cloudflow/v1.0/trigger/' + PURCHASE_FLOW_ID, {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify(body)
+        body: JSON.stringify({ rewardItemId: pendingItemId })
       });
     })
     .then(function (res) {
-      /* fvCloseModal() обнуляет pendingCard/pendingItemId — копируем ссылки ДО закрытия,
-         иначе купленная карточка никогда не перерисовывается */
-      var card = pendingCard;
-      var cost = pendingItemCost;
+      return res.text().then(function (t) {
+        var data = null;
+        try { data = t ? JSON.parse(t) : null; } catch (e) {}
+        /* портал отдаёт выходы потока плоским объектом; на случай обёртки — разворачиваем */
+        if (data && data.outputs && typeof data.outputs === 'object') data = data.outputs;
+        return { status: res.status, ok: res.ok, data: data, raw: t || '' };
+      });
+    })
+    .then(function (r) {
+      var d = r.data;
       fvCloseModal();
-      if (res.ok || res.status === 204 || res.status === 201) {
-        balance -= cost;
-        document.getElementById('fv-balance-val').textContent = balance;
-        document.getElementById('fvModalCost').textContent = cost;
-        document.getElementById('fvModalAfter').textContent = balance >= 0 ? balance : 0;
-        fvToast('success', 'bi-check-circle-fill', 'Награда успешно приобретена! 🎉');
-        /* Disable the buy button on this card if balance now too low */
-        if (card) {
-          var allCards = document.querySelectorAll('.fv-reward-card');
-          allCards.forEach(function (c) {
-            var cost = parseInt(c.getAttribute('data-item-cost'), 10) || 0;
-            var btns = c.querySelectorAll('.fv-buy-btn-can, .fv-buy-btn-no');
-            btns.forEach(function (b) {
-              if (balance < cost) {
-                b.className = 'fv-buy-btn fv-buy-btn-no';
-                b.disabled = true;
-                b.textContent = 'Не хватает';
-                b.onclick = null;
-                c.classList.remove('affordable');
-              }
-            });
-          });
-          /* Mark purchased card button */
-          var pb = card.querySelector('.fv-buy-btn');
-          if (pb) {
-            pb.className = 'fv-buy-btn fv-buy-btn-out';
-            pb.disabled = true;
-            pb.textContent = 'Куплено ✓';
-            pb.onclick = null;
-          }
-        }
-        /* остальные кнопки покупки намеренно остаются заблокированными до перезагрузки:
-           баланс пересчитывается только на сервере при рендере, повторный клик даст лишнюю покупку */
-        /* Reload history after 1.5s */
-        setTimeout(function () { location.reload(); }, 2200);
-      } else {
-        return res.text().then(function (t) {
-          fvToast('error', 'bi-exclamation-circle-fill', 'Не удалось оформить покупку (HTTP ' + res.status + '). Монеты не списаны.');
-          console.error('[fv-shop] purchase error:', t.slice(0, 300));
-          /* покупка не прошла — возвращаем магазин в рабочее состояние */
-          isSubmitting = false;
-          fvSetBuyDisabled(false);
-          document.getElementById('fvModalConfirm').disabled = false;
-          document.getElementById('fvModalConfirm').textContent = 'Подтвердить';
-        });
+
+      /* Поток не ответил штатно: не привязан к сайту, нет роли, упал внутри.
+         Отличаем от отказа по делу: у штатного ответа всегда есть поле ok. */
+      if (!r.ok || !d || d.ok === undefined) {
+        fvToast('error', 'bi-exclamation-circle-fill', 'Сервис покупок не ответил (HTTP ' + r.status + '). Монеты не списаны.');
+        console.error('[fv-shop] flow error:', r.status, r.raw.slice(0, 300));
+        restore();
+        return;
       }
+
+      /* Отказ с причиной — награду не продали, ничего не списано.
+         Баланс из ответа честнее клиентского: сервер только что его пересчитал. */
+      if (!(d.ok === true || d.ok === 'true')) {
+        fvToast('error', 'bi-exclamation-circle-fill', d.message || 'Покупка отклонена');
+        setBalance(d.balance);
+        restore();
+        return;
+      }
+
+      /* Успех. Баланс — из ответа, не вычитаем сами. */
+      setBalance(d.balance);
+      document.getElementById('fvModalCost').textContent = cost;
+      document.getElementById('fvModalAfter').textContent = balance >= 0 ? balance : 0;
+      fvToast('success', 'bi-check-circle-fill', d.message || 'Награда успешно приобретена! 🎉');
+      if (card) {
+        document.querySelectorAll('.fv-reward-card').forEach(function (c) {
+          var cc = parseInt(c.getAttribute('data-item-cost'), 10) || 0;
+          c.querySelectorAll('.fv-buy-btn-can, .fv-buy-btn-no').forEach(function (b) {
+            if (balance < cc) {
+              b.className = 'fv-buy-btn fv-buy-btn-no';
+              b.disabled = true;
+              b.textContent = 'Не хватает';
+              b.onclick = null;
+              c.classList.remove('affordable');
+            }
+          });
+        });
+        var pb = card.querySelector('.fv-buy-btn');
+        if (pb) {
+          pb.className = 'fv-buy-btn fv-buy-btn-out';
+          pb.disabled = true;
+          pb.textContent = 'Куплено ✓';
+          pb.onclick = null;
+        }
+      }
+      /* остальные кнопки остаются заблокированными до перезагрузки — витрину (остатки,
+         историю) честно перерисует сервер */
+      setTimeout(function () { location.reload(); }, 2200);
     })
     .catch(function (err) {
       fvCloseModal();
-      isSubmitting = false;
-      fvSetBuyDisabled(false);
-      document.getElementById('fvModalConfirm').disabled = false;
-      document.getElementById('fvModalConfirm').textContent = 'Подтвердить';
+      restore();
       fvToast('error', 'bi-exclamation-circle-fill', 'Ошибка сети: ' + err.message + '. Монеты не списаны.');
     });
   };
