@@ -111,7 +111,7 @@
   </div>
 
   {% comment %}
-    Конфиг плеера — в data-атрибутах, а не в JS-строке: внутри <script> HTML-сущности
+    Конфиг плеера — в data-атрибутах, а не в JS-строке: внутри скриптового блока HTML-сущности
     не декодируются, поэтому URL с & через `| escape` в JS-строке приехал бы битым,
     а без escape кавычка в значении сломала бы скрипт. В атрибуте парсер декодирует сам.
   {% endcomment %}
@@ -156,7 +156,22 @@
   var savedPosition = null;   // позиция из ранее сохранённого прогресса — для продолжения
   // Поле new_xapistatements — текст: массив, накопленный за много заходов, однажды
   // перестанет в него влезать и PATCH начнёт падать. Держим последние MAX_STMTS.
-  var MAX_STMTS     = 500;
+  // Видео сыплет played/paused/seeked ежесекундно: 500 событий с историей прошлых
+  // сессий — это сотни килобайт, PATCH падает 400 по пределу колонки. Храним только
+  // значимые события и держим сериализованный размер в бюджете.
+  var MAX_STMTS     = 120;
+  var XAPI_MAX_CHARS = 30000;   // бюджет JSON.stringify(allStatements) при сохранении
+  var KEEP_VERBS = ['answered', 'completed', 'attempted', 'passed', 'failed', 'mastered'];
+  function isKeepStatement(stmt, isRoot) {
+    if (isRoot) return true;                       // события самого урока храним все
+    var v = ((stmt.verb && stmt.verb.id) || '').split('/').pop();
+    return KEEP_VERBS.indexOf(v) !== -1;           // из дочерних — только осмысленные
+  }
+  function trimStatements(arr, budget) {
+    while (arr.length > MAX_STMTS) arr.shift();
+    while (arr.length > 5 && JSON.stringify(arr).length > budget) arr.shift();
+    return arr;
+  }
 
   container.innerHTML =
     '<div class="text-center py-5">' +
@@ -528,7 +543,12 @@
             var prev = JSON.parse(rec.new_xapistatements);
             // Продолжаем накопленный массив, иначе первый же PATCH затёр бы прошлые попытки.
             if (Object.prototype.toString.call(prev) === '[object Array]') {
-              allStatements = prev.length > MAX_STMTS ? prev.slice(-MAX_STMTS) : prev;
+              // Историю фильтруем тем же правилом: записи, накопленные до этого фикса,
+              // забиты шумом видео и сами по себе превышают бюджет.
+              allStatements = prev.filter(function (s) {
+                return isKeepStatement(s, isRootStatement(s));
+              });
+              trimStatements(allStatements, XAPI_MAX_CHARS);
             }
           } catch (e) { console.warn('[H5P] new_xapistatements не разобрался — начинаем массив заново'); }
         }
@@ -865,11 +885,15 @@
           var verbShort = verbId.split('/').pop() || verbId;
           console.log('[H5P xAPI] verb:', verbShort, '| success:', stmt.result && stmt.result.success, '| score:', stmt.result && stmt.result.score);
 
-          // Всегда добавляем в массив — не теряем ни одного стейтмента
-          allStatements.push(stmt);
-
           // Скаляры (score/completion/success) берём только из стейтмента самого урока.
           var isRoot = isRootStatement(stmt);
+
+          // В историю пишем только значимое: шум видео (played/paused/seeked…)
+          // раздувал JSON до предела колонки, и PATCH падал 400.
+          if (isKeepStatement(stmt, isRoot)) {
+            allStatements.push(stmt);
+            trimStatements(allStatements, XAPI_MAX_CHARS);
+          }
           if (isRoot) lastRootStmt = stmt;
 
           // Позиция: сперва из стейтмента (video/extensions/time), иначе спрашиваем плеер.
@@ -947,72 +971,90 @@
 
     var isFirstSave = !progressId;
 
-    if (allStatements.length > MAX_STMTS) allStatements = allStatements.slice(-MAX_STMTS);
-    var body = {
-      'new_xapistatements': JSON.stringify(allStatements),
-      'new_lastupdated'   : new Date().toISOString()
-    };
-    if (isFirstSave) {
-      // new_h5pprogressid не включён в Web API — ID присвоит сервер
-      body['new_user@odata.bind']         = '/contacts(' + userId + ')';
-      body['new_h5pcontent@odata.bind']   = '/new_h5pcontents(' + contentId + ')';
-      body['new_name']                    = 'xAPI ' + new Date().toISOString();
-      postPending = true;
-    }
-
-    // Scalar-поля — ТОЛЬКО из стейтмента самого урока: у вложенных вопросов свой
-    // score/success, и они затирали итог урока результатом последнего вопроса.
-    var r = lastRootStmt && lastRootStmt.result;
-    var decParts = [];
-    if (r) {
-      if (r.score) {
-        if (r.score.raw    != null) decParts.push('"new_scoreraw":'    + parseFloat((+r.score.raw).toFixed(4)));
-        if (r.score.max    != null) decParts.push('"new_scoremax":'    + parseFloat((+r.score.max).toFixed(4)));
-        if (r.score.scaled != null) decParts.push('"new_scorescaled":' + (+r.score.scaled).toFixed(4));
+    // Тело собирается из переданного набора событий: при 400 повторяем с меньшим.
+    function buildBody(stmts) {
+      var body = {
+        'new_xapistatements': JSON.stringify(stmts),
+        'new_lastupdated'   : new Date().toISOString()
+      };
+      if (isFirstSave) {
+        body['new_user@odata.bind']       = '/contacts(' + userId + ')';
+        body['new_h5pcontent@odata.bind'] = '/new_h5pcontents(' + contentId + ')';
+        body['new_name']                  = 'xAPI ' + new Date().toISOString();
       }
-      if (r.completion !== undefined) body.new_completion = !!r.completion;
-      // new_success в живой таблице — Whole Number (Int32), а НЕ Yes/No:
-      // булево true даёт OData 400 «Cannot convert 'True' to Edm.Int32» и рушит весь запрос.
-      if (r.success    !== undefined) body.new_success    = r.success ? 1 : 0;
+      // Scalar-поля — ТОЛЬКО из стейтмента самого урока: у вложенных вопросов свой
+      // score/success, и они затирали итог урока результатом последнего вопроса.
+      var r = lastRootStmt && lastRootStmt.result;
+      var decParts = [];
+      if (r) {
+        if (r.score) {
+          if (r.score.raw    != null) decParts.push('"new_scoreraw":'    + parseFloat((+r.score.raw).toFixed(4)));
+          if (r.score.max    != null) decParts.push('"new_scoremax":'    + parseFloat((+r.score.max).toFixed(4)));
+          if (r.score.scaled != null) decParts.push('"new_scorescaled":' + (+r.score.scaled).toFixed(4));
+        }
+        if (r.completion !== undefined) body.new_completion = !!r.completion;
+        // new_success — Whole Number (Int32), а НЕ Yes/No: булево true даёт OData 400.
+        if (r.success    !== undefined) body.new_success    = r.success ? 1 : 0;
+      }
+      // new_lastposition — ПОЗИЦИЯ в уроке, а не длительность попытки.
+      if (lastPosition != null) decParts.push('"new_lastposition":' + (+lastPosition).toFixed(4));
+      var bodyJson = JSON.stringify(body);
+      if (decParts.length) bodyJson = bodyJson.slice(0, -1) + ',' + decParts.join(',') + '}';
+      return bodyJson;
     }
-    // new_lastposition — ПОЗИЦИЯ в уроке, а не длительность попытки (r.duration):
-    // Home считает процент просмотра как lastposition / new_durationseconds.
-    if (lastPosition != null) decParts.push('"new_lastposition":' + (+lastPosition).toFixed(4));
-
-    var bodyJson = JSON.stringify(body);
-    if (decParts.length) bodyJson = bodyJson.slice(0, -1) + ',' + decParts.join(',') + '}';
 
     var method = isFirstSave ? 'POST' : 'PATCH';
     var url    = isFirstSave
       ? '/_api/new_h5pprogresses'
       : '/_api/new_h5pprogresses(' + progressId + ')';
 
+    if (isFirstSave) postPending = true;
+    trimStatements(allStatements, XAPI_MAX_CHARS);
     console.log('[H5P] xAPI save (' + method + ') id:', progressId, '| stmts:', allStatements.length);
 
-    _fetch(url, {
-      method: method, headers: hdrs, body: bodyJson, credentials: 'include'
-    }).then(function (res) {
-      saveInFlight = false;
-      if (res.ok) {
-        var warnEl = document.getElementById('fvSaveWarn');
-        if (warnEl) warnEl.parentNode.removeChild(warnEl);
-        if (isFirstSave) {
-          // Извлекаем UUID из заголовка OData-EntityId: .../(UUID)
-          var entityHdr = res.headers.get('OData-EntityId') || res.headers.get('Location') || '';
-          var m = entityHdr.match(/\(([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\)/i);
-          if (m) progressId = m[1];
-          postPending = false;
-          if (!progressId) {
-            // Заголовка нет: без перечитывания следующее сохранение снова ушло бы POST'ом
-            // и создало дубль. Перечитываем — следующий save дождётся и сделает PATCH.
-            console.warn('[H5P] OData-EntityId не пришёл — перечитываем запись прогресса');
-            progressReady = loadExistingProgress();
+    // retryStage: 0 — полный набор; 1 — последние 8 событий; 2 — пустой массив.
+    // Ступени спасают completion, если колонка new_xapistatements меньше бюджета.
+    function attempt(retryStage) {
+      var stmts = retryStage === 0 ? allStatements
+                : retryStage === 1 ? allStatements.slice(-8)
+                : [];
+      _fetch(url, {
+        method: method, headers: hdrs, body: buildBody(stmts), credentials: 'include'
+      }).then(function (res) {
+        if (res.ok) {
+          saveInFlight = false;
+          var warnEl = document.getElementById('fvSaveWarn');
+          if (warnEl) warnEl.parentNode.removeChild(warnEl);
+          if (retryStage > 0) {
+            // Полный набор не влезает в колонку — дальше живём с урезанным,
+            // иначе каждое сохранение проходило бы только со второй попытки.
+            allStatements = stmts.slice();
+            console.warn('[H5P] сохранение прошло с урезанными стейтментами (ступень ' + retryStage + ')');
           }
-          console.log('[H5P] xAPI POST OK — progressId:', progressId || '(header missing)');
-        } else {
-          console.log('[H5P] xAPI PATCH OK — progressId:', progressId);
+          if (isFirstSave) {
+            var entityHdr = res.headers.get('OData-EntityId') || res.headers.get('Location') || '';
+            var m = entityHdr.match(/\(([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\)/i);
+            if (m) progressId = m[1];
+            postPending = false;
+            if (!progressId) {
+              console.warn('[H5P] OData-EntityId не пришёл — перечитываем запись прогресса');
+              progressReady = loadExistingProgress();
+            }
+            console.log('[H5P] xAPI POST OK — progressId:', progressId || '(header missing)');
+          } else {
+            console.log('[H5P] xAPI PATCH OK — progressId:', progressId);
+          }
+          return;
         }
-      } else {
+        // 400 — почти всегда «не влезло»: пробуем следующую ступень немедленно.
+        if (res.status === 400 && retryStage < 2) {
+          res.text().then(function (txt) {
+            console.warn('[H5P] save 400 (ступень ' + retryStage + ') — повтор с урезанным набором:', txt.slice(0, 300));
+          });
+          attempt(retryStage + 1);
+          return;
+        }
+        saveInFlight = false;
         if (isFirstSave) postPending = false;
         res.text().then(function (txt) {
           console.warn('[H5P] xAPI save failed:', method, res.status, res.statusText, '—', txt.slice(0, 1200));
@@ -1023,13 +1065,14 @@
           } catch (pe) {}
           showSaveWarn(msg);
         });
-      }
-    }).catch(function (e) {
-      saveInFlight = false;
-      if (isFirstSave) postPending = false;
-      showSaveWarn(e && e.message ? e.message : 'сетевая ошибка');
-      console.error('[H5P] xAPI save error:', e);
-    });
+      }).catch(function (e) {
+        saveInFlight = false;
+        if (isFirstSave) postPending = false;
+        showSaveWarn(e && e.message ? e.message : 'сетевая ошибка');
+        console.error('[H5P] xAPI save error:', e);
+      });
+    }
+    attempt(0);
   }
 
   // Видимое предупреждение: раньше ошибка сохранения жила только в консоли,
