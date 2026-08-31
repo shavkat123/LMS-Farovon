@@ -98,10 +98,10 @@
   adx_name: Authentication/LoginThrottling/IpAddressTimeoutTimeSpan
   adx_sitesettingid: 5860e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: 00:15:00
-- adx_description: "Скрипты только со своего домена: script-src * разрешал любой сторонний хост. Плейсхолдер 'nonce' подставляет Power Pages, blob: для плеера H5P добавляет Content-Security-Policy/Script-Src/Append."
+- adx_description: "ОТКАТ 2026-08-31. Пробовали сузить до script-src 'self' 'nonce' — портал сломался: H5P-урок не открывался, блокировался в том числе собственный скрипт Power Pages (ClientLogWrapper is not defined). В фактической политике браузера blob: не появился, хотя настройка Content-Security-Policy/Script-Src/Append = blob: существует, — значит Append не применяется к явно заданной базовой политике. Прежде чем сужать снова: проверять реальный заголовок в devtools, а не наличие настроек, и вести blob: и unsafe-eval прямо в этом значении."
   adx_name: HTTP/Content-Security-Policy
   adx_sitesettingid: 5fc338c5-b58f-4195-8643-d03d9d7de019
-  adx_value: script-src 'self' 'nonce'
+  adx_value: script-src * 'nonce'
 - adx_name: Authentication/Registration/ExternalLoginEnabled
   adx_sitesettingid: 645fe5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: true
@@ -290,7 +290,7 @@
   adx_value: True
 - adx_name: Webapi/new_h5pprogress/fields
   adx_sitesettingid: d693edf3-ff10-46e7-af6d-2f51450a778d
-  adx_value: new_user,new_h5pcontent,new_name,new_xapistatements,new_lastupdated,new_scoreraw,new_scoremax,new_scorescaled,new_completion,new_success,new_lastposition
+  adx_value: new_h5pprogressid,new_user,new_h5pcontent,new_name,new_xapistatements,new_lastupdated,new_scoreraw,new_scoremax,new_scorescaled,new_completion,new_success,new_lastposition,new_attempts
 - adx_name: Webapi/new_h5pcontent/fields
   adx_sitesettingid: d8e9f012-3a4b-5c6d-7e8f-90abcdef1234
   adx_value: '*'
