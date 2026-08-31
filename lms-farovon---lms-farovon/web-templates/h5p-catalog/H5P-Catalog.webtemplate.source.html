@@ -8,6 +8,7 @@
     <attribute name="new_durationseconds" />
     <attribute name="new_thumbnailurl" />
     <attribute name="new_relatedcourse" />
+    <attribute name="new_courseorder" />
     <filter>
       <condition attribute="new_isactive" operator="eq" value="1" />
     </filter>
@@ -127,7 +128,8 @@
           <button class="fv-admin-edit-btn edit-thumb-btn"
                   data-id="{{ cid }}"
                   data-thumb="{{ item.new_thumbnailurl | escape }}"
-                  data-course="{% if item.new_relatedcourse != blank %}{{ item.new_relatedcourse.id }}{% endif %}"                  type="button">
+                  data-course="{% if item.new_relatedcourse != blank %}{{ item.new_relatedcourse.id }}{% endif %}"
+                  data-order="{{ item.new_courseorder }}"                  type="button">
             <i class="bi bi-pencil"></i> Урок
           </button>
           <button class="fv-admin-delete-btn delete-h5p"
@@ -390,6 +392,10 @@
             {% endfor %}{% endif %}
           </select>
           <small class="text-muted">Урок появится в блоке «Программа курса» на странице выбранного курса.</small>
+
+          <label class="form-label small text-muted" for="order-input" style="margin-top:14px;"><i class="bi bi-sort-numeric-down"></i> Порядок в курсе</label>
+          <input id="order-input" class="form-control" type="number" min="0" step="10" placeholder="например 10">
+          <small class="text-muted">Задаёт место урока в программе курса. Нумеруйте с шагом 10 — тогда между двумя уроками можно вставить новый, не перенумеровывая остальные. Без номера урок встанет в начало списка.</small>
         </div>
       </div>
       <div class="modal-footer" style="border-top:1px solid #F1F5F9;padding:12px 20px;">
@@ -537,7 +543,7 @@
     }
   }
 
-  var currentId = null, activeTab = 'url', uploadedUrl = null, currentCourseOrig = '';
+  var currentId = null, activeTab = 'url', uploadedUrl = null, currentCourseOrig = '', currentOrderOrig = '';
 
   // ── Вкладки ────────────────────────────────────────────────────────────────
   document.querySelectorAll('#thumbTabs [data-tab]').forEach(function (btn) {
@@ -569,6 +575,8 @@
       currentId = this.dataset.id; uploadedUrl = null;
       currentCourseOrig = this.dataset.course || '';
       var csel = document.getElementById('course-select'); if (csel) { csel.value = currentCourseOrig; }
+      currentOrderOrig = (this.dataset.order || '').trim();
+      var oinp = document.getElementById('order-input'); if (oinp) { oinp.value = currentOrderOrig; }
       var cur   = this.dataset.thumb || '';
       document.getElementById('thumb-url-input').value    = cur;
       document.getElementById('thumb-file-input').value   = '';
@@ -666,6 +674,36 @@
       });
     });
   }
+  // Порядок урока в программе курса (new_courseorder, целое число).
+  // Пустое поле пишем как null — тогда урок «не пронумерован» и встаёт в начало списка,
+  // что заметно и подталкивает проставить номер. Ноль и пустота — разные состояния.
+  function saveOrder(id, raw, orig) {
+    raw = (raw || '').trim(); orig = (orig || '').trim();
+    if (raw === orig) return Promise.resolve();                 // не изменилось
+    var val = null;
+    if (raw !== '') {
+      val = parseInt(raw, 10);
+      if (isNaN(val) || val < 0) return Promise.reject(new Error('Порядок должен быть целым числом от 0'));
+    }
+    resetToken();
+    return getToken().then(function (token) {
+      return fetch('/_api/new_h5pcontents(' + id + ')', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          '__RequestVerificationToken': token
+        },
+        body: JSON.stringify({ new_courseorder: val })
+      });
+    }).then(function (r) {
+      if (r.ok || r.status === 204) return;
+      return r.text().then(function (t) {
+        throw new Error('Порядок урока: HTTP ' + r.status + ': ' + t.slice(0, 160));
+      });
+    });
+  }
+
   function saveCourse(id, courseId, orig) {
     courseId = courseId || ''; orig = orig || '';
     if (courseId === orig) return Promise.resolve();            // не изменилось
@@ -705,6 +743,8 @@
     }
     promise.then(function () {
       return saveCourse(currentId, document.getElementById('course-select').value, currentCourseOrig);
+    }).then(function () {
+      return saveOrder(currentId, document.getElementById('order-input').value, currentOrderOrig);
     }).then(function () {
       bootstrap.Modal.getInstance(document.getElementById('thumbModal')).hide();
       location.reload();

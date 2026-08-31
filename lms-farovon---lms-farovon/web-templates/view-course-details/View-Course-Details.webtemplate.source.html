@@ -65,8 +65,11 @@
 {% assign cover = 'paper' %}{% if is_mand %}{% assign cover = 'warm' %}{% endif %}
 
 {% comment %}── Этапы курса ──
-   Порядок — по new_name: целочисленного поля порядка (аналог new_trajectoryorder) в new_h5pcontent
-   нет, а заводить столбцы в этой правке нельзя. Пока порядок задаётся префиксом в названии: «01. …».{% endcomment %}
+   Порядок — по new_courseorder (целое число, задаётся админом в карточке урока).
+   Второй ключ сортировки — new_name: он определяет порядок уроков, которым номер
+   ещё не проставили. Такие уроки Dataverse ставит В НАЧАЛО списка (при возрастающей
+   сортировке пустые значения идут первыми) — это заметно и подталкивает их пронумеровать.
+   Раньше порядок был только по названию, из-за чего «Введение» оказывалось после «Аттестации».{% endcomment %}
 {% fetchxml crs_steps %}
 <fetch>
   <entity name="new_h5pcontent">
@@ -74,11 +77,13 @@
     <attribute name="new_name" />
     <attribute name="new_librarytype" />
     <attribute name="new_durationseconds" />
+    <attribute name="new_courseorder" />
     <attribute name="modifiedon" />
     <filter type="and">
       <condition attribute="new_relatedcourse" operator="eq" value="{{ courseid }}" />
       <condition attribute="new_isactive" operator="eq" value="1" />
     </filter>
+    <order attribute="new_courseorder" />
     <order attribute="new_name" />
   </entity>
 </fetch>
