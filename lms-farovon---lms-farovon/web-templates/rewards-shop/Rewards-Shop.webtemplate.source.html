@@ -432,13 +432,14 @@
   var pendingItemCost = 0;
   var pendingItemName = '';
   var pendingCard = null;
-  /* Покупка оформляется серверным потоком «Оформить покупку награды» (Power Pages → Cloud flows):
-     он сам берёт цену и остаток из справочника, считает баланс по прогрессу пользователя
-     и только потом создаёт запись и списывает остаток. Портал передаёт в поток авторизованного
-     пользователя — подменить покупателя или цену из браузера нельзя.
-     Идентификатор — из URL потока на странице «Облачные потоки» (…/trigger/<guid>).
-     При пересоздании потока guid меняется — обновить здесь. */
-  var PURCHASE_FLOW_ID = 'd4142c4e-38a5-f111-b8de-000d3adcd7a2';
+  /* Покупка пишется напрямую в Dataverse. Серверный контроль — поток
+     «Проверка покупки награды» (Dataverse-триггер «при создании записи», от владельца):
+     сверяет цену со справочником, пересчитывает баланс; поддельную или уходящую
+     в минус запись удаляет, честной — списывает остаток new_stock.
+     Синхронный вызов потока через /_api/cloudflow здесь НЕ работает: сайт мигрирован
+     со старого шаблона ProgramRegistration_V2, endpoint отвечает 500 при любой
+     конфигурации (проверено 2026-08-31: лицензия, привязка, форматы тела, Clear config,
+     перезапуск сайта). Не возвращаться к нему без проверки на этом же сайте. */
   /* поток не терпит параллельных вызовов (Power Pages не даёт включить concurrency control
      для потоков с ответом), поэтому двойной клик по-прежнему режем на клиенте */
   var isSubmitting = false;
@@ -572,86 +573,66 @@
       document.getElementById('fv-balance-val').textContent = balance;
     }
 
-    /* Формат вызова — JSON-тело, как в REST-примере документации Power Pages
-       (форма eventData из JS-примера давала 500 без следа в журнале потока).
-       Ключ передаём обоими именами — внутренним (text) и отображаемым (rewardItemId):
-       схема триггера не требует обязательных полей, а поток читает id через coalesce,
-       поэтому вызов не может быть отброшен валидацией на входе. Кто покупает,
-       поток узнаёт от портала сам. */
-    function callFlow(token, payload) {
-      var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-      if (token) headers['__RequestVerificationToken'] = token;
-      return fetch('/_api/cloudflow/v1.0/trigger/' + PURCHASE_FLOW_ID, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(payload)
-      });
-    }
+    var itemId = pendingItemId;
+    var itemName = pendingItemName;
 
     getToken().then(function (token) {
-      return callFlow(token, { rewardItemId: pendingItemId, text: pendingItemId });
-    })
-    .then(function (res) {
-      return res.text().then(function (t) {
-        var data = null;
-        try { data = t ? JSON.parse(t) : null; } catch (e) {}
-        /* портал может отдать выходы строкой JSON или обёрнутыми — разворачиваем */
-        if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { data = null; } }
-        if (data && data.outputs && typeof data.outputs === 'object') data = data.outputs;
-        return { status: res.status, ok: res.ok, data: data, raw: t || '' };
+      var headers = {
+        'Content-Type': 'application/json',
+        'OData-MaxVersion': '4.0',
+        'OData-Version': '4.0',
+        'Accept': 'application/json'
+      };
+      if (token) headers['__RequestVerificationToken'] = token;
+      return fetch('/_api/new_rewardpurchases', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          'new_pointsspent': cost,
+          'new_name': itemName,
+          'new_rewarditem@odata.bind': '/new_rewarditems(' + itemId + ')',
+          'new_user@odata.bind': '/contacts(' + userId + ')'
+        })
       });
     })
-    .then(function (r) {
-      var d = r.data;
+    .then(function (res) {
       fvCloseModal();
-
-      /* Поток не ответил штатно: не привязан к сайту, нет роли, упал внутри.
-         Отличаем от отказа по делу: у штатного ответа всегда есть поле ok. */
-      if (!r.ok || !d || d.ok === undefined) {
-        fvToast('error', 'bi-exclamation-circle-fill', 'Сервис покупок не ответил (HTTP ' + r.status + '). Монеты не списаны.');
-        console.error('[fv-shop] flow error:', r.status, r.raw.slice(0, 300));
-        restore();
-        return;
-      }
-
-      /* Отказ с причиной — награду не продали, ничего не списано.
-         Баланс из ответа честнее клиентского: сервер только что его пересчитал. */
-      if (String(d.ok).toLowerCase() !== 'true') {
-        fvToast('error', 'bi-exclamation-circle-fill', d.message || 'Покупка отклонена');
-        setBalance(d.balance);
-        restore();
-        return;
-      }
-
-      /* Успех. Баланс — из ответа, не вычитаем сами. */
-      setBalance(d.balance);
-      document.getElementById('fvModalCost').textContent = cost;
-      document.getElementById('fvModalAfter').textContent = balance >= 0 ? balance : 0;
-      fvToast('success', 'bi-check-circle-fill', d.message || 'Награда успешно приобретена! 🎉');
-      if (card) {
-        document.querySelectorAll('.fv-reward-card').forEach(function (c) {
-          var cc = parseInt(c.getAttribute('data-item-cost'), 10) || 0;
-          c.querySelectorAll('.fv-buy-btn-can, .fv-buy-btn-no').forEach(function (b) {
-            if (balance < cc) {
-              b.className = 'fv-buy-btn fv-buy-btn-no';
-              b.disabled = true;
-              b.textContent = 'Не хватает';
-              b.onclick = null;
-              c.classList.remove('affordable');
-            }
+      if (res.ok || res.status === 204 || res.status === 201) {
+        setBalance(balance - cost);
+        document.getElementById('fvModalCost').textContent = cost;
+        document.getElementById('fvModalAfter').textContent = balance >= 0 ? balance : 0;
+        fvToast('success', 'bi-check-circle-fill', 'Награда успешно приобретена! 🎉');
+        if (card) {
+          document.querySelectorAll('.fv-reward-card').forEach(function (c) {
+            var cc = parseInt(c.getAttribute('data-item-cost'), 10) || 0;
+            c.querySelectorAll('.fv-buy-btn-can, .fv-buy-btn-no').forEach(function (b) {
+              if (balance < cc) {
+                b.className = 'fv-buy-btn fv-buy-btn-no';
+                b.disabled = true;
+                b.textContent = 'Не хватает';
+                b.onclick = null;
+                c.classList.remove('affordable');
+              }
+            });
           });
-        });
-        var pb = card.querySelector('.fv-buy-btn');
-        if (pb) {
-          pb.className = 'fv-buy-btn fv-buy-btn-out';
-          pb.disabled = true;
-          pb.textContent = 'Куплено ✓';
-          pb.onclick = null;
+          var pb = card.querySelector('.fv-buy-btn');
+          if (pb) {
+            pb.className = 'fv-buy-btn fv-buy-btn-out';
+            pb.disabled = true;
+            pb.textContent = 'Куплено ✓';
+            pb.onclick = null;
+          }
         }
+        /* серверная проверка потоком идёт следом за созданием записи; к моменту
+           перезагрузки витрину и историю перерисует сервер по фактическому состоянию */
+        setTimeout(function () { location.reload(); }, 2600);
+      } else {
+        return res.text().then(function (t) {
+          fvToast('error', 'bi-exclamation-circle-fill', 'Не удалось оформить покупку (HTTP ' + res.status + '). Монеты не списаны.');
+          console.error('[fv-shop] purchase error:', t.slice(0, 300));
+          restore();
+        });
       }
-      /* остальные кнопки остаются заблокированными до перезагрузки — витрину (остатки,
-         историю) честно перерисует сервер */
-      setTimeout(function () { location.reload(); }, 2200);
     })
     .catch(function (err) {
       fvCloseModal();

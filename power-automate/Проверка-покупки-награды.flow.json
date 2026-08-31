@@ -1,0 +1,380 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedcommondataserviceforapps_73c39"
+        },
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "Когда_создана_покупка": {
+          "type": "OpenApiConnectionWebhook",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "SubscribeWebhookTrigger",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "subscriptionRequest/message": 1,
+              "subscriptionRequest/entityname": "new_rewardpurchase",
+              "subscriptionRequest/scope": 4
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      },
+      "actions": {
+        "Инициализировать_earned": {
+          "runAfter": {},
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "earned",
+                "type": "integer",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "Инициализировать_spent": {
+          "runAfter": {
+            "Инициализировать_earned": [
+              "Succeeded"
+            ]
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "spent",
+                "type": "integer",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "Условие_целостности": {
+          "runAfter": {
+            "Инициализировать_spent": [
+              "Succeeded"
+            ]
+          },
+          "type": "If",
+          "expression": {
+            "and": [
+              {
+                "not": {
+                  "equals": [
+                    "@triggerOutputs()?['body/_new_rewarditem_value']",
+                    "@null"
+                  ]
+                }
+              },
+              {
+                "not": {
+                  "equals": [
+                    "@triggerOutputs()?['body/_new_user_value']",
+                    "@null"
+                  ]
+                }
+              }
+            ]
+          },
+          "else": {
+            "actions": {
+              "Удалить_битую_покупку": {
+                "runAfter": {},
+                "type": "OpenApiConnection",
+                "inputs": {
+                  "host": {
+                    "connectionName": "shared_commondataserviceforapps",
+                    "operationId": "DeleteRecord",
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                  },
+                  "parameters": {
+                    "entityName": "new_rewardpurchases",
+                    "recordId": "@triggerOutputs()?['body/new_rewardpurchaseid']"
+                  },
+                  "authentication": "@parameters('$authentication')"
+                }
+              }
+            }
+          },
+          "actions": {
+            "Получить_награду": {
+              "runAfter": {},
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "GetItem",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_rewarditems",
+                  "recordId": "@triggerOutputs()?['body/_new_rewarditem_value']"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Условие_доступности": {
+              "runAfter": {
+                "Получить_награду": [
+                  "Succeeded"
+                ]
+              },
+              "type": "If",
+              "expression": {
+                "and": [
+                  {
+                    "equals": [
+                      "@outputs('Получить_награду')?['body/new_isactive']",
+                      "@true"
+                    ]
+                  },
+                  {
+                    "greater": [
+                      "@coalesce(outputs('Получить_награду')?['body/new_stock'], 1)",
+                      "@0"
+                    ]
+                  },
+                  {
+                    "not": {
+                      "equals": [
+                        "@outputs('Получить_награду')?['body/new_pointscost']",
+                        "@null"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "else": {
+                "actions": {
+                  "Удалить_недоступную": {
+                    "runAfter": {},
+                    "type": "OpenApiConnection",
+                    "inputs": {
+                      "host": {
+                        "connectionName": "shared_commondataserviceforapps",
+                        "operationId": "DeleteRecord",
+                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                      },
+                      "parameters": {
+                        "entityName": "new_rewardpurchases",
+                        "recordId": "@triggerOutputs()?['body/new_rewardpurchaseid']"
+                      },
+                      "authentication": "@parameters('$authentication')"
+                    }
+                  }
+                }
+              },
+              "actions": {
+                "Условие_цены": {
+                  "runAfter": {},
+                  "type": "If",
+                  "expression": {
+                    "equals": [
+                      "@coalesce(triggerOutputs()?['body/new_pointsspent'], -1)",
+                      "@outputs('Получить_награду')?['body/new_pointscost']"
+                    ]
+                  },
+                  "else": {
+                    "actions": {
+                      "Исправить_цену": {
+                        "runAfter": {},
+                        "type": "OpenApiConnection",
+                        "inputs": {
+                          "host": {
+                            "connectionName": "shared_commondataserviceforapps",
+                            "operationId": "UpdateOnlyRecord",
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                          },
+                          "parameters": {
+                            "entityName": "new_rewardpurchases",
+                            "recordId": "@triggerOutputs()?['body/new_rewardpurchaseid']",
+                            "item/new_pointsspent": "@outputs('Получить_награду')?['body/new_pointscost']"
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      }
+                    }
+                  },
+                  "actions": {}
+                },
+                "Список_прогресса": {
+                  "runAfter": {
+                    "Условие_цены": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_h5pprogresses",
+                      "$filter": "_new_user_value eq '@{triggerOutputs()?['body/_new_user_value']}' and new_completion eq true"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Цикл_earned": {
+                  "foreach": "@outputs('Список_прогресса')?['body/value']",
+                  "runAfter": {
+                    "Список_прогресса": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Foreach",
+                  "actions": {
+                    "Плюс_за_урок": {
+                      "runAfter": {},
+                      "type": "IncrementVariable",
+                      "inputs": {
+                        "name": "earned",
+                        "value": "@add(100, int(formatNumber(mul(float(coalesce(item()?['new_scorescaled'], 0)), 50), '0')))"
+                      }
+                    }
+                  }
+                },
+                "Список_покупок": {
+                  "runAfter": {
+                    "Цикл_earned": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_rewardpurchases",
+                      "$filter": "_new_user_value eq '@{triggerOutputs()?['body/_new_user_value']}'"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Цикл_spent": {
+                  "foreach": "@outputs('Список_покупок')?['body/value']",
+                  "runAfter": {
+                    "Список_покупок": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Foreach",
+                  "actions": {
+                    "Плюс_списание": {
+                      "runAfter": {},
+                      "type": "IncrementVariable",
+                      "inputs": {
+                        "name": "spent",
+                        "value": "@int(coalesce(item()?['new_pointsspent'], 0))"
+                      }
+                    }
+                  }
+                },
+                "Условие_баланса": {
+                  "runAfter": {
+                    "Цикл_spent": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "If",
+                  "expression": {
+                    "greaterOrEquals": [
+                      "@sub(variables('earned'), variables('spent'))",
+                      "@0"
+                    ]
+                  },
+                  "else": {
+                    "actions": {
+                      "Удалить_покупку_в_минус": {
+                        "runAfter": {},
+                        "type": "OpenApiConnection",
+                        "inputs": {
+                          "host": {
+                            "connectionName": "shared_commondataserviceforapps",
+                            "operationId": "DeleteRecord",
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                          },
+                          "parameters": {
+                            "entityName": "new_rewardpurchases",
+                            "recordId": "@triggerOutputs()?['body/new_rewardpurchaseid']"
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      }
+                    }
+                  },
+                  "actions": {
+                    "Условие_остатка": {
+                      "runAfter": {},
+                      "type": "If",
+                      "expression": {
+                        "equals": [
+                          "@outputs('Получить_награду')?['body/new_stock']",
+                          "@null"
+                        ]
+                      },
+                      "actions": {},
+                      "else": {
+                        "actions": {
+                          "Списать_остаток": {
+                            "runAfter": {},
+                            "type": "OpenApiConnection",
+                            "inputs": {
+                              "host": {
+                                "connectionName": "shared_commondataserviceforapps",
+                                "operationId": "UpdateOnlyRecord",
+                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                              },
+                              "parameters": {
+                                "entityName": "new_rewarditems",
+                                "recordId": "@triggerOutputs()?['body/_new_rewarditem_value']",
+                                "item/new_stock": "@sub(outputs('Получить_награду')?['body/new_stock'], 1)"
+                              },
+                              "authentication": "@parameters('$authentication')"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}
