@@ -572,25 +572,24 @@
       document.getElementById('fv-balance-val').textContent = balance;
     }
 
-    /* Формат вызова — как в официальном примере Power Pages: form-urlencoded с одним полем
-       eventData, внутри которого JSON со входами потока по их именам. Единственный вход —
-       id награды; кто покупает, поток узнаёт от портала сам. */
+    /* Формат вызова — JSON-тело, как в REST-примере документации Power Pages
+       (форма eventData из JS-примера давала 500 без следа в журнале потока).
+       Ключ передаём обоими именами — внутренним (text) и отображаемым (rewardItemId):
+       схема триггера не требует обязательных полей, а поток читает id через coalesce,
+       поэтому вызов не может быть отброшен валидацией на входе. Кто покупает,
+       поток узнаёт от портала сам. */
     function callFlow(token, payload) {
-      var headers = { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'Accept': 'application/json' };
+      var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
       if (token) headers['__RequestVerificationToken'] = token;
       return fetch('/_api/cloudflow/v1.0/trigger/' + PURCHASE_FLOW_ID, {
         method: 'POST',
         headers: headers,
-        body: 'eventData=' + encodeURIComponent(JSON.stringify(payload))
+        body: JSON.stringify(payload)
       });
     }
 
     getToken().then(function (token) {
-      return callFlow(token, { rewardItemId: pendingItemId }).then(function (res) {
-        /* 400 на имени входа — портал ждёт внутренний ключ триггера, а не отображаемое имя */
-        if (res.status === 400) return callFlow(token, { text: pendingItemId });
-        return res;
-      });
+      return callFlow(token, { rewardItemId: pendingItemId, text: pendingItemId });
     })
     .then(function (res) {
       return res.text().then(function (t) {

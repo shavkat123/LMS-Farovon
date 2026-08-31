@@ -43,9 +43,7 @@
                   "x-ms-content-hint": "TEXT"
                 }
               },
-              "required": [
-                "text"
-              ]
+              "required": []
             }
           }
         }
@@ -65,7 +63,7 @@
             },
             "parameters": {
               "entityName": "new_rewarditems",
-              "recordId": "@triggerBody()['text']"
+              "recordId": "@coalesce(triggerBody()?['text'], triggerBody()?['rewardItemId'])"
             },
             "authentication": "@parameters('$authentication')"
           }
@@ -134,7 +132,7 @@
                       "entityName": "new_rewardpurchases",
                       "item/new_name": "@outputs('Получить_строку_по_ИД')?['body/new_column_6348fe57']",
                       "item/new_pointsspent": "@outputs('Получить_строку_по_ИД')?['body/new_pointscost']",
-                      "item/new_rewarditem@odata.bind": "new_rewarditems(@{triggerBody()['text']})",
+                      "item/new_rewarditem@odata.bind": "new_rewarditems(@{coalesce(triggerBody()?['text'], triggerBody()?['rewardItemId'])})",
                       "item/new_user@odata.bind": "contacts(@{triggerBody()['userId']})"
                     },
                     "authentication": "@parameters('$authentication')"
@@ -158,7 +156,7 @@
                     },
                     "parameters": {
                       "entityName": "new_rewarditems",
-                      "recordId": "@triggerBody()['text']",
+                      "recordId": "@coalesce(triggerBody()?['text'], triggerBody()?['rewardItemId'])",
                       "item/new_stock": "@if(equals(outputs('Получить_строку_по_ИД')?['body/new_stock'], null), null, sub(outputs('Получить_строку_по_ИД')?['body/new_stock'], 1))"
                     },
                     "authentication": "@parameters('$authentication')"
