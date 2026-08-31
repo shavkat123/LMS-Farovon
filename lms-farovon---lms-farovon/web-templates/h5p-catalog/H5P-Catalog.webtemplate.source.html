@@ -24,8 +24,10 @@
 
 {% comment %}── Список курсов для привязки (только админ) ──{% endcomment %}
 {% if is_admin %}
+{% comment %}top обязателен: выборка идёт в выпадающий список модалки, без ограничения
+   растущий каталог курсов однажды упрётся в лимит платформы и запрос вернёт ошибку.{% endcomment %}
 {% fetchxml crs_all %}
-<fetch>
+<fetch top="200">
   <entity name="msdynce_course">
     <attribute name="msdynce_courseid" />
     <attribute name="msdynce_coursename" />
