@@ -10,29 +10,17 @@
   adx_robotsfollowlink: true
   adx_weblinkid: 1f06e5ed-a538-f111-88b5-7ced8d76b3cc
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
-- adx_description: book,#FAF3E8,#B45309
+- adx_description: calendar3,#EEF2F9,#1E3A8A
   adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 2
+  adx_displayorder: 6
   adx_displaypagechildlinks: false
-  adx_name: Курсы
+  adx_name: Мероприятия
   adx_openinnewwindow: false
-  adx_pageid: b1b2c3d4-2222-3333-4444-000000000023
+  adx_pageid: b1b2c3d4-2222-3333-4444-000000000003
   adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_robotsfollowlink: true
-  adx_weblinkid: aa07e5ed-a538-f111-88b5-7ced8d76b3cc
-  adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
-- adx_description: share,#ECF6EF,#15803D
-  adx_disablepagevalidation: false
-  adx_displayimageonly: false
-  adx_displayorder: 3
-  adx_displaypagechildlinks: false
-  adx_name: Траектории
-  adx_openinnewwindow: false
-  adx_pageid: e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b
-  adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
-  adx_robotsfollowlink: true
-  adx_weblinkid: aa11e5ed-a538-f111-88b5-7ced8d76b3cc
+  adx_weblinkid: aa02e5ed-a538-f111-88b5-7ced8d76b3cc
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_description: bar-chart-line,#EEF2F9,#1E3A8A
   adx_disablepagevalidation: false
@@ -46,41 +34,17 @@
   adx_robotsfollowlink: true
   adx_weblinkid: aa06e5ed-a538-f111-88b5-7ced8d76b3cc
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
-- adx_description: chat-dots,#F0F2F5,#475569
+- adx_description: book,#FAF3E8,#B45309
   adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 5
+  adx_displayorder: 2
   adx_displaypagechildlinks: false
-  adx_name: Сообщество
+  adx_name: Курсы
   adx_openinnewwindow: false
-  adx_pageid: a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d
+  adx_pageid: b1b2c3d4-2222-3333-4444-000000000023
   adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_robotsfollowlink: true
-  adx_weblinkid: aa13e5ed-a538-f111-88b5-7ced8d76b3cc
-  adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
-- adx_description: calendar3,#EEF2F9,#1E3A8A
-  adx_disablepagevalidation: false
-  adx_displayimageonly: false
-  adx_displayorder: 6
-  adx_displaypagechildlinks: false
-  adx_name: Мероприятия
-  adx_openinnewwindow: false
-  adx_pageid: b1b2c3d4-2222-3333-4444-000000000003
-  adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
-  adx_robotsfollowlink: true
-  adx_weblinkid: aa02e5ed-a538-f111-88b5-7ced8d76b3cc
-  adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
-- adx_description: trophy,#FAF3E8,#D97706
-  adx_disablepagevalidation: false
-  adx_displayimageonly: false
-  adx_displayorder: 7
-  adx_displaypagechildlinks: false
-  adx_name: Рейтинг
-  adx_openinnewwindow: false
-  adx_pageid: e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b
-  adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
-  adx_robotsfollowlink: true
-  adx_weblinkid: aa09e5ed-a538-f111-88b5-7ced8d76b3cc
+  adx_weblinkid: aa07e5ed-a538-f111-88b5-7ced8d76b3cc
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_description: gift,#ECF6EF,#15803D
   adx_disablepagevalidation: false
@@ -94,6 +58,18 @@
   adx_robotsfollowlink: true
   adx_weblinkid: aa08e5ed-a538-f111-88b5-7ced8d76b3cc
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_description: trophy,#FAF3E8,#D97706
+  adx_disablepagevalidation: false
+  adx_displayimageonly: false
+  adx_displayorder: 7
+  adx_displaypagechildlinks: false
+  adx_name: Рейтинг
+  adx_openinnewwindow: false
+  adx_pageid: e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b
+  adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_robotsfollowlink: true
+  adx_weblinkid: aa09e5ed-a538-f111-88b5-7ced8d76b3cc
+  adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_description: person-circle,#F0F2F5,#475569
   adx_disablepagevalidation: false
   adx_displayimageonly: false
@@ -105,4 +81,28 @@
   adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_robotsfollowlink: true
   adx_weblinkid: aa10e5ed-a538-f111-88b5-7ced8d76b3cc
+  adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_description: share,#ECF6EF,#15803D
+  adx_disablepagevalidation: false
+  adx_displayimageonly: false
+  adx_displayorder: 3
+  adx_displaypagechildlinks: false
+  adx_name: Траектории
+  adx_openinnewwindow: false
+  adx_pageid: e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b
+  adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_robotsfollowlink: true
+  adx_weblinkid: aa11e5ed-a538-f111-88b5-7ced8d76b3cc
+  adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_description: chat-dots,#F0F2F5,#475569
+  adx_disablepagevalidation: false
+  adx_displayimageonly: false
+  adx_displayorder: 5
+  adx_displaypagechildlinks: false
+  adx_name: Сообщество
+  adx_openinnewwindow: false
+  adx_pageid: a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d
+  adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_robotsfollowlink: true
+  adx_weblinkid: aa13e5ed-a538-f111-88b5-7ced8d76b3cc
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc

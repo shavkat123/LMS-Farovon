@@ -1,7 +1,5 @@
-adx_accountrelationship:
 adx_append: true
 adx_appendto: true
-adx_contactrelationship:
 adx_create: true
 adx_delete: true
 adx_entitylogicalname: contact
@@ -12,8 +10,7 @@ adx_entitypermission_webrole:
 - a1b2c3d4-1111-2222-3333-000000000002
 - a1b2c3d4-1111-2222-3333-000000000003
 adx_entitypermissionid: a1b2c3d4-3333-4444-5555-00000000000d
-adx_parententitypermission:
-adx_parentrelationship:
+adx_parententitypermission: 
 adx_read: true
 adx_scope: 756150000
 adx_write: true

@@ -1,8 +1,3 @@
-# Права на запись сняты: экрана администрирования мероприятий нет, new_event нигде не пишется
-# (только чтение через FetchXML на /events и главной), а Web API для new_event не включён —
-# в sitesetting.yml нет пар Webapi/new_event/enabled и Webapi/new_event/fields.
-# Держать create/write/delete включёнными без единого потребителя — лишняя поверхность атаки.
-# Если админ-экран мероприятий появится, вернуть флаги вместе с записями Webapi/new_event/*.
 adx_append: true
 adx_appendto: true
 adx_create: false

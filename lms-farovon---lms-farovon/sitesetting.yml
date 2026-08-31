@@ -69,6 +69,10 @@
 - adx_name: ASP/Course/Form/Validation/Field/StartTime
   adx_sitesettingid: 4460e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: Start time
+- adx_name: H5P/FlowProxyUrl
+  adx_sitesettingid: 44cc5fbd-d0a2-f111-b8db-000d3adcd7a2
+  adx_source: 0
+  adx_value: https://defaultc50a298835254bd2aca8ff2e12cb2c.b8.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/89f3200e86c24eefb32ffad06d22d4ed/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=<redacted>
 - adx_name: Webapi/msdynce_course/enabled
   adx_sitesettingid: 4acfddf9-a538-f111-88b5-7ced8d76b3cc
   adx_value: true
@@ -167,36 +171,6 @@
 - adx_name: Webapi/new_rewarditem/fields
   adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000004
   adx_value: '*'
-- adx_name: Webapi/new_task/enabled
-  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-400000000001
-  adx_value: true
-- adx_name: Webapi/new_task/fields
-  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-400000000002
-  adx_value: '*'
-- adx_name: Webapi/new_broadcast/enabled
-  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000b1
-  adx_value: true
-- adx_name: Webapi/new_broadcast/fields
-  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000b2
-  adx_value: '*'
-- adx_name: Webapi/new_trajectory/enabled
-  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000c1
-  adx_value: true
-- adx_name: Webapi/new_trajectory/fields
-  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000c2
-  adx_value: '*'
-- adx_name: Webapi/new_forumthread/enabled
-  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000d1
-  adx_value: true
-- adx_name: Webapi/new_forumthread/fields
-  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000d2
-  adx_value: '*'
-- adx_name: Webapi/new_forumreply/enabled
-  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000e1
-  adx_value: true
-- adx_name: Webapi/new_forumreply/fields
-  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000e2
-  adx_value: '*'
 - adx_name: Webapi/contact/enabled
   adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000005
   adx_value: true
@@ -253,6 +227,36 @@
 - adx_description: A date/time value in GMT format to represent the effective date of the current published terms and conditions. If the terms agreement is enabled, portal users that have not accepted the terms after this date will be asked to accept them the next time they sign in. If the date is not provided, and the terms agreement is enabled, the terms will be presented every time portal users sign in.
   adx_name: Authentication/Registration/TermsPublicationDate
   adx_sitesettingid: c060e5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_name: Webapi/new_task/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-400000000001
+  adx_value: true
+- adx_name: Webapi/new_task/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-400000000002
+  adx_value: '*'
+- adx_name: Webapi/new_broadcast/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000b1
+  adx_value: true
+- adx_name: Webapi/new_broadcast/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000b2
+  adx_value: '*'
+- adx_name: Webapi/new_trajectory/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000c1
+  adx_value: true
+- adx_name: Webapi/new_trajectory/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000c2
+  adx_value: '*'
+- adx_name: Webapi/new_forumthread/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000d1
+  adx_value: true
+- adx_name: Webapi/new_forumthread/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000d2
+  adx_value: '*'
+- adx_name: Webapi/new_forumreply/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000e1
+  adx_value: true
+- adx_name: Webapi/new_forumreply/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000e2
+  adx_value: '*'
 - adx_name: Authentication/OpenIdConnect/AzureAD/Caption
   adx_sitesettingid: c63d4519-a638-f111-88b5-7ced8d76b3cc
   adx_value: Microsoft Entra ID
