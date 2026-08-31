@@ -328,9 +328,36 @@
         try { prop.call(el, { target: el, type: type }); } catch (e) {}
       }
     }
+    // ── Заплатка совместимости с YouTube ─────────────────────────────────────
+    // H5P.Video 1.6 (scripts/youtube.js) растягивает iframe так:
+    //     player.g.style = "position:absolute;top:0;left:0;width:100%;height:100%;";
+    // player.g — ВНУТРЕННЕЕ минифицированное поле YouTube IFrame API, не часть
+    // публичного контракта. В сборке плеера от 2026-08-28 (cver=2.20260828.01.00)
+    // это поле переименовали: player.g стал undefined, строка бросает
+    // «Cannot set properties of undefined (setting 'style')», iframe остаётся без
+    // размеров внутри абсолютного контейнера — видео играет со звуком, но экран чёрный.
+    //
+    // Правим текст библиотеки перед eval, потому что чинить иначе нечем: youtube.js
+    // лежит внутри каждого .h5p-пакета в SharePoint, и «правильное» исправление
+    // означало бы перепаковку всех уроков.
+    //
+    // Замена берёт публичный getIframe() и лишь потом падает на легаси-поля.
+    // Повтор по таймеру — на случай, если iframe ещё не создан в момент вызова.
+    function patchYouTubeIframeStyle(text) {
+      if (text.indexOf('player.g.style') < 0) return text;
+      console.warn('[H5P] youtube.js: заменяю player.g.style на getIframe() — ' +
+                   'внутреннее поле YouTube API переименовано в их сборке');
+      return text.replace(
+        /player\.g\.style\s*=\s*("[^"]*"|'[^']*')\s*;/g,
+        '(function(p,css){var f=function(){try{var e=(p.getIframe&&p.getIframe())||p.g||p.f||p.a;' +
+        'if(e&&e.style){e.style.cssText=css;return true;}}catch(x){}return false;};' +
+        'if(!f()){var n=0,t=setInterval(function(){if(f()||++n>40)clearInterval(t);},50);}})(player,$1);'
+      );
+    }
+
     function inlineScript(el, text) {
       try {
-        (0, eval)(text);
+        (0, eval)(patchYouTubeIframeStyle(text));
       } catch (e) {
         console.error('[H5P] eval err in', el.__h5pFp || '?', ':', e.message);
         setTimeout(function () { fireEvent(el, 'error'); }, 0);
