@@ -1,0 +1,443 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedcommondataserviceforapps_73c39"
+        },
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "metadata": {
+            "operationMetadataId": "ad58a6bb-0d19-4342-9678-aa30b6464c03"
+          },
+          "type": "Request",
+          "kind": "PowerPages",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "title": "rewardItemId",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "ID награды (GUID записи new_rewarditem)",
+                  "x-ms-content-hint": "TEXT"
+                }
+              },
+              "required": [
+                "text"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Получить_строку_по_ИД": {
+          "runAfter": {},
+          "metadata": {
+            "operationMetadataId": "a040a586-815d-4f39-8034-cbcd812e334c"
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "GetItem",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "entityName": "new_rewarditems",
+              "recordId": "@triggerBody()['text']"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Условие": {
+          "actions": {
+            "Список_строк": {
+              "runAfter": {},
+              "metadata": {
+                "operationMetadataId": "a66d8ef5-07bd-4e5b-9686-081116b866fd"
+              },
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_h5pprogresses",
+                  "$filter": "_new_user_value eq '@{triggerBody()['userId']}' and new_completion eq true"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Применить_к_каждому": {
+              "foreach": "@outputs('Список_строк')?['body/value']",
+              "actions": {
+                "Увеличение_переменной": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "82acf6b3-80f8-4318-9333-b5d3f6d16213"
+                  },
+                  "type": "IncrementVariable",
+                  "inputs": {
+                    "name": "earned",
+                    "value": "@add(100, int(formatNumber(mul(float(coalesce(item()?['new_scorescaled'], 0)), 50), '0')))"
+                  }
+                }
+              },
+              "runAfter": {
+                "Список_строк": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "9d871bea-2a5a-4052-b99d-c328769c2ba2"
+              },
+              "type": "Foreach"
+            },
+            "Условие_2": {
+              "actions": {
+                "Добавление_новой_строки": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "44e4140f-9105-434c-a747-4251d71f0ad5"
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "CreateRecord",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_rewardpurchases",
+                      "item/new_name": "@outputs('Получить_строку_по_ИД')?['body/new_column_6348fe57']",
+                      "item/new_pointsspent": "@outputs('Получить_строку_по_ИД')?['body/new_pointscost']",
+                      "item/new_rewarditem@odata.bind": "new_rewarditems(@{triggerBody()['text']})",
+                      "item/new_user@odata.bind": "contacts(@{triggerBody()['userId']})"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Обновить_строку": {
+                  "runAfter": {
+                    "Добавление_новой_строки": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "3b6144a9-13cb-47e7-9779-7dcb45ccfafa"
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "UpdateOnlyRecord",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_rewarditems",
+                      "recordId": "@triggerBody()['text']",
+                      "item/new_stock": "@if(equals(outputs('Получить_строку_по_ИД')?['body/new_stock'], null), null, sub(outputs('Получить_строку_по_ИД')?['body/new_stock'], 1))"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Return_value(s)_to_Power_Pages_3": {
+                  "runAfter": {
+                    "Обновить_строку": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "bed53e8a-47cd-469a-a100-099850ebf00b"
+                  },
+                  "type": "Response",
+                  "kind": "PowerPages",
+                  "inputs": {
+                    "statusCode": 200,
+                    "body": {
+                      "ok": "@true",
+                      "message": "Покупка оформлена",
+                      "balance": "@sub(sub(variables('earned'), variables('spent')), outputs('Получить_строку_по_ИД')?['body/new_pointscost'])",
+                      "stock": "@if(equals(outputs('Получить_строку_по_ИД')?['body/new_stock'], null), -1, sub(outputs('Получить_строку_по_ИД')?['body/new_stock'], 1))"
+                    },
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "title": "ok",
+                          "x-ms-dynamically-added": true,
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "title": "message",
+                          "x-ms-dynamically-added": true,
+                          "type": "string"
+                        },
+                        "balance": {
+                          "title": "balance",
+                          "x-ms-dynamically-added": true,
+                          "type": "number"
+                        },
+                        "stock": {
+                          "title": "stock",
+                          "x-ms-dynamically-added": true,
+                          "type": "number"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "runAfter": {
+                "Применить_к_каждому_2": [
+                  "Succeeded"
+                ]
+              },
+              "else": {
+                "actions": {
+                  "Return_value(s)_to_Power_Pages_2": {
+                    "runAfter": {},
+                    "metadata": {
+                      "operationMetadataId": "341118cb-c4b3-4740-b0d9-8df55a71077f"
+                    },
+                    "type": "Response",
+                    "kind": "PowerPages",
+                    "inputs": {
+                      "statusCode": 200,
+                      "body": {
+                        "ok": "@false",
+                        "message": "Недостаточно монет",
+                        "balance": "@sub(variables('earned'), variables('spent'))",
+                        "stock": "@coalesce(outputs('Получить_строку_по_ИД')?['body/new_stock'], -1)"
+                      },
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "ok": {
+                            "title": "ok",
+                            "x-ms-dynamically-added": true,
+                            "type": "boolean"
+                          },
+                          "message": {
+                            "title": "message",
+                            "x-ms-dynamically-added": true,
+                            "type": "string"
+                          },
+                          "balance": {
+                            "title": "balance",
+                            "x-ms-dynamically-added": true,
+                            "type": "number"
+                          },
+                          "stock": {
+                            "title": "stock",
+                            "x-ms-dynamically-added": true,
+                            "type": "number"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "expression": {
+                "greaterOrEquals": [
+                  "@sub(variables('earned'), variables('spent'))",
+                  "@outputs('Получить_строку_по_ИД')?['body/new_pointscost']"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "ed758f17-1e4e-47f7-b572-f8175924953d"
+              },
+              "type": "If"
+            },
+            "Список_строк_2": {
+              "runAfter": {
+                "Применить_к_каждому": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "6c412767-2477-4116-9682-beaca771c7b1"
+              },
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_rewardpurchases",
+                  "$filter": "_new_user_value eq '@{triggerBody()['userId']}'"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Применить_к_каждому_2": {
+              "foreach": "@outputs('Список_строк_2')?['body/value']",
+              "actions": {
+                "Увеличение_переменной_2": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "c5a0d080-5740-46d1-b422-139576e452d1"
+                  },
+                  "type": "IncrementVariable",
+                  "inputs": {
+                    "name": "spent",
+                    "value": "@int(coalesce(item()?['new_pointsspent'], 0))"
+                  }
+                }
+              },
+              "runAfter": {
+                "Список_строк_2": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "1be2890f-1af6-4ca7-bbc0-2a8dee90390b"
+              },
+              "type": "Foreach"
+            }
+          },
+          "runAfter": {
+            "Инициализировать_переменную_2": [
+              "Succeeded"
+            ]
+          },
+          "else": {
+            "actions": {
+              "Return_value(s)_to_Power_Pages": {
+                "runAfter": {},
+                "metadata": {
+                  "operationMetadataId": "906a24da-dfed-4c23-a55f-ab342622126c"
+                },
+                "type": "Response",
+                "kind": "PowerPages",
+                "inputs": {
+                  "statusCode": 200,
+                  "body": {
+                    "ok": "@false",
+                    "message": "Награда недоступна или закончилась",
+                    "balance": 0,
+                    "stock": "@coalesce(outputs('Получить_строку_по_ИД')?['body/new_stock'], -1)"
+                  },
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "ok": {
+                        "title": "ok",
+                        "x-ms-dynamically-added": true,
+                        "type": "boolean"
+                      },
+                      "message": {
+                        "title": "message",
+                        "x-ms-dynamically-added": true,
+                        "type": "string"
+                      },
+                      "balance": {
+                        "title": "balance",
+                        "x-ms-dynamically-added": true,
+                        "type": "number"
+                      },
+                      "stock": {
+                        "title": "stock",
+                        "x-ms-dynamically-added": true,
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@outputs('Получить_строку_по_ИД')?['body/new_isactive']",
+                  "@true"
+                ]
+              },
+              {
+                "greater": [
+                  "@coalesce(outputs('Получить_строку_по_ИД')?['body/new_stock'], 1)",
+                  "@0"
+                ]
+              }
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "312f4857-9e1f-4058-a567-083501604d2c"
+          },
+          "type": "If"
+        },
+        "Инициализировать_переменную": {
+          "runAfter": {
+            "Получить_строку_по_ИД": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "49033b51-d53b-4099-aa82-836d6f283fa6"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "earned",
+                "type": "integer",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "Инициализировать_переменную_2": {
+          "runAfter": {
+            "Инициализировать_переменную": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "b5bad564-fef6-4ad1-94b4-35600409aa37"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "spent",
+                "type": "integer",
+                "value": 0
+              }
+            ]
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}
