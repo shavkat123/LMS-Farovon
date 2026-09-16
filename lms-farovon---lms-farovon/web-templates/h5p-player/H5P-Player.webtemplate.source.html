@@ -215,6 +215,17 @@
       });
     }).catch(function () { return false; });
   }
+  // Битую копию нужно уметь выбросить: пока запись лежит в кэше и её modifiedon совпадает,
+  // урок открывается из неё же — «перезагрузите страницу» не помогает, ошибка вечная.
+  function idbDel(key) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (resolve) {
+        var tx = db.transaction('files', 'readwrite').objectStore('files').delete(key);
+        tx.onsuccess = function () { resolve(true); };
+        tx.onerror = function () { resolve(false); };
+      });
+    }).catch(function () { return false; });
+  }
 
   // ── Read CSP nonce from a nonce-bearing <script src> element ─────────────
   // Power Pages adds nonce to external <script src> tags it renders.
@@ -631,7 +642,14 @@
   // Failed to fetch): статус 200 может прийти, а стрим тела оборваться — ловим и повторяем.
   // Чтение тела ответа стримом с прогресс-баром (общая для Dataverse и Flow)
   async function readBodyProgress(response) {
-    if (!(response.body && response.body.getReader)) return response.arrayBuffer();
+    // Dataverse отдаёт настоящий размер файла в x-ms-file-size; Content-Length при сжатии
+    // на CDN относится к сжатому телу, поэтому как эталон длины он не годится.
+    var declared = parseInt(response.headers.get('x-ms-file-size') || '0', 10) || 0;
+    if (!(response.body && response.body.getReader)) {
+      var whole = await response.arrayBuffer();
+      assertComplete(whole.byteLength, declared);
+      return whole;
+    }
     var total = parseInt(response.headers.get('Content-Length') || '0', 10);
     var reader = response.body.getReader();
     var chunks = [], received = 0;
@@ -644,31 +662,72 @@
       if (total > 0) setStatus('Загрузка урока… ' + mb + ' / ' + (total / 1048576).toFixed(1) + ' МБ', received * 100 / total);
       else setStatus('Загрузка урока… ' + mb + ' МБ');
     }
+    assertComplete(received, declared);
     var merged = new Uint8Array(received), off = 0;
     for (var ci = 0; ci < chunks.length; ci++) { merged.set(chunks[ci], off); off += chunks[ci].length; }
     return merged.buffer;
   }
 
-  // Валидная сигнатура ZIP ('PK\x03\x04') — защита от битых копий файла:
-  // если быстрый источник (кэш/Dataverse) отдал не-ZIP, откатываемся на Flow.
-  function isZip(b) {
-    if (!b || b.byteLength < 4) return false;
-    var v = new Uint8Array(b, 0, 4);
-    return v[0] === 0x50 && v[1] === 0x4B && v[2] === 0x03 && v[3] === 0x04;
+  // Оборванная закачка приходит как обычный 200 с коротким телом. Молча принять её нельзя:
+  // обрезанный zip начинается с 'PK\x03\x04', проходил проверку и уезжал в кэш насовсем.
+  function assertComplete(received, declared) {
+    if (declared > 0 && received < declared) {
+      var e = new Error('Загрузка оборвалась: получено ' + received + ' из ' + declared + ' байт');
+      e.transient = true;
+      throw e;
+    }
   }
 
-  async function fetchBuf(fileName, attempt) {
+  // Проверка, что это .h5p целиком. Одной сигнатуры в начале мало: у обрезанного архива
+  // она на месте, а разваливается он уже внутри JSZip («unexpected signature»).
+  // Настоящий признак целости — запись «конец центрального каталога» (PK\x05\x06) в хвосте.
+  function zipProblem(b) {
+    if (!b || b.byteLength < 22) return 'файл пустой или обрезан (' + (b ? b.byteLength : 0) + ' байт)';
+    var head = new Uint8Array(b, 0, 4);
+    if (!(head[0] === 0x50 && head[1] === 0x4B && head[2] === 0x03 && head[3] === 0x04)) {
+      return 'это не zip-архив (первые байты ' + hex4(head) + ', ожидались PK\\x03\\x04)';
+    }
+    // Комментарий архива — максимум 65535 байт, значит EOCD лежит в последних 65557.
+    var tailLen = Math.min(b.byteLength, 65557);
+    var tail = new Uint8Array(b, b.byteLength - tailLen, tailLen);
+    for (var i = tail.length - 22; i >= 0; i--) {
+      if (tail[i] === 0x50 && tail[i + 1] === 0x4B && tail[i + 2] === 0x05 && tail[i + 3] === 0x06) return null;
+    }
+    return 'архив обрезан — не найден конец центрального каталога (получено ' + b.byteLength + ' байт)';
+  }
+  function isZip(b) { return zipProblem(b) === null; }
+  function hex4(v) {
+    var s = [];
+    for (var i = 0; i < 4; i++) s.push('\\x' + ('0' + v[i].toString(16).toUpperCase()).slice(-2));
+    return s.join('');
+  }
+
+  // Откуда приехали байты — нужно и для сообщения об ошибке («что именно перезаливать»),
+  // и чтобы понять, остался ли ещё источник, который стоит попробовать.
+  var FLOW_SRC   = 'Power Automate (SharePoint)';
+  var CACHE_SRC  = 'кэш браузера';
+  var lastSource = '';
+
+  // skip: 'cache' — пропустить только кэш браузера; 'fast' — кэш и Dataverse (тогда остаётся
+  // оригинал из SharePoint). Пропускаем ровно тот источник, который отдал битую копию: иначе
+  // урок, лежащий только в Dataverse, после порчи кэша не открывался вовсе — Flow его не находит.
+  async function fetchBuf(fileName, attempt, skip) {
     attempt = attempt || 1;
+    if (skip === true) skip = 'fast';
     try {
       // ── 1. Кэш: тот же урок той же версии — отдаём мгновенно, без Flow ──
-      if (attempt === 1) {
+      if (attempt === 1 && skip !== 'cache' && skip !== 'fast') {
         var cached = await idbGet(contentId);
         if (cached && cached.ver === CONTENT_VER && isZip(cached.buf)) {
           console.log('[H5P] cache HIT (' + cached.buf.byteLength + ' bytes) — Flow пропущен');
           setStatus('Открываем урок…');
+          lastSource = CACHE_SRC;
           return cached.buf;
         }
-        if (cached && cached.ver === CONTENT_VER) console.warn('[H5P] cache INVALID (не ZIP) — игнорируем, качаем заново');
+        if (cached && cached.ver === CONTENT_VER) {
+          console.warn('[H5P] cache INVALID (' + zipProblem(cached.buf) + ') — удаляем, качаем заново');
+          await idbDel(contentId);
+        }
         else if (cached) console.log('[H5P] cache STALE (ver ' + cached.ver + ' → ' + CONTENT_VER + ')');
       }
 
@@ -676,20 +735,21 @@
       //    Уроки, загруженные через портал, хранят .h5p и в Dataverse; Flow остаётся
       //    fallback'ом для файлов, которых там нет (загруженные напрямую в SharePoint)
       //    или чья Dataverse-копия повреждена (проверка сигнатуры ZIP).
-      if (attempt === 1) {
+      if (attempt === 1 && skip !== 'fast') {
         try {
           var dvRes = await _fetch('/_api/new_h5pcontents(' + contentId + ')/new_h5pfile/$value', {
             headers: { 'Accept': 'application/octet-stream' }, credentials: 'same-origin'
           });
           if (dvRes.ok) {
             var dvBuf = await readBodyProgress(dvRes);
-            if (isZip(dvBuf)) {
+            var dvBad = zipProblem(dvBuf);
+            if (!dvBad) {
               console.log('[H5P] Dataverse file HIT (' + dvBuf.byteLength + ' bytes) — Flow пропущен');
-              idbPut(contentId, { ver: CONTENT_VER, buf: dvBuf });
               setStatus('Распаковка урока…');
+              lastSource = 'Dataverse';
               return dvBuf;
             }
-            console.warn('[H5P] Dataverse-копия повреждена (не ZIP, ' + (dvBuf ? dvBuf.byteLength : 0) + ' байт) — переходим на Flow. Рекомендуется перезалить урок через «Загрузка H5P».');
+            console.warn('[H5P] Dataverse-копия повреждена (' + dvBad + ') — переходим на Flow. Файл в Dataverse нужно перезалить через «Загрузка H5P».');
           } else {
             console.log('[H5P] Dataverse file MISS (HTTP ' + dvRes.status + ') — загрузка через Flow');
           }
@@ -723,21 +783,17 @@
         buf = await readBodyProgress(response);
       }
 
-      // ── 3. Сохраняем в кэш только валидный ZIP (не блокируем открытие) ──
-      if (isZip(buf)) {
-        idbPut(contentId, { ver: CONTENT_VER, buf: buf }).then(function (ok) {
-          console.log('[H5P] cache save:', ok ? 'OK' : 'skip');
-        });
-      }
+      lastSource = FLOW_SRC;
       setStatus('Распаковка урока…');
       return buf;
     } catch (err) {
       var msg = String((err && err.message) || err);
-      var isNet = (err instanceof TypeError) || /Failed to fetch|NetworkError|network|HTTP2|load failed/i.test(msg);
+      var isNet = (err && err.transient) || (err instanceof TypeError) ||
+        /Failed to fetch|NetworkError|network|HTTP2|load failed/i.test(msg);
       if (isNet && attempt < 3) {
         console.warn('[H5P] сеть оборвалась (' + msg + ') — повтор ' + (attempt + 1) + '/3 через 2с');
         await new Promise(function (r) { setTimeout(r, 2000); });
-        return fetchBuf(fileName, attempt + 1);
+        return fetchBuf(fileName, attempt + 1, skip);
       }
       if (isNet) {
         throw new Error('Соединение оборвалось при загрузке файла урока. Обновите страницу (Ctrl+F5) и попробуйте ещё раз. Детали: ' + msg);
@@ -746,24 +802,63 @@
     }
   }
 
+  // В кэш — только архив, который действительно открылся. Раньше запись шла сразу после
+  // скачивания, по структурной проверке: нечитаемая копия успевала осесть в IndexedDB
+  // и гонялась с её же удалением в ветке ошибки.
+  function cacheGood(buf) {
+    if (lastSource === CACHE_SRC) return;
+    idbPut(contentId, { ver: CONTENT_VER, buf: buf }).then(function (ok) {
+      console.log('[H5P] cache save:', ok ? 'OK' : 'skip');
+    });
+  }
+
+  // Разобрать буфер: сначала дешёвые структурные проверки, потом собственно JSZip.
+  async function tryZip(buf) {
+    var problem = zipProblem(buf);
+    if (problem) return { zip: null, problem: problem };
+    try { return { zip: await JSZip.loadAsync(buf), problem: null }; }
+    catch (e) { return { zip: null, problem: 'архив не читается (' + e.message + ')' }; }
+  }
+
+  function zipError(problem, bytes, source) {
+    return 'Файл урока не открывается: ' + problem + '. Получено ' + bytes + ' байт, источник: ' +
+      (source || 'неизвестен') + '. Перезалейте .h5p через раздел «Загрузка H5P».';
+  }
+
+  // Быстрая копия (кэш/Dataverse) может скачаться целиком и всё равно не открыться — значит
+  // испорчена сама копия, а не передача. Тогда единственный шанс — оригинал в SharePoint
+  // через Flow; заодно битая копия выбрасывается из кэша, чтобы не залипала навсегда.
+  async function openZip(fileName) {
+    var buf = await fetchBuf(fileName, 1);
+    console.log('[H5P] got', buf.byteLength, 'bytes from', lastSource, '— extracting ZIP');
+    var first = await tryZip(buf);
+    if (first.zip) { cacheGood(buf); return first.zip; }
+
+    await idbDel(contentId);
+    if (lastSource === FLOW_SRC || !FLOW_URL) throw new Error(zipError(first.problem, buf.byteLength, lastSource));
+
+    var badSource = lastSource, badProblem = first.problem;
+    console.warn('[H5P] ' + badSource + ': ' + badProblem + ' — пробуем оригинал через Flow');
+    setStatus('Копия урока не открылась — качаем оригинал…');
+    // испорчен кэш — Dataverse ещё не пробовали; испорчена копия в Dataverse — остаётся Flow
+    var buf2 = await fetchBuf(fileName, 1, badSource === CACHE_SRC ? 'cache' : 'fast');
+    console.log('[H5P] got', buf2.byteLength, 'bytes from', lastSource, '— extracting ZIP');
+    var second = await tryZip(buf2);
+    if (second.zip) {
+      cacheGood(buf2);
+      console.warn('[H5P] оригинал открылся; копия в ' + badSource + ' испорчена (' + badProblem +
+        ') — перезалейте урок через «Загрузка H5P»');
+      return second.zip;
+    }
+    await idbDel(contentId);
+    throw new Error(zipError(second.problem, buf2.byteLength, lastSource) +
+      ' Копия в источнике «' + badSource + '» тоже не открылась: ' + badProblem + '.');
+  }
+
   async function loadViaFlow(fileName) {
     try {
-      console.log('[H5P] Loading via Flow:', fileName);
-      var buf = await fetchBuf(fileName, 1);
-
-      console.log('[H5P] Flow returned', buf.byteLength, 'bytes — extracting ZIP');
-      // Понятная диагностика вместо криптичного «Corrupted zip»
-      if (!buf || buf.byteLength < 100) {
-        throw new Error('Файл урока пустой или не загружен (' + (buf ? buf.byteLength : 0) +
-          ' байт). Похоже, .h5p не сохранился в базе — переzагрузите урок через раздел «Загрузка H5P».');
-      }
-      var zip;
-      try {
-        zip = await JSZip.loadAsync(buf);
-      } catch (zipErr) {
-        throw new Error('Файл урока повреждён или это не .h5p-архив (получено ' + buf.byteLength +
-          ' байт). Переzагрузите урок. Детали: ' + zipErr.message);
-      }
+      console.log('[H5P] Loading:', fileName);
+      var zip = await openZip(fileName);
       var tasks = [];
       zip.forEach(function (path, file) {
         if (file.dir) return;
@@ -852,6 +947,12 @@
     var v = inst && inst.video;
     if (v && typeof v.seek === 'function' &&
         (typeof v.getDuration !== 'function' || v.getDuration() > 0)) {
+      // Видео урока могли заменить более коротким (Admin Lesson Video Tools): позиция из прежнего
+      // ролика улетела бы за конец нового. С самого хвоста тоже не продолжаем — смотреть там нечего.
+      if (typeof v.getDuration === 'function' && savedPosition >= v.getDuration() - 5) {
+        console.log('[H5P] сохранённая позиция', savedPosition, 'сек — за концом видео, начинаем сначала');
+        return;
+      }
       try {
         v.seek(savedPosition);
         console.log('[H5P] продолжаем с', savedPosition, 'сек');

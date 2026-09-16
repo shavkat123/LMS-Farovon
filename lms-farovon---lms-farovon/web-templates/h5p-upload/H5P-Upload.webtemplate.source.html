@@ -233,8 +233,22 @@
     }
 
     var file = fileInput.files[0];
+    // Power Pages Web API отдаёт и принимает файл одним вызовом максимум на 16 МБ.
+    // Больше — молча приедет обрезанным, и плеер потом ругнётся «повреждён».
+    if (file.size > 16 * 1024 * 1024) {
+      showResult('danger', 'Файл ' + (file.size / 1048576).toFixed(1) + ' МБ — больше лимита в 16 МБ ' +
+        'для загрузки через портал. Уменьшите вес урока (обычно тяжелее всего видео) ' +
+        'или положите .h5p в SharePoint-библиотеку урока.');
+      return;
+    }
     var reader = new FileReader();
     reader.onload = function (ev) {
+      var bad = zipProblem(ev.target.result);
+      if (bad) {
+        showResult('danger', 'Это не целый .h5p-архив: ' + bad + '. ' +
+          'Экспортируйте урок из H5P заново и загрузите файл целиком.');
+        return;
+      }
       uploadFile(file.name, ev.target.result);
     };
     reader.onerror = function () {
@@ -242,6 +256,22 @@
     };
     reader.readAsArrayBuffer(file);
   });
+
+  // Целость .h5p = сигнатура zip в начале И запись конца центрального каталога (PK\x05\x06)
+  // в хвосте. Только по первым байтам обрезанный архив неотличим от целого.
+  function zipProblem(b) {
+    if (!b || b.byteLength < 22) return 'файл пустой или обрезан (' + (b ? b.byteLength : 0) + ' байт)';
+    var head = new Uint8Array(b, 0, 4);
+    if (!(head[0] === 0x50 && head[1] === 0x4B && head[2] === 0x03 && head[3] === 0x04)) {
+      return 'это не zip-архив';
+    }
+    var tailLen = Math.min(b.byteLength, 65557);
+    var tail = new Uint8Array(b, b.byteLength - tailLen, tailLen);
+    for (var i = tail.length - 22; i >= 0; i--) {
+      if (tail[i] === 0x50 && tail[i + 1] === 0x4B && tail[i + 2] === 0x05 && tail[i + 3] === 0x06) return null;
+    }
+    return 'архив обрезан — не найден конец центрального каталога';
+  }
 
   function getToken() {
     // Сначала пробуем токен из DOM (если форма ещё там)
@@ -283,9 +313,9 @@
     .then(function (res) {
       document.getElementById('h5p-upload-progress').style.display = 'none';
       if (res.ok || res.status === 204) {
-        showResult('success',
-          'Файл <strong>' + escHtml(filename) + '</strong> успешно загружен. ' +
-          '<a href="/h5p-player?id=' + recordId + '" class="alert-link">Открыть плеер</a>');
+        // Сразу проверяем, что в базе лежит ровно то, что отправили: PATCH отвечает 204
+        // и на оборванной передаче, а разбираться приходится уже в плеере.
+        return verifyStored(filename, buffer.byteLength);
       } else {
         return res.text().then(function (t) {
           showResult('danger', 'Ошибка загрузки файла (HTTP ' + res.status + '): ' + escHtml(t.slice(0, 200)));
@@ -296,6 +326,37 @@
       document.getElementById('h5p-upload-progress').style.display = 'none';
       showResult('danger', 'Ошибка сети: ' + escHtml(err.message));
     });
+  }
+
+  // Читаем файл обратно из Dataverse и сверяем размер и целость архива.
+  function verifyStored(filename, sentBytes) {
+    var openLink = '<a href="/h5p-player?id=' + recordId + '" class="alert-link">Открыть плеер</a>';
+    showResult('info', 'Файл отправлен, проверяем сохранённую копию…');
+    return fetch('/_api/new_h5pcontents(' + recordId + ')/new_h5pfile/$value', {
+      // без no-store браузер отдаёт копию из кэша: битая загрузка выглядела бы целой
+      headers: { 'Accept': 'application/octet-stream' }, credentials: 'same-origin', cache: 'no-store'
+    })
+      .then(function (r) { return r.ok ? r.arrayBuffer() : null; })
+      .then(function (stored) {
+        if (!stored) {
+          showResult('warning', 'Файл <strong>' + escHtml(filename) + '</strong> отправлен, ' +
+            'но проверить сохранённую копию не удалось. ' + openLink);
+          return;
+        }
+        var bad = zipProblem(stored);
+        if (bad || stored.byteLength !== sentBytes) {
+          showResult('danger', 'Файл сохранился повреждённым: ' +
+            escHtml(bad || ('в базе ' + stored.byteLength + ' байт вместо ' + sentBytes)) +
+            '. Загрузите его ещё раз — урок сейчас не откроется.');
+          return;
+        }
+        showResult('success', 'Файл <strong>' + escHtml(filename) + '</strong> успешно загружен ' +
+          'и проверен (' + (sentBytes / 1048576).toFixed(1) + ' МБ). ' + openLink);
+      })
+      .catch(function () {
+        showResult('warning', 'Файл <strong>' + escHtml(filename) + '</strong> отправлен, ' +
+          'но проверить сохранённую копию не удалось. ' + openLink);
+      });
   }
 
   function showResult(type, html) {
