@@ -1,0 +1,574 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedcommondataserviceforapps_73c39"
+        },
+        "api": { "name": "shared_commondataserviceforapps" }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": { "defaultValue": {}, "type": "Object" },
+        "$authentication": { "defaultValue": {}, "type": "SecureObject" }
+      },
+      "triggers": {
+        "Когда_создана_отправка": {
+          "type": "OpenApiConnectionWebhook",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "SubscribeWebhookTrigger",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "subscriptionRequest/message": 1,
+              "subscriptionRequest/entityname": "new_examsubmission",
+              "subscriptionRequest/scope": 4
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      },
+      "actions": {
+        "Константы": {
+          "type": "Compose",
+          "runAfter": {},
+          "inputs": {
+            "kindВремяИстекло": 100000001,
+            "attemptСдан": 100000002,
+            "attemptПроверяется": 100000003,
+            "itemНеОтвечен": 100000000,
+            "itemОтвечен": 100000001,
+            "itemОценён": 100000002,
+            "type": { "single": 100000000, "multi": 100000001, "case": 100000002, "control": 100000003 },
+            "graceSeconds": 30
+          }
+        },
+        "Try": {
+          "type": "Scope",
+          "runAfter": { "Константы": [ "Succeeded" ] },
+          "actions": {
+            "Уже_обработана": {
+              "type": "If",
+              "runAfter": {},
+              "expression": {
+                "not": { "equals": [ "@empty(coalesce(triggerOutputs()?['body/new_processedon'], ''))", true ] }
+              },
+              "actions": {
+                "Выход_обработана": { "type": "Terminate", "runAfter": {}, "inputs": { "runStatus": "Succeeded" } }
+              },
+              "else": { "actions": {} }
+            },
+            "Попытка": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Уже_обработана": [ "Succeeded" ] },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "GetItem",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examattempts",
+                  "recordId": "@triggerOutputs()?['body/_new_attempt_value']"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Чужая_отправка": {
+              "type": "If",
+              "runAfter": { "Попытка": [ "Succeeded" ] },
+              "expression": {
+                "not": {
+                  "equals": [
+                    "@outputs('Попытка')?['body/_new_contact_value']",
+                    "@triggerOutputs()?['body/_new_contact_value']"
+                  ]
+                }
+              },
+              "actions": {
+                "Журнал_чужой_отправки": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "CreateRecord",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_examlogs",
+                      "item/new_event": "ANSWER_REJECTED_LATE",
+                      "item/new_actor": "F-A4 Завершение",
+                      "item/new_subjectid": "@triggerOutputs()?['body/new_examsubmissionid']",
+                      "item/new_payload": "Отправка и попытка принадлежат разным сотрудникам — отклонена.",
+                      "item/new_attempt@odata.bind": "/new_examattempts(@{triggerOutputs()?['body/_new_attempt_value']})"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Выход_чужая": {
+                  "type": "Terminate",
+                  "runAfter": { "Журнал_чужой_отправки": [ "Succeeded" ] },
+                  "inputs": { "runStatus": "Succeeded" }
+                }
+              },
+              "else": { "actions": {} }
+            },
+            "Экзамен": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Чужая_отправка": [ "Succeeded" ] },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "GetItem",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_exams",
+                  "recordId": "@outputs('Попытка')?['body/_new_exam_value']"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "P": {
+              "type": "Compose",
+              "runAfter": { "Экзамен": [ "Succeeded" ] },
+              "inputs": "@if(empty(coalesce(outputs('Экзамен')?['body/new_configsnapshot'], '')), json(coalesce(outputs('Экзамен')?['body/new_paramsjson'], '{}')), json(outputs('Экзамен')?['body/new_configsnapshot'])?['params'])"
+            },
+            "Крайний_срок": {
+              "type": "Compose",
+              "runAfter": { "P": [ "Succeeded" ] },
+              "inputs": "@addSeconds(coalesce(outputs('Попытка')?['body/new_deadline'], utcNow()), int(outputs('Константы')['graceSeconds']))"
+            },
+            "Момент_сдачи": {
+              "type": "Compose",
+              "runAfter": { "Крайний_срок": [ "Succeeded" ] },
+              "inputs": "@if(equals(triggerOutputs()?['body/new_kind'], outputs('Константы')['kindВремяИстекло']), coalesce(outputs('Попытка')?['body/new_deadline'], utcNow()), coalesce(triggerOutputs()?['body/createdon'], utcNow()))"
+            },
+            "Попытка_сдана": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Момент_сдачи": [ "Succeeded" ] },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "UpdateOnlyRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examattempts",
+                  "recordId": "@triggerOutputs()?['body/_new_attempt_value']",
+                  "item/new_status": "@outputs('Константы')['attemptСдан']",
+                  "item/new_submittedon": "@{outputs('Момент_сдачи')}"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Задания": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Попытка_сдана": [ "Succeeded" ] },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examticketitems",
+                  "$filter": "statecode eq 0 and _new_attempt_value eq '@{triggerOutputs()?['body/_new_attempt_value']}'",
+                  "$select": "new_examticketitemid,new_order,new_type,new_points,_new_question_value",
+                  "$orderby": "new_order asc",
+                  "$top": 300
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Цикл_заданий": {
+              "type": "Foreach",
+              "runAfter": { "Задания": [ "Succeeded" ] },
+              "foreach": "@outputs('Задания')?['body/value']",
+              "runtimeConfiguration": { "concurrency": { "repetitions": 5 } },
+              "actions": {
+                "Ответы": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_examanswers",
+                      "$filter": "statecode eq 0 and _new_ticketitem_value eq '@{items('Цикл_заданий')?['new_examticketitemid']}'",
+                      "$select": "new_examanswerid,new_selected,new_text,createdon",
+                      "$orderby": "createdon desc",
+                      "$top": 50
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Ответы_в_срок": {
+                  "type": "Query",
+                  "runAfter": { "Ответы": [ "Succeeded" ] },
+                  "inputs": {
+                    "from": "@outputs('Ответы')?['body/value']",
+                    "where": "@lessOrEquals(ticks(item()?['createdon']), ticks(outputs('Крайний_срок')))"
+                  }
+                },
+                "Есть_ответ": {
+                  "type": "If",
+                  "runAfter": { "Ответы_в_срок": [ "Succeeded" ] },
+                  "expression": { "greater": [ "@length(body('Ответы_в_срок'))", 0 ] },
+                  "actions": {
+                    "Принятый": {
+                      "type": "Compose",
+                      "runAfter": {},
+                      "inputs": "@first(body('Ответы_в_срок'))"
+                    },
+                    "Отметить_принятый": {
+                      "type": "OpenApiConnection",
+                      "runAfter": { "Принятый": [ "Succeeded" ] },
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_commondataserviceforapps",
+                          "operationId": "UpdateOnlyRecord",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "new_examanswers",
+                          "recordId": "@outputs('Принятый')?['new_examanswerid']",
+                          "item/new_accepted": true
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Непринятые": {
+                      "type": "Query",
+                      "runAfter": { "Отметить_принятый": [ "Succeeded" ] },
+                      "inputs": {
+                        "from": "@outputs('Ответы')?['body/value']",
+                        "where": "@not(equals(item()?['new_examanswerid'], outputs('Принятый')?['new_examanswerid']))"
+                      }
+                    },
+                    "Цикл_непринятых": {
+                      "type": "Foreach",
+                      "runAfter": { "Непринятые": [ "Succeeded" ] },
+                      "foreach": "@body('Непринятые')",
+                      "runtimeConfiguration": { "concurrency": { "repetitions": 5 } },
+                      "actions": {
+                        "Отметить_непринятый": {
+                          "type": "OpenApiConnection",
+                          "runAfter": {},
+                          "inputs": {
+                            "host": {
+                              "connectionName": "shared_commondataserviceforapps",
+                              "operationId": "UpdateOnlyRecord",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                            },
+                            "parameters": {
+                              "entityName": "new_examanswers",
+                              "recordId": "@items('Цикл_непринятых')?['new_examanswerid']",
+                              "item/new_accepted": false
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          }
+                        }
+                      }
+                    },
+                    "Задание_с_выбором": {
+                      "type": "If",
+                      "runAfter": { "Цикл_непринятых": [ "Succeeded" ] },
+                      "expression": {
+                        "or": [
+                          { "equals": [ "@items('Цикл_заданий')?['new_type']", "@outputs('Константы')['type']['single']" ] },
+                          { "equals": [ "@items('Цикл_заданий')?['new_type']", "@outputs('Константы')['type']['multi']" ] }
+                        ]
+                      },
+                      "actions": {
+                        "Вопрос": {
+                          "type": "OpenApiConnection",
+                          "runAfter": {},
+                          "inputs": {
+                            "host": {
+                              "connectionName": "shared_commondataserviceforapps",
+                              "operationId": "GetItem",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                            },
+                            "parameters": {
+                              "entityName": "new_examquestions",
+                              "recordId": "@items('Цикл_заданий')?['_new_question_value']"
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          }
+                        },
+                        "Варианты": {
+                          "type": "Compose",
+                          "runAfter": { "Вопрос": [ "Succeeded" ] },
+                          "inputs": "@json(coalesce(outputs('Вопрос')?['body/new_optionsjson'], '[]'))"
+                        },
+                        "Верные": {
+                          "type": "Select",
+                          "runAfter": { "Варианты": [ "Succeeded" ] },
+                          "inputs": {
+                            "from": "@outputs('Варианты')",
+                            "select": "@item()?['id']"
+                          }
+                        },
+                        "Только_верные": {
+                          "type": "Query",
+                          "runAfter": { "Верные": [ "Succeeded" ] },
+                          "inputs": {
+                            "from": "@outputs('Варианты')",
+                            "where": "@equals(coalesce(item()?['correct'], false), true)"
+                          }
+                        },
+                        "Верные_ид": {
+                          "type": "Select",
+                          "runAfter": { "Только_верные": [ "Succeeded" ] },
+                          "inputs": {
+                            "from": "@body('Только_верные')",
+                            "select": "@item()?['id']"
+                          }
+                        },
+                        "Выбор": {
+                          "type": "Compose",
+                          "runAfter": { "Верные_ид": [ "Succeeded" ] },
+                          "inputs": "@if(empty(coalesce(outputs('Принятый')?['new_selected'], '')), json('[]'), split(outputs('Принятый')?['new_selected'], '|'))"
+                        },
+                        "Совпало": {
+                          "type": "Compose",
+                          "runAfter": { "Выбор": [ "Succeeded" ] },
+                          "inputs": "@length(intersection(outputs('Выбор'), body('Верные_ид')))"
+                        },
+                        "Лишних": {
+                          "type": "Compose",
+                          "runAfter": { "Совпало": [ "Succeeded" ] },
+                          "inputs": "@sub(length(outputs('Выбор')), outputs('Совпало'))"
+                        },
+                        "Балл": {
+                          "type": "Compose",
+                          "runAfter": { "Лишних": [ "Succeeded" ] },
+                          "inputs": "@if(equals(items('Цикл_заданий')?['new_type'], outputs('Константы')['type']['single']), if(and(equals(length(outputs('Выбор')), 1), equals(outputs('Совпало'), 1)), float(coalesce(items('Цикл_заданий')?['new_points'], 0)), 0), if(equals(coalesce(outputs('P')?['multiMode'], 'penalty'), 'allOrNothing'), if(and(equals(outputs('Совпало'), length(body('Верные_ид'))), equals(outputs('Лишних'), 0)), float(coalesce(items('Цикл_заданий')?['new_points'], 0)), 0), if(equals(coalesce(outputs('P')?['multiMode'], 'penalty'), 'perOption'), float(formatNumber(mul(float(coalesce(items('Цикл_заданий')?['new_points'], 0)), div(float(add(outputs('Совпало'), sub(sub(length(outputs('Варианты')), length(body('Верные_ид'))), outputs('Лишних')))), float(length(outputs('Варианты'))))), '0.00', 'en-US')), float(formatNumber(mul(float(coalesce(items('Цикл_заданий')?['new_points'], 0)), div(float(max(0, sub(outputs('Совпало'), outputs('Лишних')))), float(max(1, length(body('Верные_ид')))))), '0.00', 'en-US')))))"
+                        },
+                        "Записать_балл": {
+                          "type": "OpenApiConnection",
+                          "runAfter": { "Балл": [ "Succeeded" ] },
+                          "inputs": {
+                            "host": {
+                              "connectionName": "shared_commondataserviceforapps",
+                              "operationId": "UpdateOnlyRecord",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                            },
+                            "parameters": {
+                              "entityName": "new_examticketitems",
+                              "recordId": "@items('Цикл_заданий')?['new_examticketitemid']",
+                              "item/new_earned": "@outputs('Балл')",
+                              "item/new_status": "@outputs('Константы')['itemОценён']"
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {
+                          "Пометить_отвеченным": {
+                            "type": "OpenApiConnection",
+                            "runAfter": {},
+                            "inputs": {
+                              "host": {
+                                "connectionName": "shared_commondataserviceforapps",
+                                "operationId": "UpdateOnlyRecord",
+                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                              },
+                              "parameters": {
+                                "entityName": "new_examticketitems",
+                                "recordId": "@items('Цикл_заданий')?['new_examticketitemid']",
+                                "item/new_status": "@outputs('Константы')['itemОтвечен']"
+                              },
+                              "authentication": "@parameters('$authentication')"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Без_ответа_ноль": {
+                        "type": "OpenApiConnection",
+                        "runAfter": {},
+                        "inputs": {
+                          "host": {
+                            "connectionName": "shared_commondataserviceforapps",
+                            "operationId": "UpdateOnlyRecord",
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                          },
+                          "parameters": {
+                            "entityName": "new_examticketitems",
+                            "recordId": "@items('Цикл_заданий')?['new_examticketitemid']",
+                            "item/new_earned": 0,
+                            "item/new_status": "@outputs('Константы')['itemОценён']"
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "Задания_после_приёма": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Цикл_заданий": [ "Succeeded" ] },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examticketitems",
+                  "$filter": "statecode eq 0 and _new_attempt_value eq '@{triggerOutputs()?['body/_new_attempt_value']}' and new_status eq 100000001",
+                  "$select": "new_examticketitemid,new_type",
+                  "$top": 300
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Есть_письменные": {
+              "type": "If",
+              "runAfter": { "Задания_после_приёма": [ "Succeeded" ] },
+              "expression": { "greater": [ "@length(outputs('Задания_после_приёма')?['body/value'])", 0 ] },
+              "actions": {
+                "На_проверку": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "UpdateOnlyRecord",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_examattempts",
+                      "recordId": "@triggerOutputs()?['body/_new_attempt_value']",
+                      "item/new_status": "@outputs('Константы')['attemptПроверяется']"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                }
+              },
+              "else": {
+                "actions": {
+                  "Финализировать": {
+                    "type": "Workflow",
+                    "runAfter": {},
+                    "inputs": {
+                      "host": {
+                        "workflowReferenceName": "b1a50003-e5c9-4d7a-9a61-2026091600a5"
+                      },
+                      "body": {
+                        "text": "@triggerOutputs()?['body/_new_attempt_value']",
+                        "text_1": "Первичная"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "Отметить_отправку": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Есть_письменные": [ "Succeeded" ] },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "UpdateOnlyRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examsubmissions",
+                  "recordId": "@triggerOutputs()?['body/new_examsubmissionid']",
+                  "item/new_processedon": "@{utcNow()}",
+                  "item/new_result": "@{if(greater(length(outputs('Задания_после_приёма')?['body/value']), 0), 'Отправлено на проверку письменных ответов', 'Оценено сразу: письменных заданий с ответами нет')}"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Журнал_сдачи": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Отметить_отправку": [ "Succeeded" ] },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "CreateRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examlogs",
+                  "item/new_event": "@{if(equals(triggerOutputs()?['body/new_kind'], outputs('Константы')['kindВремяИстекло']), 'ATTEMPT_EXPIRED', 'ATTEMPT_SUBMITTED')}",
+                  "item/new_actor": "F-A4 Завершение",
+                  "item/new_subjectid": "@triggerOutputs()?['body/_new_attempt_value']",
+                  "item/new_payload": "@{concat('{\"заданий\":', string(length(outputs('Задания')?['body/value'])), ',\"письменныхНаПроверку\":', string(length(outputs('Задания_после_приёма')?['body/value'])), ',\"сдано\":\"', string(outputs('Момент_сдачи')), '\"}')}",
+                  "item/new_exam@odata.bind": "/new_exams(@{outputs('Попытка')?['body/_new_exam_value']})",
+                  "item/new_attempt@odata.bind": "/new_examattempts(@{triggerOutputs()?['body/_new_attempt_value']})"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          }
+        },
+        "Catch": {
+          "type": "Scope",
+          "runAfter": { "Try": [ "Failed", "TimedOut" ] },
+          "actions": {
+            "Журнал_сбоя": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "CreateRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examlogs",
+                  "item/new_event": "FLOW_ERROR",
+                  "item/new_actor": "F-A4 Завершение",
+                  "item/new_subjectid": "@{workflow()?['run']?['name']}",
+                  "item/new_payload": "@{string(result('Try'))}"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Отметить_попытку_ошибкой": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Журнал_сбоя": [ "Succeeded" ] },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "UpdateOnlyRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examattempts",
+                  "recordId": "@triggerOutputs()?['body/_new_attempt_value']",
+                  "item/new_errortext": "Завершение не отработало из-за сбоя потока. Подробности — в журнале экзамена."
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}
