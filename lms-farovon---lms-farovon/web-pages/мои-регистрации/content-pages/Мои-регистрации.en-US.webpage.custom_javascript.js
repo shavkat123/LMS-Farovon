@@ -28,21 +28,13 @@ $(function() {
         let imgURL = "";
         const courseid = this.dataset.courseid;
         const regid = this.dataset.regid;
-        webapi.safeAjax({
-            type: "GET",
-            url: "/_api/msdynce_courses(" + courseid + ")/msdynce_entityimage/?size=full",
-            contentType: "application/json",
-            success: function(res, status) {
-                let imgHTML = "";
-                if (res) {
-                    imgURL = "data:image/png;base64," + res.value;
-                    imgHTML = "<img class='image-right'  src=" + imgURL + "  alt='course photo'>";
-                } else {
-                    imgHTML = "<img class='image-right'  src='/card-placeholder.svg'  alt='course photo'>";
-                }
-                $("#div" + regid).append(imgHTML);
-            }
-        });
+        // Столбец-картинку читаем как /$value: форма «/<столбец>/?size=full» после перехода
+        // на явные списки полей Web API трактуется как «все столбцы» и отдаёт 403 (90040101).
+        imgURL = "/_api/msdynce_courses(" + courseid + ")/msdynce_entityimage/$value?size=full";
+        $("#div" + regid).append(
+            "<img class='image-right' src=" + '"' + imgURL + '"' + " alt='course photo'" +
+            " onerror=" + '"' + "this.onerror=null;this.src='/card-placeholder.svg';" + '"' + ">"
+        );
 
     });
 

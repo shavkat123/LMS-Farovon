@@ -24,17 +24,12 @@ $(function () {
   $('.image-preview-clear-btn').attr('title', 'remove');
 
   //get the image
-  webapi.safeAjax({
-    type: 'GET',
-    url: "/_api/msdynce_courses({{request.params['id']}})/msdynce_entityimage/?size=full",
-    contentType: 'application/json',
-    success: function (res, status) {
-      if (res) {
-        imgBaseString = res.value;
-        $('.image-preview-area img').attr('src', 'data:image/png;base64,' + imgBaseString);
-      }
-    },
-  });
+  // Столбец-картинку читаем как /$value: форма «/<столбец>/?size=full» после перехода
+  // на явные списки полей Web API трактуется как «все столбцы» и отдаёт 403 (90040101).
+  var coverUrl = "/_api/msdynce_courses({{request.params['id']}})/msdynce_entityimage/$value?size=full";
+  var coverProbe = new Image();
+  coverProbe.onload = function () { $('.image-preview-area img').attr('src', coverUrl); };
+  coverProbe.src = coverUrl;
   //Edit Course record
   $('#updateCourseButton').click(function (e) {
     // validation

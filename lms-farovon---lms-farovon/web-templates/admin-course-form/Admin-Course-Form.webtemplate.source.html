@@ -334,23 +334,30 @@
           <span class="adm-eyebrow">Уроки курса</span>
           <a href="/admin/library" style="font-size:11px;font-weight:600;color:var(--adm-primary) !important;text-decoration:none !important;">Библиотека →</a>
         </div>
-        <div style="margin-top:8px;">
+        {% comment %}Кнопки строк обслуживает Admin Lesson Video Tools. data-lv-row — список правится на месте, без перезагрузки: иначе пропали бы несохранённые правки формы курса.{% endcomment %}
+        <div style="margin-top:8px;" data-lv-list data-lv-empty="В курсе не осталось уроков.">
           {% assign lcount = crs_lessons.results.entities.size %}
           {% if lcount == 0 %}
           <div style="font-size:12px;color:var(--adm-fg-3);padding:6px 0;">Уроки не привязаны. Привяжите H5P-уроки к курсу в Библиотеке (поле «Связанный курс»).</div>
           {% else %}
           {% for l in crs_lessons.results.entities %}
-          <div class="acf-lesson">
+          {% assign lnm = l.new_name | default: 'Без названия' | escape %}
+          <div class="acf-lesson" data-lv-row="{{ l.new_h5pcontentid }}">
             <i class="bi bi-play-circle"></i>
             <div style="flex:1;min-width:0;">
-              <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ l.new_name | escape }}</div>
-              <div class="t">{{ l.new_librarytype | default: 'H5P' | escape }}</div>
+              <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ lnm }}</div>
+              <div class="t" data-lv-typetext>{{ l.new_librarytype | default: 'H5P' | escape }}</div>
+            </div>
+            <div class="lv-acts">
+              <button type="button" class="lv-act" data-lv-action="replace" data-lv-id="{{ l.new_h5pcontentid }}" data-lv-name="{{ lnm }}" data-lv-type="{{ l.new_librarytype | escape }}" data-lv-active="1" title="Заменить видео урока" aria-label="Заменить видео урока {{ lnm }}"><i class="bi bi-arrow-repeat"></i></button>
+              <button type="button" class="lv-act lv-act--danger" data-lv-action="delete" data-lv-id="{{ l.new_h5pcontentid }}" data-lv-name="{{ lnm }}" data-lv-active="1" title="Удалить урок" aria-label="Удалить урок {{ lnm }}"><i class="bi bi-trash3"></i></button>
             </div>
           </div>
           {% endfor %}
           {% endif %}
         </div>
       </div>
+      {% include 'Admin Lesson Video Tools' %}
 
       <div class="adm-card acf-card acf-danger">
         <span class="adm-eyebrow" style="color:#DC2626;">Опасная зона</span>
@@ -406,11 +413,14 @@
   });
   // текущая обложка (edit) — GET не требует CSRF
   if (IS_EDIT) {
-    fetch('/_api/msdynce_courses(' + COURSE_ID + ')/msdynce_entityimage/?size=full', {
-      headers: { 'Accept': 'application/json' }, credentials: 'same-origin'
-    }).then(function (r) { if (!r.ok) { console.warn('[course-cover] HTTP', r.status); return null; } return r.json(); })
-      .then(function (res) {
-        if (res && res.value) { coverImg.src = 'data:image/png;base64,' + res.value; coverBox.classList.add('has'); clearBtn.style.display = ''; }
+    // Столбец-картинку читаем как /$value: форма '/msdynce_entityimage/?size=full' после
+    // перехода на явные списки полей Web API трактуется как «все столбцы» и отдаёт 403 (90040101).
+    // Ответ теперь бинарный (204 — обложки нет), поэтому blob вместо base64.
+    fetch('/_api/msdynce_courses(' + COURSE_ID + ')/msdynce_entityimage/$value?size=full', {
+      credentials: 'same-origin'
+    }).then(function (r) { if (!r.ok) { console.warn('[course-cover] HTTP', r.status); return null; } return r.status === 204 ? null : r.blob(); })
+      .then(function (b) {
+        if (b && b.size) { coverImg.src = URL.createObjectURL(b); coverBox.classList.add('has'); clearBtn.style.display = ''; }
       // Пустой catch прятал причину «обложка не подтянулась» — теперь она хотя бы в консоли
       }).catch(function (e) { console.warn('[course-cover]', e); });
   }
