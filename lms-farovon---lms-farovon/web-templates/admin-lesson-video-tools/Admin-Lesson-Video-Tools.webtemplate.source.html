@@ -1,0 +1,844 @@
+{% comment %}
+  Admin Lesson Video Tools — замена видео урока и удаление урока на админ-экранах.
+  Подключается include'ом ВНУТРИ ролевого гейта экрана (сейчас: Admin Library, Admin Course Form).
+
+  Урок — запись new_h5pcontent, его видео — .h5p-файл в столбце new_h5pfile. «Заменить видео»
+  перезаписывает только файл: id урока не меняется, поэтому название, обложка, курс, порядок
+  и прогресс сотрудников остаются за уроком. Новый файл берётся с диска или копируется у другого
+  материала библиотеки (из Dataverse, а если там его нет — оригинал из SharePoint через Flow).
+
+  Разметка экрана:
+    кнопки  data-lv-action = replace | delete | show, data-lv-id, data-lv-name,
+            data-lv-type (текущий new_librarytype), data-lv-active = 1 | 0
+    строка  data-lv-row = id урока — после операции правится на месте, без перезагрузки
+            (нужно там, где рядом несохранённая форма); контейнер строк — data-lv-list,
+            его текст на случай, когда строк не осталось, — data-lv-empty.
+            Без data-lv-row страница просто перезагружается.
+{% endcomment %}
+
+<div id="fvLvCfg" hidden data-flow-url="{{ settings['H5P/FlowProxyUrl'] | default: '' | escape }}"></div>
+
+<style>
+  .lv-acts { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; flex-shrink: 0; }
+  .lv-act { display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 28px; min-width: 28px; padding: 0 8px; border-radius: 7px; border: 1px solid var(--adm-border-2); background: #fff; color: var(--adm-fg-2); font-size: 12px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all .12s; }
+  .lv-acts .lv-act i { color: inherit; font-size: 13px; }
+  .lv-act:hover { border-color: var(--adm-primary); color: var(--adm-primary); background: var(--adm-primary-50); }
+  .lv-act--danger:hover { border-color: var(--adm-danger); color: var(--adm-danger); background: var(--adm-danger-50); }
+  .lv-act:disabled { opacity: .5; cursor: default; }
+  .lv-act:focus-visible, .lv-tab:focus-visible, .lv-drop:focus-visible { outline: 2px solid var(--adm-primary); outline-offset: 2px; }
+  .lv-list-empty { font-size: 12px; color: var(--adm-fg-3); padding: 6px 0; }
+
+  .lv-ov { display: none; position: fixed; inset: 0; z-index: 10050; background: rgba(11,18,32,.45); align-items: center; justify-content: center; padding: 20px; }
+  .lv-ov.open { display: flex; }
+  .lv-ov [hidden] { display: none !important; }
+  .lv-dlg { background: #fff; border-radius: 14px; width: 100%; max-width: 560px; max-height: calc(100vh - 40px); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(11,18,32,.25); text-align: left; }
+  .lv-dlg--sm { max-width: 440px; }
+  .lv-hd { padding: 18px 20px 14px; border-bottom: 1px solid var(--adm-border-1); }
+  .lv-hd h2 { font-size: 16px; font-weight: 700; color: var(--adm-fg-1); margin: 3px 0 0; }
+  .lv-sub { font-size: 13px; color: var(--adm-fg-2); margin-top: 4px; overflow-wrap: anywhere; }
+  .lv-bd { padding: 16px 20px; overflow-y: auto; }
+  .lv-ft { padding: 12px 20px; border-top: 1px solid var(--adm-border-1); display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+  .lv-ft .adm-btn:disabled { opacity: .55; cursor: default; }
+  .lv-note { display: flex; gap: 8px; font-size: 12.5px; line-height: 1.45; color: var(--adm-fg-2); background: var(--adm-primary-50); border-radius: 8px; padding: 10px 12px; }
+  .lv-note i { color: var(--adm-primary); flex-shrink: 0; }
+  .lv-p { font-size: 13px; line-height: 1.5; color: var(--adm-fg-1); margin: 0 0 10px; }
+  .lv-p--muted { font-size: 12.5px; color: var(--adm-fg-2); }
+  .lv-tabs { display: flex; gap: 4px; padding: 3px; margin: 14px 0 12px; border-radius: 9px; background: var(--adm-bg-muted); }
+  .lv-tab { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; background: transparent; border-radius: 7px; padding: 7px 10px; font-size: 12.5px; font-weight: 600; color: var(--adm-fg-2); cursor: pointer; }
+  .lv-tab.on { background: #fff; color: var(--adm-primary); box-shadow: 0 1px 2px rgba(11,18,32,.08); }
+  .lv-tab:disabled { cursor: default; }
+  .lv-drop { display: block; margin: 0; padding: 20px 16px; border: 1.5px dashed var(--adm-border-2); border-radius: 10px; text-align: center; font-size: 13px; color: var(--adm-fg-2); cursor: pointer; transition: all .12s; }
+  .lv-drop:hover, .lv-drop.drag { border-color: var(--adm-primary); background: var(--adm-primary-50); }
+  .lv-drop input { display: none; }
+  .lv-drop .ic { display: block; font-size: 22px; color: var(--adm-primary); margin-bottom: 6px; }
+  .lv-drop .m, .lv-item .m { display: block; font-size: 11px; color: var(--adm-fg-3); margin-top: 3px; }
+  .lv-list { max-height: 280px; overflow-y: auto; margin-top: 8px; border: 1px solid var(--adm-border-1); border-radius: 10px; }
+  .lv-list.busy { pointer-events: none; opacity: .6; }
+  .lv-item { display: flex; align-items: center; gap: 10px; margin: 0; padding: 9px 12px; border-bottom: 1px solid var(--adm-border-1); font-size: 13px; font-weight: 400; color: var(--adm-fg-1); cursor: pointer; }
+  .lv-item:last-child { border-bottom: 0; }
+  .lv-item:hover { background: #FAFBFC; }
+  .lv-item.on { background: var(--adm-primary-50); }
+  .lv-item input { flex-shrink: 0; margin: 0; accent-color: var(--adm-primary); }
+  .lv-item .tx { flex: 1; min-width: 0; }
+  .lv-item .n { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lv-empty { padding: 18px 12px; text-align: center; font-size: 12.5px; color: var(--adm-fg-3); }
+  .lv-status { display: none; margin-top: 12px; padding: 9px 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.45; overflow-wrap: anywhere; }
+  .lv-status.show { display: block; }
+  .lv-status.info { background: var(--adm-bg-muted); color: var(--adm-fg-2); }
+  .lv-status.ok { background: var(--adm-success-50); color: var(--adm-success); }
+  .lv-status.err { background: var(--adm-danger-50); color: var(--adm-danger); }
+  .lv-btn-danger { background: var(--adm-danger); color: #fff !important; }
+  .lv-btn-danger:hover { background: #991B1B; }
+
+  .lv-toast { position: fixed; right: 20px; bottom: 20px; z-index: 10060; max-width: 380px; padding: 12px 16px; border-radius: 12px; background: #0B1220; color: #fff; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; font-size: 13px; font-weight: 500; line-height: 1.45; box-shadow: 0 8px 24px rgba(11,18,32,.25); opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity .25s ease-out, transform .25s ease-out; }
+  .lv-toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .lv-toast.err { background: var(--adm-danger); }
+  .lv-toast a { color: #BFD3FF !important; font-weight: 600; text-decoration: underline !important; }
+</style>
+
+<div class="lv-ov adm-scope" id="lvReplace" aria-hidden="true">
+  <div class="lv-dlg" role="dialog" aria-modal="true" aria-labelledby="lvReplaceTitle">
+    <div class="lv-hd">
+      <span class="adm-eyebrow">Видео урока</span>
+      <h2 id="lvReplaceTitle">Заменить видео</h2>
+      <div class="lv-sub" id="lvReplaceSub"></div>
+    </div>
+    <div class="lv-bd">
+      <div class="lv-note">
+        <i class="bi bi-info-circle"></i>
+        <span>Меняется только файл урока. Название, описание, обложка, курс, порядок и прогресс сотрудников остаются прежними.</span>
+      </div>
+      <div class="lv-tabs" role="tablist">
+        <button type="button" class="lv-tab on" role="tab" aria-selected="true" data-lv-tab="file"><i class="bi bi-upload"></i> Загрузить новый</button>
+        <button type="button" class="lv-tab" role="tab" aria-selected="false" data-lv-tab="lib"><i class="bi bi-collection-play"></i> Выбрать из библиотеки</button>
+      </div>
+      <div id="lvPaneFile">
+        <label class="lv-drop" id="lvDrop" tabindex="0">
+          <input type="file" id="lvFile" accept=".h5p">
+          <i class="bi bi-file-earmark-zip ic" aria-hidden="true"></i>
+          <span id="lvDropText">Выберите .h5p-файл или перетащите его сюда</span>
+          <span class="m">до 16 МБ — лимит загрузки через портал</span>
+        </label>
+      </div>
+      <div id="lvPaneLib" hidden>
+        <input type="text" class="adm-input" id="lvLibSearch" placeholder="Поиск по библиотеке…" autocomplete="off" aria-label="Поиск по библиотеке">
+        <div class="lv-list" id="lvLibList" role="radiogroup" aria-label="Материалы библиотеки"></div>
+      </div>
+      <div class="lv-status" id="lvStatus" role="status" aria-live="polite"></div>
+    </div>
+    <div class="lv-ft">
+      <button type="button" class="adm-btn adm-btn--ghost" id="lvReplaceCancel">Отмена</button>
+      <button type="button" class="adm-btn adm-btn--primary" id="lvReplaceGo" disabled><i class="bi bi-arrow-repeat"></i> Заменить видео</button>
+    </div>
+  </div>
+</div>
+
+<div class="lv-ov adm-scope" id="lvDelete" aria-hidden="true">
+  <div class="lv-dlg lv-dlg--sm" role="alertdialog" aria-modal="true" aria-labelledby="lvDelTitle" aria-describedby="lvDelText">
+    <div class="lv-hd">
+      <span class="adm-eyebrow" style="color:var(--adm-danger);">Удаление урока</span>
+      <h2 id="lvDelTitle">Удалить урок?</h2>
+      <div class="lv-sub" id="lvDelName"></div>
+    </div>
+    <div class="lv-bd">
+      <p class="lv-p" id="lvDelText">Урок исчезнет из каталога и программы курса, его файл удалится. Отменить удаление нельзя.</p>
+      <p class="lv-p" id="lvDelLearners"></p>
+      <p class="lv-p lv-p--muted" id="lvDelHideHint">Если урок ещё может понадобиться — скройте его: сотрудники перестанут его видеть, а файл и прогресс сохранятся.</p>
+      <div class="lv-status" id="lvDelStatus" role="status" aria-live="polite"></div>
+    </div>
+    <div class="lv-ft">
+      <button type="button" class="adm-btn adm-btn--ghost" id="lvDelCancel">Отмена</button>
+      <button type="button" class="adm-btn adm-btn--ghost" id="lvDelHide"><i class="bi bi-eye-slash"></i> Скрыть</button>
+      <button type="button" class="adm-btn lv-btn-danger" id="lvDelGo"><i class="bi bi-trash3"></i> Удалить навсегда</button>
+    </div>
+  </div>
+</div>
+
+<div class="lv-toast" id="lvToast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  // Шаблон могут подключить дважды — второй экземпляр не должен вешать обработчики повторно.
+  if (window.fvLessonToolsReady) return;
+  window.fvLessonToolsReady = true;
+
+  // Power Pages Web API принимает и отдаёт файл одним вызовом максимум на 16 МБ;
+  // больше — молча приезжает обрезанным.
+  var MAX_BYTES = 16 * 1024 * 1024;
+  var DROP_TEXT = 'Выберите .h5p-файл или перетащите его сюда';
+  var cfgEl = document.getElementById('fvLvCfg');
+  var FLOW_URL = cfgEl ? (cfgEl.getAttribute('data-flow-url') || '') : '';
+
+  var cur = null;        // урок, с которым работаем: { raw, id, name, type, active }
+  var ready = null;      // проверенный новый файл: { buf, name, info }
+  var seq = 0;           // номер выбора: ответы для устаревшего выбора игнорируются
+  var busy = false;      // идёт запись — окно не закрываем
+  var picked = '';
+  var libItems = null, libPromise = null;
+  var toastT = null, lastFocus = null;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function normId(v) { return String(v || '').replace(/[{}]/g, '').trim().toLowerCase(); }
+  function mb(n) { return (n / 1048576).toFixed(1) + ' МБ'; }
+  function fmtDur(sec) {
+    sec = Math.round(+sec || 0);
+    if (sec <= 0) return '';
+    var s = sec % 60;
+    return Math.floor(sec / 60) + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function shortType(t) { return String(t || '').replace(/^H5P\./, '').split(' ')[0]; }
+  function plural(n, one, few, many) {
+    var n10 = n % 10, n100 = n % 100;
+    if (n10 === 1 && n100 !== 11) return one;
+    if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return few;
+    return many;
+  }
+
+  // ── Тост; после перезагрузки страницы он доезжает через sessionStorage ────
+  function toast(msg, link, isErr) {
+    var t = $('lvToast');
+    if (!t) return;
+    t.textContent = msg;
+    if (link) {
+      var a = document.createElement('a');
+      a.href = link.href; a.textContent = link.text; a.target = '_blank'; a.rel = 'noopener';
+      t.appendChild(document.createTextNode(' '));
+      t.appendChild(a);
+    }
+    t.className = 'lv-toast show' + (isErr ? ' err' : '');
+    clearTimeout(toastT);
+    toastT = setTimeout(function () { t.classList.remove('show'); }, link || isErr ? 9000 : 5000);
+  }
+  var FLASH_KEY = 'fvLvFlash';
+  function flash(msg, link, isErr) {
+    try { sessionStorage.setItem(FLASH_KEY, JSON.stringify({ msg: msg, link: link || null, err: !!isErr, t: Date.now() })); }
+    catch (e) { /* приватный режим — тост просто не покажется */ }
+  }
+  try {
+    var fl = JSON.parse(sessionStorage.getItem(FLASH_KEY) || 'null');
+    sessionStorage.removeItem(FLASH_KEY);
+    if (fl && fl.msg && Date.now() - (fl.t || 0) < 60000) toast(fl.msg, fl.link, fl.err);
+  } catch (e) { /* нет sessionStorage */ }
+
+  // ── Web API ────────────────────────────────────────────────────────────────
+  // Токен берём свежий на каждую операцию: закэшированный после долгого простоя
+  // страницы бывает уже недействителен.
+  function getToken() {
+    return fetch('/_layout/tokenhtml', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.text() : ''; })
+      .then(function (html) {
+        var inp = html.match(/<input[^>]+__RequestVerificationToken[^>]*>/i);
+        var v = inp && inp[0].match(/value="([^"]+)"/i);
+        return v ? v[1] : '';
+      });
+  }
+  // Ошибка Web API приходит как {"error":{"message":…}} — показываем сообщение, а не весь JSON.
+  function apiError(res) {
+    return res.text().then(function (t) {
+      var msg = t;
+      try { var j = JSON.parse(t); msg = (j.error && (j.error.message || j.error.code)) || t; } catch (e) { /* не JSON */ }
+      throw new Error('HTTP ' + res.status + (msg ? ' — ' + String(msg).slice(0, 220) : ''));
+    });
+  }
+  function jsonHeaders(tok) {
+    return {
+      'Content-Type': 'application/json', 'Accept': 'application/json',
+      'OData-MaxVersion': '4.0', 'OData-Version': '4.0', '__RequestVerificationToken': tok
+    };
+  }
+  function patchLesson(id, body) {
+    return getToken().then(function (tok) {
+      return fetch('/_api/new_h5pcontents(' + id + ')', {
+        method: 'PATCH', credentials: 'same-origin', headers: jsonHeaders(tok), body: JSON.stringify(body)
+      });
+    }).then(function (r) { if (!r.ok) return apiError(r); });
+  }
+  function deleteLesson(id) {
+    return getToken().then(function (tok) {
+      return fetch('/_api/new_h5pcontents(' + id + ')', {
+        method: 'DELETE', credentials: 'same-origin', headers: jsonHeaders(tok)
+      });
+    }).then(function (r) { if (!r.ok) return apiError(r); });
+  }
+  // Сколько сотрудников начинали урок — по уникальным пользователям: в прогрессе бывают дубли.
+  function learnersCount(id) {
+    return fetch('/_api/new_h5pprogresses?$select=_new_user_value&$filter=_new_h5pcontent_value eq ' + id, {
+      headers: { 'Accept': 'application/json' }, credentials: 'same-origin'
+    })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j || !j.value) return null;
+        var seen = {}, n = 0;
+        j.value.forEach(function (p) { var u = p._new_user_value || ''; if (!seen[u]) { seen[u] = true; n++; } });
+        return n;
+      })
+      .catch(function () { return null; });
+  }
+  function loadLibrary() {
+    if (libPromise) return libPromise;
+    libPromise = fetch('/_api/new_h5pcontents?$select=new_h5pcontentid,new_name,new_librarytype,new_durationseconds,' +
+                       'new_isactive,createdon,_new_relatedcourse_value&$orderby=createdon desc&$top=500', {
+      headers: { 'Accept': 'application/json' }, credentials: 'same-origin'
+    })
+      .then(function (r) { return r.ok ? r.json() : apiError(r); })
+      .then(function (j) { return (j && j.value) || []; })
+      .then(addCourseNames)
+      .catch(function (e) { libPromise = null; throw e; });
+    return libPromise;
+  }
+
+  // Название курса пришло бы аннотацией FormattedValue, но портал её не отдаёт:
+  // нужен заголовок Prefer, которого Power Pages Web API не принимает. Подтягиваем сами.
+  function addCourseNames(list) {
+    if (!list.some(function (x) { return x._new_relatedcourse_value; })) return list;
+    return fetch('/_api/msdynce_courses?$select=msdynce_courseid,msdynce_coursename&$top=500', {
+      headers: { 'Accept': 'application/json' }, credentials: 'same-origin'
+    })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var map = {};
+        (((j || {}).value) || []).forEach(function (c) { map[c.msdynce_courseid] = c.msdynce_coursename; });
+        list.forEach(function (x) { x.crsName = map[x._new_relatedcourse_value] || ''; });
+        return list;
+      })
+      .catch(function () { return list; });   // без названий список всё равно работает
+  }
+
+  // ── Файл урока ─────────────────────────────────────────────────────────────
+  // Целый .h5p = zip-сигнатура в начале И запись конца центрального каталога (PK\x05\x06)
+  // в хвосте: у обрезанного архива начало на месте, а разваливается он уже внутри JSZip.
+  function zipProblem(b) {
+    if (!b || b.byteLength < 22) return 'файл пустой или обрезан (' + (b ? b.byteLength : 0) + ' байт)';
+    var head = new Uint8Array(b, 0, 4);
+    if (!(head[0] === 0x50 && head[1] === 0x4B && head[2] === 0x03 && head[3] === 0x04)) return 'это не zip-архив';
+    var tailLen = Math.min(b.byteLength, 65557);
+    var tail = new Uint8Array(b, b.byteLength - tailLen, tailLen);
+    for (var i = tail.length - 22; i >= 0; i--) {
+      if (tail[i] === 0x50 && tail[i + 1] === 0x4B && tail[i + 2] === 0x05 && tail[i + 3] === 0x06) return null;
+    }
+    return 'архив обрезан — не найден конец центрального каталога';
+  }
+
+  // JSZip лежит в web-files для плеера; на админ-экраны его грузим, только когда он нужен.
+  var jszipPromise = null;
+  function loadJSZip() {
+    if (window.JSZip) return Promise.resolve(window.JSZip);
+    if (jszipPromise) return jszipPromise;
+    jszipPromise = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = '/jszip.min.js';
+      s.onload = function () { if (window.JSZip) resolve(window.JSZip); else reject(new Error('JSZip не загрузилась.')); };
+      s.onerror = function () { jszipPromise = null; reject(new Error('Не удалось загрузить /jszip.min.js.')); };
+      document.head.appendChild(s);
+    });
+    return jszipPromise;
+  }
+
+  // Разбор пакета. h5p.json обязателен — без него это не H5P. Тип пишем в том же виде, что
+  // у остальных уроков («H5P.InteractiveVideo 1.27»): по нему программа курса отличает видео от теста.
+  function inspectPackage(buf) {
+    return loadJSZip()
+      .then(function (JSZip) {
+        return JSZip.loadAsync(buf).catch(function (e) { throw new Error('Архив не читается (' + e.message + ').'); });
+      })
+      .then(function (zip) {
+        var hj = zip.file('h5p.json');
+        if (!hj) throw new Error('В архиве нет h5p.json — это не H5P-пакет.');
+        return hj.async('string').then(function (txt) {
+          var meta = null;
+          try { meta = JSON.parse(txt.replace(/^\uFEFF/, '')); } catch (e) { /* ниже — понятная ошибка */ }
+          if (!meta || !meta.mainLibrary) throw new Error('В h5p.json не указана основная библиотека — пакет повреждён.');
+          var type = meta.mainLibrary;
+          (meta.preloadedDependencies || []).forEach(function (d) {
+            if (d && d.machineName === meta.mainLibrary && d.majorVersion != null) {
+              type = d.machineName + ' ' + d.majorVersion + '.' + d.minorVersion;
+            }
+          });
+          return videoDuration(zip).then(function (sec) { return { type: type, duration: sec }; });
+        });
+      });
+  }
+
+  // Длительность встроенного видео: у Interactive Video — interactiveVideo.video.files,
+  // у простого H5P.Video — sources; пути внутри пакета — относительно папки content/.
+  // У роликов с YouTube файла в пакете нет — тогда длительность не узнать (null).
+  function videoDuration(zip) {
+    var cj = zip.file('content/content.json');
+    if (!cj) return Promise.resolve(null);
+    return cj.async('string').then(function (txt) {
+      var c = JSON.parse(txt.replace(/^\uFEFF/, ''));
+      var files = (c.interactiveVideo && c.interactiveVideo.video && c.interactiveVideo.video.files) || c.sources || [];
+      for (var i = 0; i < files.length; i++) {
+        var f = files[i];
+        if (f && f.path && !/^https?:\/\//i.test(f.path) && zip.file('content/' + f.path)) {
+          return zip.file('content/' + f.path).async('blob').then(function (blob) {
+            return probeMedia(blob.slice(0, blob.size, f.mime || 'video/mp4'));
+          });
+        }
+      }
+      return null;
+    }).catch(function () { return null; });
+  }
+  function probeMedia(blob) {
+    return new Promise(function (resolve) {
+      var url = URL.createObjectURL(blob);
+      var v = document.createElement('video');
+      var done = false;
+      var timer = setTimeout(function () { finish(null); }, 10000);
+      function finish(sec) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        v.removeAttribute('src');
+        URL.revokeObjectURL(url);
+        resolve(sec);
+      }
+      v.preload = 'metadata';
+      v.muted = true;
+      v.addEventListener('loadedmetadata', function () {
+        finish(isFinite(v.duration) && v.duration > 0 ? Math.round(v.duration) : null);
+      });
+      v.addEventListener('error', function () { finish(null); });
+      v.src = url;
+    });
+  }
+
+  function readFile(f) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () { resolve(r.result); };
+      r.onerror = function () { reject(new Error('Не удалось прочитать файл с диска.')); };
+      r.readAsArrayBuffer(f);
+    });
+  }
+
+  // Файл другого материала: сначала копия в Dataverse, затем оригинал в SharePoint через Flow —
+  // у материалов, положенных в SharePoint напрямую, копии в Dataverse нет.
+  function fetchLessonFile(id) {
+    return fetch('/_api/new_h5pcontents(' + id + ')/new_h5pfile/$value', {
+      headers: { 'Accept': 'application/octet-stream' }, credentials: 'same-origin', cache: 'no-store'
+    }).then(function (r) {
+      if (!r.ok) return null;
+      var declared = parseInt(r.headers.get('x-ms-file-size') || '0', 10) || 0;
+      if (declared > MAX_BYTES) {
+        var big = new Error('Файл материала ' + mb(declared) + ' — больше лимита портала в 16 МБ, скопировать его в урок нельзя.');
+        big.fatal = true;
+        throw big;
+      }
+      var name = r.headers.get('x-ms-file-name') || '';
+      return r.arrayBuffer().then(function (buf) {
+        // Оборванная или битая копия — не повод сдаваться: целый оригинал может лежать в SharePoint.
+        if ((declared && buf.byteLength < declared) || zipProblem(buf)) return null;
+        return { buf: buf, name: name };
+      });
+    }, function () { return null; })
+      .catch(function (e) { if (e && e.fatal) throw e; return null; })
+      .then(function (got) { return got || fetchViaFlow(id, 1); });
+  }
+  function fetchViaFlow(id, attempt) {
+    if (!FLOW_URL) {
+      return Promise.reject(new Error('У материала нет файла в Dataverse, а загрузка из SharePoint не настроена (Site Setting «H5P/FlowProxyUrl»).'));
+    }
+    return fetch(FLOW_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/octet-stream, application/json, text/plain, */*' },
+      body: JSON.stringify({ fileName: id + '.h5p' })
+    }).then(function (r) {
+      // 502–504 — обычно «холодный старт» Power Automate, как и в плеере: один повтор.
+      if ((r.status === 502 || r.status === 503 || r.status === 504) && attempt < 2) {
+        return new Promise(function (ok) { setTimeout(ok, 2000); }).then(function () { return fetchViaFlow(id, attempt + 1); });
+      }
+      if (!r.ok) throw new Error('Файл материала не найден ни в Dataverse, ни в SharePoint (Flow HTTP ' + r.status + ').');
+      var ct = (r.headers.get('Content-Type') || '').toLowerCase();
+      if (ct.indexOf('json') === -1 && ct.indexOf('text/plain') === -1) {
+        return r.arrayBuffer().then(function (buf) { return { buf: buf, name: id + '.h5p' }; });
+      }
+      // Power Automate может отдать файл base64-строкой, в том числе внутри JSON (поле $content).
+      return r.text().then(function (txt) {
+        var j = null;
+        try { j = JSON.parse(txt); } catch (e) { /* не JSON — голый base64 */ }
+        var b64 = j == null ? txt : (typeof j === 'string' ? j : (j['$content'] || j.content || j.value || j.body || j.data || ''));
+        b64 = String(b64 || '').replace(/\s/g, '');
+        if (!b64 || !/^[A-Za-z0-9+\/=]+$/.test(b64)) throw new Error('Flow вернул ответ неожиданного формата.');
+        var bin = atob(b64), u = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+        return { buf: u.buffer, name: id + '.h5p' };
+      });
+    });
+  }
+
+  // Заголовок x-ms-file-name пропускает только ASCII: кириллицу кодируем, как «Загрузка H5P».
+  // Имя, пришедшее из Dataverse уже в ASCII-виде, повторно не кодируем.
+  function headerName(name) {
+    name = String(name || '').trim() || 'lesson.h5p';
+    return /^[\x20-\x7E]+$/.test(name) ? name : encodeURIComponent(name);
+  }
+  function putFile(id, buf, name) {
+    return getToken().then(function (tok) {
+      return fetch('/_api/new_h5pcontents(' + id + ')/new_h5pfile', {
+        method: 'PATCH', credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/octet-stream', 'x-ms-file-name': headerName(name),
+          'OData-MaxVersion': '4.0', 'OData-Version': '4.0', '__RequestVerificationToken': tok
+        },
+        body: buf
+      });
+    }).then(function (r) { if (!r.ok) return apiError(r); });
+  }
+  // PATCH отвечает 204 и на оборванной передаче — читаем файл обратно и сверяем размер и целость.
+  function storedProblem(id, sentBytes) {
+    return fetch('/_api/new_h5pcontents(' + id + ')/new_h5pfile/$value', {
+      headers: { 'Accept': 'application/octet-stream' }, credentials: 'same-origin', cache: 'no-store'
+    }).then(function (r) {
+      if (!r.ok) return 'сохранённый файл не читается (HTTP ' + r.status + ')';
+      return r.arrayBuffer().then(function (b) {
+        return b.byteLength !== sentBytes ? 'в базе ' + b.byteLength + ' байт вместо ' + sentBytes : zipProblem(b);
+      });
+    }).catch(function (e) {
+      // Сеть оборвалась на проверке, а не на загрузке — это не признак битого файла.
+      console.warn('[lesson-video] проверить сохранённый файл не удалось:', e);
+      return null;
+    });
+  }
+  function uploadVerified(id, buf, name) {
+    return putFile(id, buf, name)
+      .then(function () { return storedProblem(id, buf.byteLength); })
+      .then(function (p) {
+        if (!p) return;
+        // Обрыв передачи обычно разовый — одна повторная попытка.
+        return putFile(id, buf, name)
+          .then(function () { return storedProblem(id, buf.byteLength); })
+          .then(function (p2) {
+            if (p2) throw new Error('файл сохранился повреждённым (' + p2 + '). Повторите замену — пока урок может не открываться.');
+          });
+      });
+  }
+
+  // Своя копия урока в кэше плеера (IndexedDB) — выбрасываем, чтобы «Открыть урок» сразу
+  // показал новое видео. У сотрудников кэш сбросится сам: его ключ версии — modifiedon урока.
+  function forgetCached(c) {
+    try {
+      var rq = indexedDB.open('fv-h5p-cache', 1);
+      rq.onupgradeneeded = function () { rq.result.createObjectStore('files'); };
+      rq.onsuccess = function () {
+        try {
+          var st = rq.result.transaction('files', 'readwrite').objectStore('files');
+          st.delete(c.id);
+          if (c.raw && c.raw !== c.id) st.delete(c.raw);
+        } catch (e) { /* кэша нет — и не надо */ }
+      };
+    } catch (e) { /* IndexedDB недоступна */ }
+  }
+
+  // ── Окна ───────────────────────────────────────────────────────────────────
+  function openOv(id, focusId) {
+    lastFocus = document.activeElement;
+    $(id).classList.add('open');
+    $(id).setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    setTimeout(function () { var f = $(focusId); if (f) f.focus(); }, 30);
+  }
+  function closeOv(id) {
+    var ov = $(id);
+    if (!ov.classList.contains('open')) return;
+    ov.classList.remove('open');
+    ov.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    seq++;          // незавершённые проверки закрытого окна больше ничего не трогают
+    ready = null;   // и не держат в памяти файл до 16 МБ
+    if (lastFocus && lastFocus.focus && document.contains(lastFocus)) lastFocus.focus();
+  }
+  function closeAll() { closeOv('lvReplace'); closeOv('lvDelete'); }
+
+  function setStatus(elId, type, text) {
+    var el = $(elId);
+    el.className = 'lv-status' + (type ? ' show ' + type : '');
+    el.textContent = text || '';
+  }
+  function setBusy(on, text) {
+    busy = on;
+    $('lvReplaceCancel').disabled = on;
+    $('lvReplaceGo').disabled = on || !ready;
+    $('lvFile').disabled = on;
+    $('lvLibSearch').disabled = on;
+    $('lvLibList').classList.toggle('busy', on);
+    document.querySelectorAll('#lvReplace [data-lv-tab]').forEach(function (b) { b.disabled = on; });
+    if (on) setStatus('lvStatus', 'info', text + ' Не закрывайте окно.');
+  }
+  function setDelBusy(on, text) {
+    busy = on;
+    ['lvDelGo', 'lvDelHide', 'lvDelCancel'].forEach(function (id) { $(id).disabled = on; });
+    if (on) setStatus('lvDelStatus', 'info', text);
+  }
+
+  function readTrigger(b) {
+    return {
+      raw: b.getAttribute('data-lv-id') || '',
+      id: normId(b.getAttribute('data-lv-id')),
+      name: b.getAttribute('data-lv-name') || 'Без названия',
+      type: b.getAttribute('data-lv-type') || '',
+      active: b.getAttribute('data-lv-active') !== '0'
+    };
+  }
+  function rowsFor(id) {
+    return Array.prototype.filter.call(document.querySelectorAll('[data-lv-row]'), function (r) {
+      return normId(r.getAttribute('data-lv-row')) === id;
+    });
+  }
+
+  // Итог операции: строки с data-lv-row правим на месте, иначе — перезагрузка страницы.
+  function finish(action, body, msg, link, isErr) {
+    var c = cur;
+    closeAll();
+    libItems = null; libPromise = null;   // состав библиотеки поменялся
+    var rows = rowsFor(c.id);
+    if (!rows.length) { flash(msg, link, isErr); location.reload(); return; }
+    rows.forEach(function (row) {
+      if (action === 'deleted' || action === 'hidden') {
+        var list = row.closest('[data-lv-list]');
+        row.parentNode.removeChild(row);
+        if (list && !list.querySelector('[data-lv-row]')) {
+          var em = document.createElement('div');
+          em.className = 'lv-list-empty';
+          em.textContent = list.getAttribute('data-lv-empty') || 'Уроков не осталось.';
+          list.appendChild(em);
+        }
+      } else if (action === 'replaced' && body && body.new_librarytype) {
+        var t = row.querySelector('[data-lv-typetext]');
+        if (t) t.textContent = body.new_librarytype;
+        row.querySelectorAll('[data-lv-type]').forEach(function (b) { b.setAttribute('data-lv-type', body.new_librarytype); });
+      }
+    });
+    toast(msg, link, isErr);
+  }
+
+  // ── Замена видео ───────────────────────────────────────────────────────────
+  function openReplace(btn) {
+    cur = readTrigger(btn);
+    $('lvReplaceSub').textContent = 'Урок «' + cur.name + '»';
+    setBusy(false);
+    setTab('file');
+    openOv('lvReplace', 'lvDrop');
+  }
+  function setTab(name) {
+    document.querySelectorAll('#lvReplace [data-lv-tab]').forEach(function (b) {
+      var on = b.getAttribute('data-lv-tab') === name;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    $('lvPaneFile').hidden = name !== 'file';
+    $('lvPaneLib').hidden = name !== 'lib';
+    // Смена источника сбрасывает выбор: в урок не должен уехать файл из соседней вкладки.
+    seq++; ready = null; picked = '';
+    $('lvReplaceGo').disabled = true;
+    $('lvFile').value = '';
+    $('lvDropText').textContent = DROP_TEXT;
+    setStatus('lvStatus', '', '');
+    if (name === 'lib') showLibrary();
+  }
+
+  function showLibrary() {
+    var box = $('lvLibList');
+    $('lvLibSearch').value = '';
+    if (libItems) { renderLib(); return; }
+    box.innerHTML = '<div class="lv-empty">Загружаем библиотеку…</div>';
+    loadLibrary()
+      .then(function (items) { libItems = items; renderLib(); })
+      .catch(function (e) { box.innerHTML = '<div class="lv-empty">Не удалось загрузить библиотеку: ' + esc(e.message) + '</div>'; });
+  }
+  function renderLib() {
+    var box = $('lvLibList');
+    if (!libItems) return;
+    var q = ($('lvLibSearch').value || '').trim().toLowerCase();
+    var rows = libItems.filter(function (x) {
+      return normId(x.new_h5pcontentid) !== cur.id &&
+             (!q || String(x.new_name || '').toLowerCase().indexOf(q) !== -1);
+    });
+    if (!rows.length) {
+      box.innerHTML = '<div class="lv-empty">' + (q ? 'Ничего не найдено.' : 'В библиотеке нет других материалов.') + '</div>';
+      return;
+    }
+    box.innerHTML = rows.map(function (x) {
+      var id = normId(x.new_h5pcontentid);
+      var meta = [shortType(x.new_librarytype), fmtDur(x.new_durationseconds), x.crsName ? 'курс «' + x.crsName + '»' : '']
+        .filter(Boolean).join(' · ');
+      var on = id === picked;
+      return '<label class="lv-item' + (on ? ' on' : '') + '">' +
+        '<input type="radio" name="lvLibPick" value="' + esc(id) + '"' + (on ? ' checked' : '') + '>' +
+        '<span class="tx"><span class="n">' + esc(x.new_name || 'Без названия') + '</span>' +
+        (meta ? '<span class="m">' + esc(meta) + '</span>' : '') + '</span>' +
+        (x.new_isactive === false ? '<span class="adm-pill adm-pill--neutral">Скрыт</span>' : '') +
+        '</label>';
+    }).join('');
+  }
+
+  function takeFile(f) {
+    var my = ++seq;
+    ready = null;
+    $('lvReplaceGo').disabled = true;
+    $('lvDropText').textContent = f.name + ' · ' + mb(f.size);
+    if (!/\.h5p$/i.test(f.name)) { setStatus('lvStatus', 'err', 'Нужен файл .h5p — экспорт урока из H5P или Lumi.'); return; }
+    if (f.size > MAX_BYTES) {
+      setStatus('lvStatus', 'err', 'Файл ' + mb(f.size) + ' — больше лимита портала в 16 МБ. Уменьшите вес урока (обычно тяжелее всего видео).');
+      return;
+    }
+    setStatus('lvStatus', 'info', 'Проверяем файл…');
+    readFile(f)
+      .then(function (buf) { if (my === seq) return prepare(buf, f.name, null, my); })
+      .catch(function (e) { if (my === seq) setStatus('lvStatus', 'err', e.message); });
+  }
+  function pickFromLibrary(id) {
+    var my = ++seq;
+    picked = id; ready = null;
+    $('lvReplaceGo').disabled = true;
+    var src = null;
+    (libItems || []).forEach(function (x) { if (normId(x.new_h5pcontentid) === id) src = x; });
+    setStatus('lvStatus', 'info', 'Берём файл материала…');
+    fetchLessonFile(id)
+      .then(function (got) { if (my === seq) return prepare(got.buf, got.name || (id + '.h5p'), src, my); })
+      .catch(function (e) { if (my === seq) setStatus('lvStatus', 'err', e.message); });
+  }
+
+  // Общая проверка нового файла из любого источника — до того, как он попадёт в урок.
+  function prepare(buf, name, src, my) {
+    if (buf.byteLength > MAX_BYTES) throw new Error('Файл ' + mb(buf.byteLength) + ' — больше лимита портала в 16 МБ.');
+    var bad = zipProblem(buf);
+    if (bad) throw new Error('Это не целый .h5p-архив: ' + bad + '.');
+    setStatus('lvStatus', 'info', 'Проверяем пакет…');
+    return inspectPackage(buf).then(function (info) {
+      if (my !== seq) return;
+      // Ролик с YouTube в пакете не лежит — длительность берём у материала-источника, если она есть.
+      if (!info.duration && src && +src.new_durationseconds > 0) info.duration = Math.round(+src.new_durationseconds);
+      ready = { buf: buf, name: name, info: info };
+      var parts = [mb(buf.byteLength), shortType(info.type)];
+      if (info.duration) parts.push(fmtDur(info.duration));
+      setStatus('lvStatus', 'ok', 'Файл проверен: ' + parts.join(' · ') + '.' +
+        (info.duration ? '' : ' Длительность не определилась — у урока останется прежняя.'));
+      $('lvReplaceGo').disabled = false;
+    });
+  }
+
+  function doReplace() {
+    if (!ready || busy || !cur) return;
+    var r = ready, c = cur;
+    // Тип в формате «H5P.X 1.2» обновляем всегда (версия могла смениться); свою подпись
+    // того же вида, заданную при создании, не трогаем. Поле пишем в любом случае: обновление
+    // записи двигает modifiedon, а по нему плеер и префетч курса сбрасывают кэш файла.
+    var kind = r.info.type.split(' ')[0].replace(/^H5P\./, '').toLowerCase();
+    var keep = c.type && !/^H5P\./.test(c.type) && c.type.replace(/\s/g, '').toLowerCase().indexOf(kind) !== -1;
+    var body = { new_librarytype: keep ? c.type : r.info.type };
+    if (r.info.duration) body.new_durationseconds = r.info.duration;
+
+    setBusy(true, 'Загружаем файл в урок…');
+    uploadVerified(c.id, r.buf, r.name)
+      .then(function () {
+        setBusy(true, 'Обновляем карточку урока…');
+        return patchLesson(c.id, body).then(function () { return ''; }, function (e) { return e.message; });
+      })
+      .then(function (warn) {
+        busy = false;
+        forgetCached(c);
+        var link = c.active ? { href: '/h5p-player?id=' + c.id, text: 'Открыть урок' } : null;
+        if (warn) finish('replaced', null, 'Видео заменено, но тип и длительность урока не обновились: ' + warn, link, true);
+        else finish('replaced', body, 'Видео урока «' + c.name + '» заменено.', link);
+      })
+      .catch(function (e) {
+        setBusy(false);
+        setStatus('lvStatus', 'err', 'Не удалось заменить видео: ' + e.message);
+      });
+  }
+
+  // ── Удаление / скрытие ─────────────────────────────────────────────────────
+  function openDelete(btn) {
+    cur = readTrigger(btn);
+    $('lvDelName').textContent = 'Урок «' + cur.name + '»';
+    $('lvDelLearners').textContent = '';
+    $('lvDelHide').hidden = !cur.active;
+    $('lvDelHideHint').hidden = !cur.active;
+    setDelBusy(false);
+    setStatus('lvDelStatus', '', '');
+    openOv('lvDelete', 'lvDelCancel');
+    var my = ++seq;
+    learnersCount(cur.id).then(function (n) {
+      if (my !== seq || n == null) return;
+      $('lvDelLearners').textContent = n === 0
+        ? 'Урок ещё никто не начинал.'
+        : 'Урок начали ' + n + ' ' + plural(n, 'сотрудник', 'сотрудника', 'сотрудников') + ' — их прогресс по нему пропадёт из отчётов.';
+    });
+  }
+  function doDelete() {
+    if (busy || !cur) return;
+    var c = cur;
+    setDelBusy(true, 'Удаляем урок…');
+    deleteLesson(c.id)
+      .then(function () {
+        busy = false;
+        forgetCached(c);
+        finish('deleted', null, 'Урок «' + c.name + '» удалён.');
+      })
+      .catch(function (e) {
+        setDelBusy(false);
+        setStatus('lvDelStatus', 'err', 'Не удалось удалить: ' + e.message + (c.active ? ' Урок можно скрыть вместо удаления.' : ''));
+      });
+  }
+  function doHide() {
+    if (busy || !cur) return;
+    var c = cur;
+    setDelBusy(true, 'Скрываем урок…');
+    patchLesson(c.id, { new_isactive: false })
+      .then(function () {
+        busy = false;
+        finish('hidden', null, 'Урок «' + c.name + '» скрыт — сотрудники его больше не видят.');
+      })
+      .catch(function (e) {
+        setDelBusy(false);
+        setStatus('lvDelStatus', 'err', 'Не удалось скрыть: ' + e.message);
+      });
+  }
+  function doShow(btn) {
+    var c = readTrigger(btn);
+    btn.disabled = true;
+    patchLesson(c.id, { new_isactive: true })
+      .then(function () {
+        cur = c;
+        finish('shown', null, 'Урок «' + c.name + '» снова виден сотрудникам.', { href: '/h5p-player?id=' + c.id, text: 'Открыть урок' });
+      })
+      .catch(function (e) {
+        btn.disabled = false;
+        toast('Не удалось показать урок: ' + e.message, null, true);
+      });
+  }
+
+  // ── События ────────────────────────────────────────────────────────────────
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-lv-action]') : null;
+    if (!b || b.disabled || busy || !normId(b.getAttribute('data-lv-id'))) return;
+    e.preventDefault();
+    var a = b.getAttribute('data-lv-action');
+    if (a === 'replace') openReplace(b);
+    else if (a === 'delete') openDelete(b);
+    else if (a === 'show') doShow(b);
+  });
+
+  document.querySelectorAll('#lvReplace [data-lv-tab]').forEach(function (b) {
+    b.addEventListener('click', function () { if (!busy) setTab(b.getAttribute('data-lv-tab')); });
+  });
+  $('lvFile').addEventListener('change', function () { if (this.files && this.files[0]) takeFile(this.files[0]); });
+  var drop = $('lvDrop');
+  drop.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && !busy) { e.preventDefault(); $('lvFile').click(); }
+  });
+  ['dragenter', 'dragover'].forEach(function (t) {
+    drop.addEventListener(t, function (e) { e.preventDefault(); if (!busy) drop.classList.add('drag'); });
+  });
+  ['dragleave', 'drop'].forEach(function (t) {
+    drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.remove('drag'); });
+  });
+  drop.addEventListener('drop', function (e) {
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f && !busy) takeFile(f);
+  });
+  $('lvLibSearch').addEventListener('input', renderLib);
+  $('lvLibList').addEventListener('change', function (e) {
+    var r = e.target;
+    if (!r || r.name !== 'lvLibPick') return;
+    this.querySelectorAll('.lv-item').forEach(function (l) { l.classList.toggle('on', l.contains(r)); });
+    pickFromLibrary(r.value);
+  });
+  $('lvReplaceGo').addEventListener('click', doReplace);
+  $('lvReplaceCancel').addEventListener('click', function () { if (!busy) closeOv('lvReplace'); });
+  $('lvDelCancel').addEventListener('click', function () { if (!busy) closeOv('lvDelete'); });
+  $('lvDelGo').addEventListener('click', doDelete);
+  $('lvDelHide').addEventListener('click', doHide);
+  ['lvReplace', 'lvDelete'].forEach(function (id) {
+    $(id).addEventListener('click', function (e) { if (e.target === this && !busy) closeOv(id); });
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !busy) closeAll(); });
+  // Уход со страницы посреди записи оставил бы урок с недозалитым файлом.
+  window.addEventListener('beforeunload', function (e) { if (busy) { e.preventDefault(); e.returnValue = ''; } });
+})();
+</script>
