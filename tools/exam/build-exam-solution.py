@@ -111,8 +111,14 @@ def attribute_xml(col, primary=False):
         raise ValueError('неизвестный тип столбца: %s' % kind)
 
     if primary:
-        req = 'required'
-        mask = 'PrimaryName|ValidForAdvancedFind|ValidForForm|ValidForGrid|RequiredForForm'
+        # Столбец с автонумерацией обязательным быть не должен: значение выдаёт сервер, а
+        # коннектор Dataverse требует заполнять любое обязательное поле при создании записи —
+        # поток тогда не сохраняется («missing required property item/new_name»).
+        auto_number = kind == 'autonumber'
+        req = 'none' if auto_number else 'required'
+        mask = 'PrimaryName|ValidForAdvancedFind|ValidForForm|ValidForGrid'
+        if not auto_number:
+            mask += '|RequiredForForm'
         searchable, retrievable = '1', '1'
     else:
         req = 'none'
