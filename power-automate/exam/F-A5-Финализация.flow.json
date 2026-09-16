@@ -6,15 +6,23 @@
         "connection": {
           "connectionReferenceLogicalName": "new_sharedcommondataserviceforapps_73c39"
         },
-        "api": { "name": "shared_commondataserviceforapps" }
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        }
       }
     },
     "definition": {
       "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
       "contentVersion": "1.0.0.0",
       "parameters": {
-        "$connections": { "defaultValue": {}, "type": "Object" },
-        "$authentication": { "defaultValue": {}, "type": "SecureObject" }
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
       },
       "triggers": {
         "manual": {
@@ -37,7 +45,10 @@
                   "x-ms-dynamically-added": true
                 }
               },
-              "required": [ "text", "text_1" ]
+              "required": [
+                "text",
+                "text_1"
+              ]
             }
           }
         }
@@ -54,7 +65,12 @@
             "resultАннулировано": 100000002,
             "itemОценён": 100000002,
             "itemНейтрализован": 100000003,
-            "type": { "single": 100000000, "multi": 100000001, "case": 100000002, "control": 100000003 },
+            "type": {
+              "single": 100000000,
+              "multi": 100000001,
+              "case": 100000002,
+              "control": 100000003
+            },
             "certДействует": 100000000,
             "certИстёк": 100000001,
             "certОтозван": 100000002,
@@ -65,42 +81,130 @@
         },
         "ВесаСумма": {
           "type": "InitializeVariable",
-          "runAfter": { "Константы": [ "Succeeded" ] },
-          "inputs": { "variables": [ { "name": "ВесаСумма", "type": "float", "value": 0 } ] }
+          "runAfter": {
+            "Константы": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "variables": [
+              {
+                "name": "ВесаСумма",
+                "type": "float",
+                "value": 0
+              }
+            ]
+          }
         },
         "ВзвешенныйИтог": {
           "type": "InitializeVariable",
-          "runAfter": { "ВесаСумма": [ "Succeeded" ] },
-          "inputs": { "variables": [ { "name": "ВзвешенныйИтог", "type": "float", "value": 0 } ] }
+          "runAfter": {
+            "ВесаСумма": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "variables": [
+              {
+                "name": "ВзвешенныйИтог",
+                "type": "float",
+                "value": 0
+              }
+            ]
+          }
         },
         "Заработано": {
           "type": "InitializeVariable",
-          "runAfter": { "ВзвешенныйИтог": [ "Succeeded" ] },
-          "inputs": { "variables": [ { "name": "Заработано", "type": "float", "value": 0 } ] }
+          "runAfter": {
+            "ВзвешенныйИтог": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "variables": [
+              {
+                "name": "Заработано",
+                "type": "float",
+                "value": 0
+              }
+            ]
+          }
         },
         "Максимум": {
           "type": "InitializeVariable",
-          "runAfter": { "Заработано": [ "Succeeded" ] },
-          "inputs": { "variables": [ { "name": "Максимум", "type": "float", "value": 0 } ] }
+          "runAfter": {
+            "Заработано": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "variables": [
+              {
+                "name": "Максимум",
+                "type": "float",
+                "value": 0
+              }
+            ]
+          }
         },
         "КейсНабрано": {
           "type": "InitializeVariable",
-          "runAfter": { "Максимум": [ "Succeeded" ] },
-          "inputs": { "variables": [ { "name": "КейсНабрано", "type": "float", "value": 0 } ] }
+          "runAfter": {
+            "Максимум": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "variables": [
+              {
+                "name": "КейсНабрано",
+                "type": "float",
+                "value": 0
+              }
+            ]
+          }
         },
         "КейсМакс": {
           "type": "InitializeVariable",
-          "runAfter": { "КейсНабрано": [ "Succeeded" ] },
-          "inputs": { "variables": [ { "name": "КейсМакс", "type": "float", "value": 0 } ] }
+          "runAfter": {
+            "КейсНабрано": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "variables": [
+              {
+                "name": "КейсМакс",
+                "type": "float",
+                "value": 0
+              }
+            ]
+          }
         },
         "Блоки": {
           "type": "InitializeVariable",
-          "runAfter": { "КейсМакс": [ "Succeeded" ] },
-          "inputs": { "variables": [ { "name": "Блоки", "type": "array", "value": [] } ] }
+          "runAfter": {
+            "КейсМакс": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "variables": [
+              {
+                "name": "Блоки",
+                "type": "array",
+                "value": []
+              }
+            ]
+          }
         },
         "Try": {
           "type": "Scope",
-          "runAfter": { "Блоки": [ "Succeeded" ] },
+          "runAfter": {
+            "Блоки": [
+              "Succeeded"
+            ]
+          },
           "actions": {
             "Попытка": {
               "type": "OpenApiConnection",
@@ -120,7 +224,11 @@
             },
             "Экзамен": {
               "type": "OpenApiConnection",
-              "runAfter": { "Попытка": [ "Succeeded" ] },
+              "runAfter": {
+                "Попытка": [
+                  "Succeeded"
+                ]
+              },
               "inputs": {
                 "host": {
                   "connectionName": "shared_commondataserviceforapps",
@@ -136,12 +244,20 @@
             },
             "P": {
               "type": "Compose",
-              "runAfter": { "Экзамен": [ "Succeeded" ] },
+              "runAfter": {
+                "Экзамен": [
+                  "Succeeded"
+                ]
+              },
               "inputs": "@if(empty(coalesce(outputs('Экзамен')?['body/new_configsnapshot'], '')), json(coalesce(outputs('Экзамен')?['body/new_paramsjson'], '{}')), json(outputs('Экзамен')?['body/new_configsnapshot'])?['params'])"
             },
             "Задания": {
               "type": "OpenApiConnection",
-              "runAfter": { "P": [ "Succeeded" ] },
+              "runAfter": {
+                "P": [
+                  "Succeeded"
+                ]
+              },
               "inputs": {
                 "host": {
                   "connectionName": "shared_commondataserviceforapps",
@@ -160,7 +276,11 @@
             },
             "Итоговые_оценки": {
               "type": "OpenApiConnection",
-              "runAfter": { "Задания": [ "Succeeded" ] },
+              "runAfter": {
+                "Задания": [
+                  "Succeeded"
+                ]
+              },
               "inputs": {
                 "host": {
                   "connectionName": "shared_commondataserviceforapps",
@@ -178,7 +298,11 @@
             },
             "Пары_оценок": {
               "type": "Select",
-              "runAfter": { "Итоговые_оценки": [ "Succeeded" ] },
+              "runAfter": {
+                "Итоговые_оценки": [
+                  "Succeeded"
+                ]
+              },
               "inputs": {
                 "from": "@outputs('Итоговые_оценки')?['body/value']",
                 "select": "@concat('\"', item()?['_new_ticketitem_value'], '\":', string(coalesce(item()?['new_score'], 0)))"
@@ -186,14 +310,26 @@
             },
             "КартаОценок": {
               "type": "Compose",
-              "runAfter": { "Пары_оценок": [ "Succeeded" ] },
+              "runAfter": {
+                "Пары_оценок": [
+                  "Succeeded"
+                ]
+              },
               "inputs": "@if(equals(length(body('Пары_оценок')), 0), json('{}'), json(concat('{', join(body('Пары_оценок'), ','), '}')))"
             },
             "Цикл_блоков": {
               "type": "Foreach",
-              "runAfter": { "КартаОценок": [ "Succeeded" ] },
+              "runAfter": {
+                "КартаОценок": [
+                  "Succeeded"
+                ]
+              },
               "foreach": "@outputs('P')?['blocks']",
-              "runtimeConfiguration": { "concurrency": { "repetitions": 1 } },
+              "runtimeConfiguration": {
+                "concurrency": {
+                  "repetitions": 1
+                }
+              },
               "actions": {
                 "Тип_блока": {
                   "type": "Compose",
@@ -202,7 +338,11 @@
                 },
                 "Задания_блока": {
                   "type": "Query",
-                  "runAfter": { "Тип_блока": [ "Succeeded" ] },
+                  "runAfter": {
+                    "Тип_блока": [
+                      "Succeeded"
+                    ]
+                  },
                   "inputs": {
                     "from": "@outputs('Задания')?['body/value']",
                     "where": "@equals(item()?['new_type'], outputs('Тип_блока'))"
@@ -210,27 +350,61 @@
                 },
                 "Сбросить_Заработано": {
                   "type": "SetVariable",
-                  "runAfter": { "Задания_блока": [ "Succeeded" ] },
-                  "inputs": { "name": "Заработано", "value": 0 }
+                  "runAfter": {
+                    "Задания_блока": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "name": "Заработано",
+                    "value": 0
+                  }
                 },
                 "Сбросить_Максимум": {
                   "type": "SetVariable",
-                  "runAfter": { "Сбросить_Заработано": [ "Succeeded" ] },
-                  "inputs": { "name": "Максимум", "value": 0 }
+                  "runAfter": {
+                    "Сбросить_Заработано": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "name": "Максимум",
+                    "value": 0
+                  }
                 },
                 "Цикл_заданий_блока": {
                   "type": "Foreach",
-                  "runAfter": { "Сбросить_Максимум": [ "Succeeded" ] },
+                  "runAfter": {
+                    "Сбросить_Максимум": [
+                      "Succeeded"
+                    ]
+                  },
                   "foreach": "@body('Задания_блока')",
-                  "runtimeConfiguration": { "concurrency": { "repetitions": 1 } },
+                  "runtimeConfiguration": {
+                    "concurrency": {
+                      "repetitions": 1
+                    }
+                  },
                   "actions": {
                     "Учитывать_задание": {
                       "type": "If",
                       "runAfter": {},
                       "expression": {
                         "or": [
-                          { "not": { "equals": [ "@coalesce(items('Цикл_заданий_блока')?['new_neutralized'], false)", true ] } },
-                          { "equals": [ "@coalesce(outputs('P')?['neutralizeRule'], 'exclude')", "creditAll" ] }
+                          {
+                            "not": {
+                              "equals": [
+                                "@coalesce(items('Цикл_заданий_блока')?['new_neutralized'], false)",
+                                true
+                              ]
+                            }
+                          },
+                          {
+                            "equals": [
+                              "@coalesce(outputs('P')?['neutralizeRule'], 'exclude')",
+                              "creditAll"
+                            ]
+                          }
                         ]
                       },
                       "actions": {
@@ -244,59 +418,108 @@
                         },
                         "Плюс_заработано": {
                           "type": "IncrementVariable",
-                          "runAfter": { "Плюс_максимум": [ "Succeeded" ] },
+                          "runAfter": {
+                            "Плюс_максимум": [
+                              "Succeeded"
+                            ]
+                          },
                           "inputs": {
                             "name": "Заработано",
                             "value": "@if(equals(coalesce(items('Цикл_заданий_блока')?['new_neutralized'], false), true), float(coalesce(items('Цикл_заданий_блока')?['new_points'], 0)), if(or(equals(items('Цикл_заданий_блока')?['new_type'], outputs('Константы')['type']['case']), equals(items('Цикл_заданий_блока')?['new_type'], outputs('Константы')['type']['control'])), float(coalesce(outputs('КартаОценок')?[items('Цикл_заданий_блока')?['new_examticketitemid']], 0)), float(coalesce(items('Цикл_заданий_блока')?['new_earned'], 0))))"
                           }
                         }
                       },
-                      "else": { "actions": {} }
+                      "else": {
+                        "actions": {}
+                      }
                     }
                   }
                 },
                 "Блок_не_пуст": {
                   "type": "If",
-                  "runAfter": { "Цикл_заданий_блока": [ "Succeeded" ] },
-                  "expression": { "greater": [ "@variables('Максимум')", 0 ] },
+                  "runAfter": {
+                    "Цикл_заданий_блока": [
+                      "Succeeded"
+                    ]
+                  },
+                  "expression": {
+                    "greater": [
+                      "@variables('Максимум')",
+                      0
+                    ]
+                  },
                   "actions": {
                     "Плюс_вес": {
                       "type": "IncrementVariable",
                       "runAfter": {},
-                      "inputs": { "name": "ВесаСумма", "value": "@float(items('Цикл_блоков')?['weight'])" }
+                      "inputs": {
+                        "name": "ВесаСумма",
+                        "value": "@float(items('Цикл_блоков')?['weight'])"
+                      }
                     },
                     "Плюс_взвешенное": {
                       "type": "IncrementVariable",
-                      "runAfter": { "Плюс_вес": [ "Succeeded" ] },
+                      "runAfter": {
+                        "Плюс_вес": [
+                          "Succeeded"
+                        ]
+                      },
                       "inputs": {
                         "name": "ВзвешенныйИтог",
                         "value": "@mul(float(items('Цикл_блоков')?['weight']), div(variables('Заработано'), variables('Максимум')))"
                       }
                     }
                   },
-                  "else": { "actions": {} }
+                  "else": {
+                    "actions": {}
+                  }
                 },
                 "Это_кейсы": {
                   "type": "If",
-                  "runAfter": { "Блок_не_пуст": [ "Succeeded" ] },
-                  "expression": { "equals": [ "@items('Цикл_блоков')?['type']", "case" ] },
+                  "runAfter": {
+                    "Блок_не_пуст": [
+                      "Succeeded"
+                    ]
+                  },
+                  "expression": {
+                    "equals": [
+                      "@items('Цикл_блоков')?['type']",
+                      "case"
+                    ]
+                  },
                   "actions": {
                     "Запомнить_кейс_набрано": {
                       "type": "SetVariable",
                       "runAfter": {},
-                      "inputs": { "name": "КейсНабрано", "value": "@variables('Заработано')" }
+                      "inputs": {
+                        "name": "КейсНабрано",
+                        "value": "@variables('Заработано')"
+                      }
                     },
                     "Запомнить_кейс_макс": {
                       "type": "SetVariable",
-                      "runAfter": { "Запомнить_кейс_набрано": [ "Succeeded" ] },
-                      "inputs": { "name": "КейсМакс", "value": "@variables('Максимум')" }
+                      "runAfter": {
+                        "Запомнить_кейс_набрано": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "name": "КейсМакс",
+                        "value": "@variables('Максимум')"
+                      }
                     }
                   },
-                  "else": { "actions": {} }
+                  "else": {
+                    "actions": {}
+                  }
                 },
                 "Добавить_блок": {
                   "type": "AppendToArrayVariable",
-                  "runAfter": { "Это_кейсы": [ "Succeeded" ] },
+                  "runAfter": {
+                    "Это_кейсы": [
+                      "Succeeded"
+                    ]
+                  },
                   "inputs": {
                     "name": "Блоки",
                     "value": {
@@ -311,27 +534,47 @@
             },
             "Процент": {
               "type": "Compose",
-              "runAfter": { "Цикл_блоков": [ "Succeeded" ] },
+              "runAfter": {
+                "Цикл_блоков": [
+                  "Succeeded"
+                ]
+              },
               "inputs": "@if(greater(variables('ВесаСумма'), 0), float(formatNumber(mul(div(variables('ВзвешенныйИтог'), variables('ВесаСумма')), 100), '0.00', 'en-US')), 0)"
             },
             "КейсПроцент": {
               "type": "Compose",
-              "runAfter": { "Процент": [ "Succeeded" ] },
+              "runAfter": {
+                "Процент": [
+                  "Succeeded"
+                ]
+              },
               "inputs": "@if(greater(variables('КейсМакс'), 0), float(formatNumber(mul(div(variables('КейсНабрано'), variables('КейсМакс')), 100), '0.00', 'en-US')), 0)"
             },
             "Сдано": {
               "type": "Compose",
-              "runAfter": { "КейсПроцент": [ "Succeeded" ] },
+              "runAfter": {
+                "КейсПроцент": [
+                  "Succeeded"
+                ]
+              },
               "inputs": "@and(greaterOrEquals(outputs('Процент'), float(coalesce(outputs('P')?['passPercent'], 75))), or(equals(variables('КейсМакс'), 0), greaterOrEquals(outputs('КейсПроцент'), float(coalesce(outputs('P')?['casePassMinPercent'], 0)))))"
             },
             "Результат": {
               "type": "Compose",
-              "runAfter": { "Сдано": [ "Succeeded" ] },
+              "runAfter": {
+                "Сдано": [
+                  "Succeeded"
+                ]
+              },
               "inputs": "@if(equals(triggerBody()?['text_1'], 'Аннулирование'), outputs('Константы')['resultАннулировано'], if(equals(outputs('Сдано'), true), outputs('Константы')['resultСдано'], outputs('Константы')['resultНеСдано']))"
             },
             "Обновить_попытку": {
               "type": "OpenApiConnection",
-              "runAfter": { "Результат": [ "Succeeded" ] },
+              "runAfter": {
+                "Результат": [
+                  "Succeeded"
+                ]
+              },
               "inputs": {
                 "host": {
                   "connectionName": "shared_commondataserviceforapps",
@@ -354,8 +597,17 @@
             },
             "Первичная_финализация": {
               "type": "If",
-              "runAfter": { "Обновить_попытку": [ "Succeeded" ] },
-              "expression": { "equals": [ "@triggerBody()?['text_1']", "Первичная" ] },
+              "runAfter": {
+                "Обновить_попытку": [
+                  "Succeeded"
+                ]
+              },
+              "expression": {
+                "equals": [
+                  "@triggerBody()?['text_1']",
+                  "Первичная"
+                ]
+              },
               "actions": {
                 "Проставить_сроки": {
                   "type": "OpenApiConnection",
@@ -376,21 +628,41 @@
                   }
                 }
               },
-              "else": { "actions": {} }
+              "else": {
+                "actions": {}
+              }
             },
             "Разбор_заданий": {
               "type": "Foreach",
-              "runAfter": { "Первичная_финализация": [ "Succeeded" ] },
+              "runAfter": {
+                "Первичная_финализация": [
+                  "Succeeded"
+                ]
+              },
               "foreach": "@outputs('Задания')?['body/value']",
-              "runtimeConfiguration": { "concurrency": { "repetitions": 5 } },
+              "runtimeConfiguration": {
+                "concurrency": {
+                  "repetitions": 5
+                }
+              },
               "actions": {
                 "Это_задание_с_выбором": {
                   "type": "If",
                   "runAfter": {},
                   "expression": {
                     "or": [
-                      { "equals": [ "@items('Разбор_заданий')?['new_type']", "@outputs('Константы')['type']['single']" ] },
-                      { "equals": [ "@items('Разбор_заданий')?['new_type']", "@outputs('Константы')['type']['multi']" ] }
+                      {
+                        "equals": [
+                          "@items('Разбор_заданий')?['new_type']",
+                          "@outputs('Константы')['type']['single']"
+                        ]
+                      },
+                      {
+                        "equals": [
+                          "@items('Разбор_заданий')?['new_type']",
+                          "@outputs('Константы')['type']['multi']"
+                        ]
+                      }
                     ]
                   },
                   "actions": {
@@ -412,7 +684,11 @@
                     },
                     "Принятый_ответ": {
                       "type": "OpenApiConnection",
-                      "runAfter": { "Вопрос": [ "Succeeded" ] },
+                      "runAfter": {
+                        "Вопрос": [
+                          "Succeeded"
+                        ]
+                      },
                       "inputs": {
                         "host": {
                           "connectionName": "shared_commondataserviceforapps",
@@ -430,7 +706,11 @@
                     },
                     "Верные_варианты": {
                       "type": "Query",
-                      "runAfter": { "Принятый_ответ": [ "Succeeded" ] },
+                      "runAfter": {
+                        "Принятый_ответ": [
+                          "Succeeded"
+                        ]
+                      },
                       "inputs": {
                         "from": "@json(coalesce(outputs('Вопрос')?['body/new_optionsjson'], '[]'))",
                         "where": "@equals(coalesce(item()?['correct'], false), true)"
@@ -438,7 +718,11 @@
                     },
                     "Разбор_выбора": {
                       "type": "Compose",
-                      "runAfter": { "Верные_варианты": [ "Succeeded" ] },
+                      "runAfter": {
+                        "Верные_варианты": [
+                          "Succeeded"
+                        ]
+                      },
                       "inputs": {
                         "kind": "choice",
                         "mode": "@{coalesce(outputs('P')?['revealMode'], 'full')}",
@@ -452,7 +736,11 @@
                     },
                     "Записать_разбор_выбора": {
                       "type": "OpenApiConnection",
-                      "runAfter": { "Разбор_выбора": [ "Succeeded" ] },
+                      "runAfter": {
+                        "Разбор_выбора": [
+                          "Succeeded"
+                        ]
+                      },
                       "inputs": {
                         "host": {
                           "connectionName": "shared_commondataserviceforapps",
@@ -481,7 +769,11 @@
                       },
                       "Разбор_письменного": {
                         "type": "Compose",
-                        "runAfter": { "Оценка_задания": [ "Succeeded" ] },
+                        "runAfter": {
+                          "Оценка_задания": [
+                            "Succeeded"
+                          ]
+                        },
                         "inputs": {
                           "kind": "written",
                           "criteria": "@if(equals(length(body('Оценка_задания')), 0), json('[]'), json(coalesce(first(body('Оценка_задания'))?['new_criteriajson'], '[]')))",
@@ -492,7 +784,11 @@
                       },
                       "Записать_разбор_письменного": {
                         "type": "OpenApiConnection",
-                        "runAfter": { "Разбор_письменного": [ "Succeeded" ] },
+                        "runAfter": {
+                          "Разбор_письменного": [
+                            "Succeeded"
+                          ]
+                        },
                         "inputs": {
                           "host": {
                             "connectionName": "shared_commondataserviceforapps",
@@ -516,7 +812,11 @@
             },
             "Попытки_сотрудника": {
               "type": "OpenApiConnection",
-              "runAfter": { "Разбор_заданий": [ "Succeeded" ] },
+              "runAfter": {
+                "Разбор_заданий": [
+                  "Succeeded"
+                ]
+              },
               "inputs": {
                 "host": {
                   "connectionName": "shared_commondataserviceforapps",
@@ -534,7 +834,11 @@
             },
             "Ключи_итоговой": {
               "type": "Select",
-              "runAfter": { "Попытки_сотрудника": [ "Succeeded" ] },
+              "runAfter": {
+                "Попытки_сотрудника": [
+                  "Succeeded"
+                ]
+              },
               "inputs": {
                 "from": "@outputs('Попытки_сотрудника')?['body/value']",
                 "select": {
@@ -546,14 +850,26 @@
             },
             "Итоговая_попытка": {
               "type": "Compose",
-              "runAfter": { "Ключи_итоговой": [ "Succeeded" ] },
+              "runAfter": {
+                "Ключи_итоговой": [
+                  "Succeeded"
+                ]
+              },
               "inputs": "@last(sort(body('Ключи_итоговой'), 'k'))"
             },
             "Цикл_отметок_итога": {
               "type": "Foreach",
-              "runAfter": { "Итоговая_попытка": [ "Succeeded" ] },
+              "runAfter": {
+                "Итоговая_попытка": [
+                  "Succeeded"
+                ]
+              },
               "foreach": "@outputs('Попытки_сотрудника')?['body/value']",
-              "runtimeConfiguration": { "concurrency": { "repetitions": 5 } },
+              "runtimeConfiguration": {
+                "concurrency": {
+                  "repetitions": 5
+                }
+              },
               "actions": {
                 "Отметить_итоговую": {
                   "type": "OpenApiConnection",
@@ -576,7 +892,11 @@
             },
             "Сертификаты_сотрудника": {
               "type": "OpenApiConnection",
-              "runAfter": { "Цикл_отметок_итога": [ "Succeeded" ] },
+              "runAfter": {
+                "Цикл_отметок_итога": [
+                  "Succeeded"
+                ]
+              },
               "inputs": {
                 "host": {
                   "connectionName": "shared_commondataserviceforapps",
@@ -594,13 +914,27 @@
             },
             "Итог_сдан": {
               "type": "If",
-              "runAfter": { "Сертификаты_сотрудника": [ "Succeeded" ] },
-              "expression": { "equals": [ "@outputs('Итоговая_попытка')?['passed']", true ] },
+              "runAfter": {
+                "Сертификаты_сотрудника": [
+                  "Succeeded"
+                ]
+              },
+              "expression": {
+                "equals": [
+                  "@outputs('Итоговая_попытка')?['passed']",
+                  true
+                ]
+              },
               "actions": {
                 "Нет_ли_сертификата": {
                   "type": "If",
                   "runAfter": {},
-                  "expression": { "equals": [ "@length(outputs('Сертификаты_сотрудника')?['body/value'])", 0 ] },
+                  "expression": {
+                    "equals": [
+                      "@length(outputs('Сертификаты_сотрудника')?['body/value'])",
+                      0
+                    ]
+                  },
                   "actions": {
                     "Выдать_сертификат": {
                       "type": "OpenApiConnection",
@@ -625,7 +959,11 @@
                     },
                     "Журнал_выдачи": {
                       "type": "OpenApiConnection",
-                      "runAfter": { "Выдать_сертификат": [ "Succeeded" ] },
+                      "runAfter": {
+                        "Выдать_сертификат": [
+                          "Succeeded"
+                        ]
+                      },
                       "inputs": {
                         "host": {
                           "connectionName": "shared_commondataserviceforapps",
@@ -644,24 +982,8 @@
                       }
                     }
                   },
-                  "else": { "actions": {} }
-                },
-                "Отметить_контакт_действует": {
-                  "type": "OpenApiConnection",
-                  "runAfter": { "Нет_ли_сертификата": [ "Succeeded" ] },
-                  "inputs": {
-                    "host": {
-                      "connectionName": "shared_commondataserviceforapps",
-                      "operationId": "UpdateOnlyRecord",
-                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
-                    },
-                    "parameters": {
-                      "entityName": "contacts",
-                      "recordId": "@outputs('Попытка')?['body/_new_contact_value']",
-                      "item/new_certstatus": "@outputs('Константы')['contactДействует']",
-                      "item/new_certvaliduntil": "@{addToTime(utcNow(), int(coalesce(outputs('Экзамен')?['body/new_certvalidmonths'], 12)), 'Month', 'yyyy-MM-dd')}"
-                    },
-                    "authentication": "@parameters('$authentication')"
+                  "else": {
+                    "actions": {}
                   }
                 }
               },
@@ -671,7 +993,11 @@
                     "type": "Foreach",
                     "runAfter": {},
                     "foreach": "@outputs('Сертификаты_сотрудника')?['body/value']",
-                    "runtimeConfiguration": { "concurrency": { "repetitions": 1 } },
+                    "runtimeConfiguration": {
+                      "concurrency": {
+                        "repetitions": 1
+                      }
+                    },
                     "actions": {
                       "Отозвать": {
                         "type": "OpenApiConnection",
@@ -693,7 +1019,11 @@
                       },
                       "Журнал_отзыва": {
                         "type": "OpenApiConnection",
-                        "runAfter": { "Отозвать": [ "Succeeded" ] },
+                        "runAfter": {
+                          "Отозвать": [
+                            "Succeeded"
+                          ]
+                        },
                         "inputs": {
                           "host": {
                             "connectionName": "shared_commondataserviceforapps",
@@ -711,30 +1041,17 @@
                         }
                       }
                     }
-                  },
-                  "Отметить_контакт_нет": {
-                    "type": "OpenApiConnection",
-                    "runAfter": { "Цикл_отзыва": [ "Succeeded" ] },
-                    "inputs": {
-                      "host": {
-                        "connectionName": "shared_commondataserviceforapps",
-                        "operationId": "UpdateOnlyRecord",
-                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
-                      },
-                      "parameters": {
-                        "entityName": "contacts",
-                        "recordId": "@outputs('Попытка')?['body/_new_contact_value']",
-                        "item/new_certstatus": "@outputs('Константы')['contactНет']"
-                      },
-                      "authentication": "@parameters('$authentication')"
-                    }
                   }
                 }
               }
             },
             "Журнал_итога": {
               "type": "OpenApiConnection",
-              "runAfter": { "Итог_сдан": [ "Succeeded" ] },
+              "runAfter": {
+                "Итог_сдан": [
+                  "Succeeded"
+                ]
+              },
               "inputs": {
                 "host": {
                   "connectionName": "shared_commondataserviceforapps",
@@ -756,7 +1073,11 @@
             "Ответ": {
               "type": "Response",
               "kind": "Http",
-              "runAfter": { "Журнал_итога": [ "Succeeded" ] },
+              "runAfter": {
+                "Журнал_итога": [
+                  "Succeeded"
+                ]
+              },
               "inputs": {
                 "statusCode": 200,
                 "body": {
@@ -768,10 +1089,18 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": { "type": "boolean" },
-                    "percent": { "type": "number" },
-                    "casePercent": { "type": "number" },
-                    "passed": { "type": "boolean" }
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "percent": {
+                      "type": "number"
+                    },
+                    "casePercent": {
+                      "type": "number"
+                    },
+                    "passed": {
+                      "type": "boolean"
+                    }
                   }
                 }
               }
@@ -780,7 +1109,12 @@
         },
         "Catch": {
           "type": "Scope",
-          "runAfter": { "Try": [ "Failed", "TimedOut" ] },
+          "runAfter": {
+            "Try": [
+              "Failed",
+              "TimedOut"
+            ]
+          },
           "actions": {
             "Журнал_сбоя": {
               "type": "OpenApiConnection",
@@ -804,17 +1138,34 @@
             "Ответ_с_ошибкой": {
               "type": "Response",
               "kind": "Http",
-              "runAfter": { "Журнал_сбоя": [ "Succeeded" ] },
+              "runAfter": {
+                "Журнал_сбоя": [
+                  "Succeeded"
+                ]
+              },
               "inputs": {
                 "statusCode": 200,
-                "body": { "ok": false, "percent": 0, "casePercent": 0, "passed": false },
+                "body": {
+                  "ok": false,
+                  "percent": 0,
+                  "casePercent": 0,
+                  "passed": false
+                },
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": { "type": "boolean" },
-                    "percent": { "type": "number" },
-                    "casePercent": { "type": "number" },
-                    "passed": { "type": "boolean" }
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "percent": {
+                      "type": "number"
+                    },
+                    "casePercent": {
+                      "type": "number"
+                    },
+                    "passed": {
+                      "type": "boolean"
+                    }
                   }
                 }
               }
