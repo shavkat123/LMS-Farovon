@@ -10,7 +10,7 @@
   adx_sitesettingid: 0a61e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_name: Webapi/msdynce_course/fields
   adx_sitesettingid: 0fcfddf9-a538-f111-88b5-7ced8d76b3cc
-  adx_value: '*'
+  adx_value: msdynce_courseid,msdynce_coursename,msdynce_coursecategory,msdynce_coursedescription,msdynce_coursetype,msdynce_coursegradelevel,msdynce_coursedays,msdynce_frequency,msdynce_registerationmaxcapacity,msdynce_coursestartdateandtime,msdynce_courseenddateandtime,msdynce_registerationdeadline,msdynce_entityimage,msdynce_entityimage_file_name,msdynce_entityimage_file_type,msdynce_instructorname,_msdynce_instructorname_value,new_trajectory,_new_trajectory_value,new_trajectoryorder,statecode,statuscode
 - adx_name: HTTP/Content-Security-Policy/Style-Src/Append
   adx_sitesettingid: 11f425d5-1a45-f111-bec6-7ced8d76b3cc
   adx_source: 0
@@ -72,7 +72,7 @@
 - adx_name: H5P/FlowProxyUrl
   adx_sitesettingid: 44cc5fbd-d0a2-f111-b8db-000d3adcd7a2
   adx_source: 0
-  adx_value: https://9551b98256b5e59f9dee6e901e8c62.50.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/17/workflows/57b24f7e0f064d0694928c0a5211baa2/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=<redacted>
+  adx_value: ${OS.LMS_H5P_FLOW_PROXY_URL}
 - adx_name: Webapi/msdynce_course/enabled
   adx_sitesettingid: 4acfddf9-a538-f111-88b5-7ced8d76b3cc
   adx_value: true
@@ -152,7 +152,7 @@
   adx_value: false
 - adx_name: Webapi/msdynce_registration/fields
   adx_sitesettingid: 9605e5ed-a538-f111-88b5-7ced8d76b3cc
-  adx_value: '*'
+  adx_value: msdynce_registrationid
 - adx_name: Search/Enabled
   adx_sitesettingid: 9a5fe5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: false
@@ -164,13 +164,13 @@
   adx_value: true
 - adx_name: Webapi/new_rewardpurchase/fields
   adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000002
-  adx_value: '*'
+  adx_value: new_rewardpurchaseid,new_name,new_pointsspent,new_rewarditem,_new_rewarditem_value,new_user,_new_user_value
 - adx_name: Webapi/new_rewarditem/enabled
   adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000003
   adx_value: true
 - adx_name: Webapi/new_rewarditem/fields
   adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000004
-  adx_value: '*'
+  adx_value: new_rewarditemid
 - adx_name: Webapi/contact/enabled
   adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000005
   adx_value: true
@@ -232,31 +232,31 @@
   adx_value: true
 - adx_name: Webapi/new_task/fields
   adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-400000000002
-  adx_value: '*'
+  adx_value: new_taskid,new_name,new_description,new_taskstatus,new_priority,new_category,new_duedate,new_assignee,_new_assignee_value
 - adx_name: Webapi/new_broadcast/enabled
   adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000b1
   adx_value: true
 - adx_name: Webapi/new_broadcast/fields
   adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000b2
-  adx_value: '*'
+  adx_value: new_broadcastid,new_name,new_body,new_channel,new_audience,new_status,new_senddatetime,new_isactive
 - adx_name: Webapi/new_trajectory/enabled
   adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000c1
   adx_value: true
 - adx_name: Webapi/new_trajectory/fields
   adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000c2
-  adx_value: '*'
+  adx_value: new_trajectoryid,new_name,new_description,new_department,new_targetrole,new_isactive
 - adx_name: Webapi/new_forumthread/enabled
   adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000d1
   adx_value: true
 - adx_name: Webapi/new_forumthread/fields
   adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000d2
-  adx_value: '*'
+  adx_value: new_forumthreadid,new_name,new_body,new_tag,new_votes,new_ispinned,new_author,_new_author_value
 - adx_name: Webapi/new_forumreply/enabled
   adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000e1
   adx_value: true
 - adx_name: Webapi/new_forumreply/fields
   adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000e2
-  adx_value: '*'
+  adx_value: new_forumreplyid,new_name,new_body,new_thread,_new_thread_value,new_author,_new_author_value
 - adx_name: Authentication/OpenIdConnect/AzureAD/Caption
   adx_sitesettingid: c63d4519-a638-f111-88b5-7ced8d76b3cc
   adx_value: Microsoft Entra ID
@@ -291,10 +291,10 @@
 - adx_description: "Список полей не подходит: плеер фильтрует по _new_user_value и _new_h5pcontent_value (форма lookup-значения), а в белом списке лежат new_user/new_h5pcontent — Web API отбивал GET с 403, из-за чего плеер не находил существующую запись прогресса и плодил дубли. Сузить обратно можно только проверив на живом портале, что GET с фильтром по _x_value проходит."
   adx_name: Webapi/new_h5pprogress/fields
   adx_sitesettingid: d693edf3-ff10-46e7-af6d-2f51450a778d
-  adx_value: '*'
+  adx_value: new_h5pprogressid,new_name,new_xapistatements,new_lastupdated,new_lastposition,new_scoreraw,new_scoremax,new_scorescaled,new_completion,new_success,new_user,_new_user_value,new_h5pcontent,_new_h5pcontent_value
 - adx_name: Webapi/new_h5pcontent/fields
   adx_sitesettingid: d8e9f012-3a4b-5c6d-7e8f-90abcdef1234
-  adx_value: '*'
+  adx_value: new_h5pcontentid,new_name,new_librarytype,new_durationseconds,new_isactive,new_courseorder,new_thumbnailurl,new_thumbnailfile,new_h5pfile,createdon,new_relatedcourse,_new_relatedcourse_value,new_uploadedby,_new_uploadedby_value
 - adx_name: ASP/Course/Form/Validation/Field/DescriptionToLong
   adx_sitesettingid: dd30e0ff-a538-f111-88b5-7ced8d76b3cc
   adx_value: Description can't be longer than 1000 characters.

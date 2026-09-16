@@ -1,0 +1,20 @@
+# Профиль деплоя по умолчанию: подставляет секреты при `pac pages upload`.
+#
+# Зачем: значение H5P/FlowProxyUrl — URL триггера Power Automate с подписью `sig=`.
+# Это секрет: кто знает ссылку, тот может дёргать поток. В sitesetting.yml он лежать не должен,
+# поэтому там стоит заглушка, а реальное значение берётся отсюда из переменной окружения.
+#
+# Перед деплоем в текущей сессии PowerShell:
+#   $env:LMS_H5P_FLOW_PROXY_URL = "<полный URL триггера с sig=>"
+# Постоянно (один раз, для своего пользователя):
+#   [Environment]::SetEnvironmentVariable('LMS_H5P_FLOW_PROXY_URL', '<URL>', 'User')
+#
+# Деплой (профиль `default` подставляется по умолчанию, флаг можно не писать):
+#   pac pages upload --path <папка сайта> -mv Enhanced --deploymentProfile default
+#
+# ВАЖНО: если переменная не задана, в среду уедет заглушка и H5P-уроки перестанут
+# подтягивать файлы из SharePoint. После деплоя проверять, что урок открывается.
+adx_sitesetting:
+  - adx_sitesettingid: 44cc5fbd-d0a2-f111-b8db-000d3adcd7a2
+    adx_name: H5P/FlowProxyUrl
+    adx_value: ${OS.LMS_H5P_FLOW_PROXY_URL}
