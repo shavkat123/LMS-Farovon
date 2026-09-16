@@ -1,0 +1,17 @@
+# Свои попытки: создаёт и читает.
+# Статусы и баллы проставляет поток, не участник.
+#
+adx_append: true
+adx_appendto: true
+adx_contactrelationship: new_examattempt_contact_contact
+adx_create: true
+adx_delete: false
+adx_entitylogicalname: new_examattempt
+adx_entityname: Exam Attempt Self
+adx_entitypermission_webrole:
+- 2ccfddf9-a538-f111-88b5-7ced8d76b3cc
+adx_entitypermissionid: a1b2c3d4-3333-4444-5555-000000000022
+adx_parententitypermission: 
+adx_read: true
+adx_scope: 756150001
+adx_write: false

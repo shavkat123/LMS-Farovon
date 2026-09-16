@@ -69,10 +69,6 @@
 - adx_name: ASP/Course/Form/Validation/Field/StartTime
   adx_sitesettingid: 4460e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: Start time
-- adx_name: H5P/FlowProxyUrl
-  adx_sitesettingid: 44cc5fbd-d0a2-f111-b8db-000d3adcd7a2
-  adx_source: 0
-  adx_value: ${OS.LMS_H5P_FLOW_PROXY_URL}
 - adx_name: Webapi/msdynce_course/enabled
   adx_sitesettingid: 4acfddf9-a538-f111-88b5-7ced8d76b3cc
   adx_value: true
@@ -177,7 +173,7 @@
 - adx_description: "Явный список вместо *: contact читается Web API глобально (ASP Contacts, scope Global). Поля нужны страницам профилей (firstname/lastname/birthdate/entityimage). Дубль-запись со '*' удалена."
   adx_name: Webapi/contact/fields
   adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000006
-  adx_value: fullname,emailaddress1,firstname,lastname,contactid,birthdate,entityimage,msdynce_entityimage_file_name,msdynce_entityimage_file_type,parentcustomerid,_parentcustomerid_value
+  adx_value: fullname,emailaddress1,firstname,lastname,contactid,birthdate,entityimage,msdynce_entityimage_file_name,msdynce_entityimage_file_type,parentcustomerid,_parentcustomerid_value,new_certstatus,new_certvaliduntil
 - adx_name: Profile/ShowMarketingOptionsPanel
   adx_sitesettingid: a65fe5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: True
@@ -340,3 +336,71 @@
 - adx_name: ASP/Course/ProcessingMessage
   adx_sitesettingid: fb60e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: Processing...
+- adx_name: Webapi/new_certification/enabled
+  adx_sitesettingid: a9e8a692-9da9-4888-ba30-9aa2ff3fb88b
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_certification/fields
+  adx_sitesettingid: 3cf991bc-a332-4497-a786-ead8153eb5f1
+  adx_source: 0
+  adx_value: new_certificationid,new_name,new_issuedon,new_validuntil,new_status,new_revokereason,new_contact,_new_contact_value,new_exam,_new_exam_value,new_attempt,_new_attempt_value
+- adx_name: Webapi/new_exam/enabled
+  adx_sitesettingid: dcac75b8-c983-465d-aa0d-871cbf2632b4
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_exam/fields
+  adx_sitesettingid: 21ef069f-16d8-4d8d-946c-0b5be6e9b97c
+  adx_source: 0
+  adx_value: new_examid,new_name,new_status,new_opens,new_closes,new_rules_ru,new_consenttext,new_consentversion,new_paramsjson,new_certvalidmonths,new_publishedon,new_course,_new_course_value
+- adx_name: Webapi/new_examanswer/enabled
+  adx_sitesettingid: 070772d6-402f-4d21-a2c3-18a6706537a5
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_examanswer/fields
+  adx_sitesettingid: 568056ba-8e4b-4252-8cf0-e4d9d10bc631
+  adx_source: 0
+  adx_value: new_examanswerid,new_name,new_selected,new_text,new_idempotencykey,new_clientts,new_accepted,createdon,new_ticketitem,_new_ticketitem_value,new_attempt,_new_attempt_value,new_contact,_new_contact_value
+- adx_name: Webapi/new_examappeal/enabled
+  adx_sitesettingid: 84ae836c-48a3-421f-b3af-ee995e9e0db9
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_examappeal/fields
+  adx_sitesettingid: 48b6c45e-775a-43a1-ada0-2a655dddd342
+  adx_source: 0
+  adx_value: new_examappealid,new_name,new_items,new_reason,new_status,new_outcomejson,new_decidedon,new_idempotencykey,createdon,new_attempt,_new_attempt_value,new_contact,_new_contact_value
+- adx_name: Webapi/new_examattempt/enabled
+  adx_sitesettingid: 1f792dcc-e61b-485d-85ee-77370d4d73ad
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_examattempt/fields
+  adx_sitesettingid: 11fce3ce-6324-49e0-ac1f-1616a181f19b
+  adx_source: 0
+  adx_value: new_examattemptid,new_name,new_attemptno,new_status,new_consentgiven,new_consentversion,new_ticketreadyon,new_startedon,new_deadline,new_submittedon,new_finalizedon,new_appealuntil,new_itemcount,new_percent,new_casepercent,new_passed,new_result,new_blockscores,new_isfinal,new_resultversion,new_errortext,new_idempotencykey,createdon,new_exam,_new_exam_value,new_contact,_new_contact_value
+- adx_name: Webapi/new_examsubmission/enabled
+  adx_sitesettingid: b0ecca3c-7fce-450a-80e6-b15729b725c4
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_examsubmission/fields
+  adx_sitesettingid: 7586b198-4ab4-47e3-a58b-8f4d0a85917b
+  adx_source: 0
+  adx_value: new_examsubmissionid,new_name,new_kind,new_idempotencykey,new_processedon,new_result,createdon,new_attempt,_new_attempt_value,new_contact,_new_contact_value
+- adx_name: Webapi/new_examticketitem/enabled
+  adx_sitesettingid: 8c54db31-bae1-4388-b51d-032d803e9ac4
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_examticketitem/fields
+  adx_sitesettingid: be77ec69-c72b-41e2-b8c5-4b6949c3db9d
+  adx_source: 0
+  adx_value: new_examticketitemid,new_name,new_order,new_type,new_modulename,new_stem,new_optionsjson,new_points,new_answerlimitchars,new_status,new_earned,new_revealjson,new_neutralized,new_attempt,_new_attempt_value,new_contact,_new_contact_value
+- adx_name: Exam/AnswerGraceSeconds
+  adx_sitesettingid: ed6c1840-9e7c-4f05-a3a1-473d0f4fca77
+  adx_source: 0
+  adx_value: 30
+- adx_name: Exam/PollIntervalMs
+  adx_sitesettingid: edcfc3ff-339c-40cd-a019-fac9a3f557da
+  adx_source: 0
+  adx_value: 3000
+- adx_name: Exam/SupportContact
+  adx_sitesettingid: df784327-6739-438e-b06f-6ecbd4637f33
+  adx_source: 0
+  adx_value: hr@farovon.tj
