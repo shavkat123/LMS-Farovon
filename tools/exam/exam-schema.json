@@ -1,0 +1,1376 @@
+{
+  "solution": {
+    "uniquename": "LMSExam",
+    "display": "LMS Exam",
+    "publisherprefix": "new"
+  },
+  "tables": [
+    {
+      "logical": "new_exam",
+      "display": "Экзамен",
+      "plural": "Экзамены",
+      "primary": {
+        "logical": "new_name",
+        "display": "Название",
+        "type": {
+          "kind": "string",
+          "max": 200
+        }
+      },
+      "columns": [
+        {
+          "logical": "new_course",
+          "display": "Курс",
+          "kind": "lookup",
+          "target": "msdynce_course"
+        },
+        {
+          "logical": "new_status",
+          "display": "Статус",
+          "kind": "choice",
+          "options": [
+            "Черновик",
+            "Опубликован",
+            "Закрыт"
+          ]
+        },
+        {
+          "logical": "new_opens",
+          "display": "Открыт с",
+          "kind": "datetime"
+        },
+        {
+          "logical": "new_closes",
+          "display": "Закрыт до",
+          "kind": "datetime"
+        },
+        {
+          "logical": "new_paramsjson",
+          "display": "Параметры (JSON)",
+          "kind": "memo",
+          "max": 50000
+        },
+        {
+          "logical": "new_configsnapshot",
+          "display": "Снимок конфигурации",
+          "kind": "memo",
+          "max": 1048576
+        },
+        {
+          "logical": "new_publishedon",
+          "display": "Опубликован",
+          "kind": "datetime"
+        },
+        {
+          "logical": "new_rules_ru",
+          "display": "Правила для участника",
+          "kind": "memo",
+          "max": 10000
+        },
+        {
+          "logical": "new_consenttext",
+          "display": "Текст согласия",
+          "kind": "memo",
+          "max": 10000
+        },
+        {
+          "logical": "new_consentversion",
+          "display": "Версия согласия",
+          "kind": "string",
+          "max": 20
+        },
+        {
+          "logical": "new_certvalidmonths",
+          "display": "Срок сертификата, мес.",
+          "kind": "int"
+        },
+        {
+          "logical": "new_errortext",
+          "display": "Ошибки проверки",
+          "kind": "memo",
+          "max": 4000
+        }
+      ]
+    },
+    {
+      "logical": "new_exammodule",
+      "display": "Модуль экзамена",
+      "plural": "Модули экзамена",
+      "primary": {
+        "logical": "new_name",
+        "display": "Название",
+        "type": {
+          "kind": "string",
+          "max": 200
+        }
+      },
+      "columns": [
+        {
+          "logical": "new_exam",
+          "display": "Экзамен",
+          "kind": "lookup",
+          "target": "new_exam"
+        },
+        {
+          "logical": "new_order",
+          "display": "Порядок",
+          "kind": "int"
+        },
+        {
+          "logical": "new_section",
+          "display": "Модуль курса",
+          "kind": "string",
+          "max": 100
+        },
+        {
+          "logical": "new_weight",
+          "display": "Вес",
+          "kind": "decimal",
+          "precision": 2
+        },
+        {
+          "logical": "new_sourcekind",
+          "display": "Источник",
+          "kind": "choice",
+          "options": [
+            "Текст озвучки",
+            "H5P-урок курса",
+            "Файл PPTX",
+            "Файл PDF"
+          ]
+        },
+        {
+          "logical": "new_file",
+          "display": "Файл презентации",
+          "kind": "file",
+          "maxkb": 32768
+        },
+        {
+          "logical": "new_h5pcontent",
+          "display": "H5P-урок",
+          "kind": "lookup",
+          "target": "new_h5pcontent"
+        },
+        {
+          "logical": "new_text",
+          "display": "Извлечённый текст",
+          "kind": "memo",
+          "max": 1048576
+        },
+        {
+          "logical": "new_narration",
+          "display": "Текст озвучки",
+          "kind": "memo",
+          "max": 1048576
+        },
+        {
+          "logical": "new_narrationsource",
+          "display": "Источник озвучки",
+          "kind": "choice",
+          "options": [
+            "Нет",
+            "Заметки PPTX",
+            "Документ (DOCX, TXT)",
+            "Расшифровка видео (VTT)"
+          ]
+        },
+        {
+          "logical": "new_textchars",
+          "display": "Знаков текста",
+          "kind": "int"
+        },
+        {
+          "logical": "new_extractedon",
+          "display": "Извлечено",
+          "kind": "datetime"
+        },
+        {
+          "logical": "new_status",
+          "display": "Статус",
+          "kind": "choice",
+          "options": [
+            "Нет текста",
+            "Распознаётся",
+            "Текст готов",
+            "Вопросы созданы"
+          ]
+        }
+      ]
+    },
+    {
+      "logical": "new_examslide",
+      "display": "Слайд",
+      "plural": "Слайды",
+      "primary": {
+        "logical": "new_name",
+        "display": "Название",
+        "type": {
+          "kind": "string",
+          "max": 100
+        }
+      },
+      "columns": [
+        {
+          "logical": "new_module",
+          "display": "Модуль",
+          "kind": "lookup",
+          "target": "new_exammodule"
+        },
+        {
+          "logical": "new_number",
+          "display": "Номер слайда",
+          "kind": "int"
+        },
+        {
+          "logical": "new_source",
+          "display": "Источник",
+          "kind": "choice",
+          "options": [
+            "Текст H5P",
+            "Картинка H5P",
+            "Вопрос H5P",
+            "PPTX",
+            "PDF"
+          ]
+        },
+        {
+          "logical": "new_text",
+          "display": "Текст слайда",
+          "kind": "memo",
+          "max": 20000
+        },
+        {
+          "logical": "new_imagebase64",
+          "display": "Картинка (base64)",
+          "kind": "memo",
+          "max": 140000
+        },
+        {
+          "logical": "new_status",
+          "display": "Статус",
+          "kind": "choice",
+          "options": [
+            "Текст готов",
+            "Нужно распознать",
+            "Распознано",
+            "Ошибка"
+          ]
+        },
+        {
+          "logical": "new_errortext",
+          "display": "Ошибка",
+          "kind": "memo",
+          "max": 2000
+        }
+      ]
+    },
+    {
+      "logical": "new_examquestion",
+      "display": "Вопрос банка",
+      "plural": "Вопросы банка",
+      "primary": {
+        "logical": "new_name",
+        "display": "Название",
+        "type": {
+          "kind": "autonumber",
+          "format": "Q-{SEQNUM:6}",
+          "max": 100
+        }
+      },
+      "columns": [
+        {
+          "logical": "new_exam",
+          "display": "Экзамен",
+          "kind": "lookup",
+          "target": "new_exam"
+        },
+        {
+          "logical": "new_module",
+          "display": "Модуль",
+          "kind": "lookup",
+          "target": "new_exammodule"
+        },
+        {
+          "logical": "new_type",
+          "display": "Тип",
+          "kind": "choice",
+          "options": [
+            "Одиночный",
+            "Множественный",
+            "Кейс",
+            "Контрольный"
+          ]
+        },
+        {
+          "logical": "new_difficulty",
+          "display": "Сложность",
+          "kind": "choice",
+          "options": [
+            "Базовый",
+            "Средний",
+            "Продвинутый"
+          ]
+        },
+        {
+          "logical": "new_stem",
+          "display": "Формулировка",
+          "kind": "memo",
+          "max": 10000
+        },
+        {
+          "logical": "new_optionsjson",
+          "display": "Варианты (JSON)",
+          "kind": "memo",
+          "max": 20000
+        },
+        {
+          "logical": "new_explanation",
+          "display": "Пояснение",
+          "kind": "memo",
+          "max": 4000
+        },
+        {
+          "logical": "new_reference",
+          "display": "Эталонный ответ",
+          "kind": "memo",
+          "max": 10000
+        },
+        {
+          "logical": "new_rubricjson",
+          "display": "Рубрика (JSON)",
+          "kind": "memo",
+          "max": 20000
+        },
+        {
+          "logical": "new_points",
+          "display": "Баллы",
+          "kind": "decimal",
+          "precision": 2
+        },
+        {
+          "logical": "new_slides",
+          "display": "Слайды-источники",
+          "kind": "string",
+          "max": 200
+        },
+        {
+          "logical": "new_sourcequote",
+          "display": "Цитата источника",
+          "kind": "memo",
+          "max": 2000
+        },
+        {
+          "logical": "new_status",
+          "display": "Статус",
+          "kind": "choice",
+          "options": [
+            "На проверке",
+            "Одобрен",
+            "Отклонён",
+            "Выведен"
+          ]
+        },
+        {
+          "logical": "new_reviewjson",
+          "display": "Рецензия (JSON)",
+          "kind": "memo",
+          "max": 20000
+        },
+        {
+          "logical": "new_reviewfirstpass",
+          "display": "Одобрен с первой проверки",
+          "kind": "bool"
+        },
+        {
+          "logical": "new_source",
+          "display": "Происхождение",
+          "kind": "choice",
+          "options": [
+            "ИИ",
+            "Вручную"
+          ]
+        },
+        {
+          "logical": "new_job",
+          "display": "Задание",
+          "kind": "lookup",
+          "target": "new_aijob"
+        },
+        {
+          "logical": "new_contenthash",
+          "display": "Хеш формулировки",
+          "kind": "string",
+          "max": 400
+        },
+        {
+          "logical": "new_exposures",
+          "display": "Показов в разборе",
+          "kind": "int"
+        },
+        {
+          "logical": "new_version",
+          "display": "Версия",
+          "kind": "int"
+        },
+        {
+          "logical": "new_parentquestion",
+          "display": "Предыдущая версия",
+          "kind": "lookup",
+          "target": "new_examquestion"
+        }
+      ]
+    },
+    {
+      "logical": "new_aijob",
+      "display": "Задание ИИ",
+      "plural": "Задания ИИ",
+      "primary": {
+        "logical": "new_name",
+        "display": "Название",
+        "type": {
+          "kind": "autonumber",
+          "format": "JOB-{SEQNUM:5}",
+          "max": 100
+        }
+      },
+      "columns": [
+        {
+          "logical": "new_exam",
+          "display": "Экзамен",
+          "kind": "lookup",
+          "target": "new_exam"
+        },
+        {
+          "logical": "new_module",
+          "display": "Модуль",
+          "kind": "lookup",
+          "target": "new_exammodule"
+        },
+        {
+          "logical": "new_status",
+          "display": "Статус",
+          "kind": "choice",
+          "options": [
+            "Создано",
+            "Выполняется",
+            "Готово",
+            "Частично",
+            "Ошибка"
+          ]
+        },
+        {
+          "logical": "new_specjson",
+          "display": "Задание (JSON)",
+          "kind": "memo",
+          "max": 20000
+        },
+        {
+          "logical": "new_created",
+          "display": "Создано вопросов",
+          "kind": "int"
+        },
+        {
+          "logical": "new_approved",
+          "display": "Одобрено",
+          "kind": "int"
+        },
+        {
+          "logical": "new_rejected",
+          "display": "Отклонено",
+          "kind": "int"
+        },
+        {
+          "logical": "new_inputtokens",
+          "display": "Входных токенов",
+          "kind": "int"
+        },
+        {
+          "logical": "new_outputtokens",
+          "display": "Выходных токенов",
+          "kind": "int"
+        },
+        {
+          "logical": "new_costusd",
+          "display": "Стоимость, USD",
+          "kind": "decimal",
+          "precision": 2
+        },
+        {
+          "logical": "new_errortext",
+          "display": "Ошибка",
+          "kind": "memo",
+          "max": 4000
+        },
+        {
+          "logical": "new_idempotencykey",
+          "display": "Ключ идемпотентности",
+          "kind": "string",
+          "max": 100
+        }
+      ]
+    },
+    {
+      "logical": "new_aiprompt",
+      "display": "Промпт",
+      "plural": "Промпты",
+      "primary": {
+        "logical": "new_name",
+        "display": "Название",
+        "type": {
+          "kind": "string",
+          "max": 200
+        }
+      },
+      "columns": [
+        {
+          "logical": "new_code",
+          "display": "Код",
+          "kind": "string",
+          "max": 40
+        },
+        {
+          "logical": "new_version",
+          "display": "Версия",
+          "kind": "int"
+        },
+        {
+          "logical": "new_status",
+          "display": "Статус",
+          "kind": "choice",
+          "options": [
+            "Черновик",
+            "Утверждён",
+            "Выведен"
+          ]
+        },
+        {
+          "logical": "new_systemtext",
+          "display": "Системный текст",
+          "kind": "memo",
+          "max": 100000
+        },
+        {
+          "logical": "new_schemajson",
+          "display": "Схема ответа (JSON)",
+          "kind": "memo",
+          "max": 20000
+        },
+        {
+          "logical": "new_model",
+          "display": "Модель",
+          "kind": "string",
+          "max": 50
+        },
+        {
+          "logical": "new_effort",
+          "display": "Усилие",
+          "kind": "choice",
+          "options": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "logical": "new_maxtokens",
+          "display": "Лимит токенов",
+          "kind": "int"
+        }
+      ]
+    },
+    {
+      "logical": "new_examattempt",
+      "display": "Попытка",
+      "plural": "Попытки",
+      "primary": {
+        "logical": "new_name",
+        "display": "Название",
+        "type": {
+          "kind": "autonumber",
+          "format": "ATT-{SEQNUM:6}",
+          "max": 100
+        }
+      },
+      "columns": [
+        {
+          "logical": "new_exam",
+          "display": "Экзамен",
+          "kind": "lookup",
+          "target": "new_exam"
+        },
+        {
+          "logical": "new_contact",
+          "display": "Сотрудник",
+          "kind": "lookup",
+          "target": "contact"
+        },
+        {
+          "logical": "new_attemptno",
+          "display": "Номер попытки",
+          "kind": "int"
+        },
+        {
+          "logical": "new_status",
+          "display": "Статус",
+          "kind": "choice",
+          "options": [
+            "Готовится",
+            "Идёт",
+            "Сдан",
+            "Проверяется",
+            "Оценён",
+            "Аннулирован",
+            "Ошибка"
+          ]
+        },
+        {
+          "logical": "new_consentgiven",
+          "display": "Согласие дано",
+          "kind": "bool"
+        },
+        {
+          "logical": "new_consentversion",
+          "display": "Версия согласия",
+          "kind": "string",
+          "max": 20
+        },
+        {
+          "logical": "new_ticketreadyon",
+          "display": "Билет готов",
+          "kind": "datetime"
+        },
+        {
+          "logical": "new_startedon",
+          "display": "Начата",
+          "kind": "datetime"
+        },
+        {
+          "logical": "new_deadline",
+          "display": "Дедлайн",
+          "kind": "datetime"
+        },
+        {
+          "logical": "new_submittedon",
+          "display": "Отправлена",
+          "kind": "datetime"
+        },
+        {
+          "logical": "new_finalizedon",
+          "display": "Финализирована",
+          "kind": "datetime"
+        },
+        {
+          "logical": "new_appealuntil",
+          "display": "Апелляция до",
+          "kind": "datetime"
+        },
+        {
+          "logical": "new_tickethash",
+          "display": "Хеш билета",
+          "kind": "string",
+          "max": 4000
+        },
+        {
+          "logical": "new_itemcount",
+          "display": "Заданий",
+          "kind": "int"
+        },
+        {
+          "logical": "new_percent",
+          "display": "Процент",
+          "kind": "decimal",
+          "precision": 2
+        },
+        {
+          "logical": "new_casepercent",
+          "display": "Процент за кейсы",
+          "kind": "decimal",
+          "precision": 2
+        },
+        {
+          "logical": "new_passed",
+          "display": "Сдано",
+          "kind": "bool"
+        },
+        {
+          "logical": "new_result",
+          "display": "Результат",
+          "kind": "choice",
+          "options": [
+            "Сдано",
+            "Не сдано",
+            "Аннулировано"
+          ]
+        },
+        {
+          "logical": "new_blockscores",
+          "display": "Баллы по блокам",
+          "kind": "memo",
+          "max": 4000
+        },
+        {
+          "logical": "new_isfinal",
+          "display": "Определяет итог",
+          "kind": "bool"
+        },
+        {
+          "logical": "new_resultversion",
+          "display": "Версия результата",
+          "kind": "int"
+        },
+        {
+          "logical": "new_errortext",
+          "display": "Ошибка",
+          "kind": "memo",
+          "max": 4000
+        },
+        {
+          "logical": "new_idempotencykey",
+          "display": "Ключ идемпотентности",
+          "kind": "string",
+          "max": 100
+        }
+      ]
+    },
+    {
+      "logical": "new_examticketitem",
+      "display": "Задание билета",
+      "plural": "Задания билета",
+      "primary": {
+        "logical": "new_name",
+        "display": "Название",
+        "type": {
+          "kind": "string",
+          "max": 100
+        }
+      },
+      "columns": [
+        {
+          "logical": "new_attempt",
+          "display": "Попытка",
+          "kind": "lookup",
+          "target": "new_examattempt"
+        },
+        {
+          "logical": "new_contact",
+          "display": "Сотрудник",
+          "kind": "lookup",
+          "target": "contact"
+        },
+        {
+          "logical": "new_question",
+          "display": "Вопрос",
+          "kind": "lookup",
+          "target": "new_examquestion"
+        },
+        {
+          "logical": "new_order",
+          "display": "Порядок",
+          "kind": "int"
+        },
+        {
+          "logical": "new_type",
+          "display": "Тип",
+          "kind": "choice",
+          "options": [
+            "Одиночный",
+            "Множественный",
+            "Кейс",
+            "Контрольный"
+          ]
+        },
+        {
+          "logical": "new_modulename",
+          "display": "Модуль",
+          "kind": "string",
+          "max": 200
+        },
+        {
+          "logical": "new_stem",
+          "display": "Формулировка",
+          "kind": "memo",
+          "max": 10000
+        },
+        {
+          "logical": "new_optionsjson",
+          "display": "Варианты (JSON)",
+          "kind": "memo",
+          "max": 20000
+        },
+        {
+          "logical": "new_points",
+          "display": "Баллы",
+          "kind": "decimal",
+          "precision": 2
+        },
+        {
+          "logical": "new_answerlimitchars",
+          "display": "Лимит знаков ответа",
+          "kind": "int"
+        },
+        {
+          "logical": "new_status",
+          "display": "Статус",
+          "kind": "choice",
+          "options": [
+            "Не отвечен",
+            "Отвечен",
+            "Оценён",
+            "Нейтрализован",
+            "Ошибка оценки"
+          ]
+        },
+        {
+          "logical": "new_earned",
+          "display": "Набрано",
+          "kind": "decimal",
+          "precision": 2
+        },
+        {
+          "logical": "new_revealjson",
+          "display": "Разбор (JSON)",
+          "kind": "memo",
+          "max": 50000
+        },
+        {
+          "logical": "new_neutralized",
+          "display": "Нейтрализован",
+          "kind": "bool"
+        }
+      ]
+    },
+    {
+      "logical": "new_examanswer",
+      "display": "Ответ",
+      "plural": "Ответы",
+      "primary": {
+        "logical": "new_name",
+        "display": "Название",
+        "type": {
+          "kind": "string",
+          "max": 100
+        }
+      },
+      "columns": [
+        {
+          "logical": "new_ticketitem",
+          "display": "Задание билета",
+          "kind": "lookup",
+          "target": "new_examticketitem"
+        },
+        {
+          "logical": "new_attempt",
+          "display": "Попытка",
+          "kind": "lookup",
+          "target": "new_examattempt"
+        },
+        {
+          "logical": "new_contact",
+          "display": "Сотрудник",
+          "kind": "lookup",
+          "target": "contact"
+        },
+        {
+          "logical": "new_selected",
+          "display": "Выбранные варианты",
+          "kind": "string",
+          "max": 1000
+        },
+        {
+          "logical": "new_text",
+          "display": "Текст ответа",
+          "kind": "memo",
+          "max": 6000
+        },
+        {
+          "logical": "new_idempotencykey",
+          "display": "Ключ идемпотентности",
+          "kind": "string",
+          "max": 100
+        },
+        {
+          "logical": "new_clientts",
+          "display": "Время клиента",
+          "kind": "string",
+          "max": 40
+        },
+        {
+          "logical": "new_accepted",
+          "display": "Принят",
+          "kind": "bool"
+        }
+      ]
+    },
+    {
+      "logical": "new_examsubmission",
+      "display": "Завершение",
+      "plural": "Завершения",
+      "primary": {
+        "logical": "new_name",
+        "display": "Название",
+        "type": {
+          "kind": "string",
+          "max": 100
+        }
+      },
+      "columns": [
+        {
+          "logical": "new_attempt",
+          "display": "Попытка",
+          "kind": "lookup",
+          "target": "new_examattempt"
+        },
+        {
+          "logical": "new_contact",
+          "display": "Сотрудник",
+          "kind": "lookup",
+          "target": "contact"
+        },
+        {
+          "logical": "new_kind",
+          "display": "Вид",
+          "kind": "choice",
+          "options": [
+            "Завершить",
+            "Время истекло"
+          ]
+        },
+        {
+          "logical": "new_idempotencykey",
+          "display": "Ключ идемпотентности",
+          "kind": "string",
+          "max": 100
+        },
+        {
+          "logical": "new_processedon",
+          "display": "Обработано",
+          "kind": "datetime"
+        },
+        {
+          "logical": "new_result",
+          "display": "Результат",
+          "kind": "string",
+          "max": 200
+        }
+      ]
+    },
+    {
+      "logical": "new_examgrade",
+      "display": "Оценка ИИ",
+      "plural": "Оценки ИИ",
+      "primary": {
+        "logical": "new_name",
+        "display": "Название",
+        "type": {
+          "kind": "string",
+          "max": 100
+        }
+      },
+      "columns": [
+        {
+          "logical": "new_ticketitem",
+          "display": "Задание билета",
+          "kind": "lookup",
+          "target": "new_examticketitem"
+        },
+        {
+          "logical": "new_attempt",
+          "display": "Попытка",
+          "kind": "lookup",
+          "target": "new_examattempt"
+        },
+        {
+          "logical": "new_run",
+          "display": "Прогон",
+          "kind": "choice",
+          "options": [
+            "Первичная",
+            "Апелляция-2",
+            "Арбитр-3",
+            "Переоценка после сбоя"
+          ]
+        },
+        {
+          "logical": "new_model",
+          "display": "Модель",
+          "kind": "string",
+          "max": 50
+        },
+        {
+          "logical": "new_promptversion",
+          "display": "Версия промпта",
+          "kind": "string",
+          "max": 50
+        },
+        {
+          "logical": "new_status",
+          "display": "Статус",
+          "kind": "choice",
+          "options": [
+            "Ожидает",
+            "Готово",
+            "Ошибка",
+            "Отказ модели"
+          ]
+        },
+        {
+          "logical": "new_score",
+          "display": "Балл",
+          "kind": "decimal",
+          "precision": 2
+        },
+        {
+          "logical": "new_criteriajson",
+          "display": "Критерии (JSON)",
+          "kind": "memo",
+          "max": 50000
+        },
+        {
+          "logical": "new_flags",
+          "display": "Флаги",
+          "kind": "memo",
+          "max": 2000
+        },
+        {
+          "logical": "new_language",
+          "display": "Язык",
+          "kind": "string",
+          "max": 10
+        },
+        {
+          "logical": "new_rawjson",
+          "display": "Сырой ответ",
+          "kind": "memo",
+          "max": 100000
+        },
+        {
+          "logical": "new_inputtokens",
+          "display": "Входных токенов",
+          "kind": "int"
+        },
+        {
+          "logical": "new_outputtokens",
+          "display": "Выходных токенов",
+          "kind": "int"
+        },
+        {
+          "logical": "new_latencyms",
+          "display": "Задержка, мс",
+          "kind": "int"
+        },
+        {
+          "logical": "new_costusd",
+          "display": "Стоимость, USD",
+          "kind": "decimal",
+          "precision": 2
+        },
+        {
+          "logical": "new_isfinal",
+          "display": "Итоговая",
+          "kind": "bool"
+        },
+        {
+          "logical": "new_tries",
+          "display": "Попыток",
+          "kind": "int"
+        },
+        {
+          "logical": "new_nextretryon",
+          "display": "Следующая попытка",
+          "kind": "datetime"
+        },
+        {
+          "logical": "new_idempotencykey",
+          "display": "Ключ идемпотентности",
+          "kind": "string",
+          "max": 100
+        },
+        {
+          "logical": "new_errortext",
+          "display": "Ошибка",
+          "kind": "memo",
+          "max": 4000
+        }
+      ]
+    },
+    {
+      "logical": "new_examappeal",
+      "display": "Апелляция",
+      "plural": "Апелляции",
+      "primary": {
+        "logical": "new_name",
+        "display": "Название",
+        "type": {
+          "kind": "autonumber",
+          "format": "APL-{SEQNUM:5}",
+          "max": 100
+        }
+      },
+      "columns": [
+        {
+          "logical": "new_attempt",
+          "display": "Попытка",
+          "kind": "lookup",
+          "target": "new_examattempt"
+        },
+        {
+          "logical": "new_contact",
+          "display": "Сотрудник",
+          "kind": "lookup",
+          "target": "contact"
+        },
+        {
+          "logical": "new_items",
+          "display": "Задания",
+          "kind": "string",
+          "max": 4000
+        },
+        {
+          "logical": "new_reason",
+          "display": "Обоснование",
+          "kind": "memo",
+          "max": 4000
+        },
+        {
+          "logical": "new_status",
+          "display": "Статус",
+          "kind": "choice",
+          "options": [
+            "Подана",
+            "Отклонена",
+            "В работе",
+            "Рассмотрена",
+            "Ошибка"
+          ]
+        },
+        {
+          "logical": "new_outcomejson",
+          "display": "Решение (JSON)",
+          "kind": "memo",
+          "max": 20000
+        },
+        {
+          "logical": "new_decidedon",
+          "display": "Рассмотрена",
+          "kind": "datetime"
+        },
+        {
+          "logical": "new_idempotencykey",
+          "display": "Ключ идемпотентности",
+          "kind": "string",
+          "max": 100
+        }
+      ]
+    },
+    {
+      "logical": "new_examadminaction",
+      "display": "Действие администратора",
+      "plural": "Действия администратора",
+      "primary": {
+        "logical": "new_name",
+        "display": "Название",
+        "type": {
+          "kind": "autonumber",
+          "format": "ACT-{SEQNUM:5}",
+          "max": 100
+        }
+      },
+      "columns": [
+        {
+          "logical": "new_kind",
+          "display": "Вид",
+          "kind": "choice",
+          "options": [
+            "Нейтрализовать вопрос",
+            "Аннулировать попытку",
+            "Дополнительная попытка",
+            "Переоценить после сбоя"
+          ]
+        },
+        {
+          "logical": "new_exam",
+          "display": "Экзамен",
+          "kind": "lookup",
+          "target": "new_exam"
+        },
+        {
+          "logical": "new_attempt",
+          "display": "Попытка",
+          "kind": "lookup",
+          "target": "new_examattempt"
+        },
+        {
+          "logical": "new_question",
+          "display": "Вопрос",
+          "kind": "lookup",
+          "target": "new_examquestion"
+        },
+        {
+          "logical": "new_contact",
+          "display": "Сотрудник",
+          "kind": "lookup",
+          "target": "contact"
+        },
+        {
+          "logical": "new_requestedby",
+          "display": "Инициатор",
+          "kind": "lookup",
+          "target": "contact"
+        },
+        {
+          "logical": "new_reason",
+          "display": "Обоснование",
+          "kind": "memo",
+          "max": 4000
+        },
+        {
+          "logical": "new_status",
+          "display": "Статус",
+          "kind": "choice",
+          "options": [
+            "Создано",
+            "Выполнено",
+            "Ошибка"
+          ]
+        },
+        {
+          "logical": "new_result",
+          "display": "Результат",
+          "kind": "memo",
+          "max": 4000
+        }
+      ]
+    },
+    {
+      "logical": "new_examlog",
+      "display": "Журнал экзамена",
+      "plural": "Журнал экзамена",
+      "primary": {
+        "logical": "new_name",
+        "display": "Название",
+        "type": {
+          "kind": "autonumber",
+          "format": "LOG-{SEQNUM:9}",
+          "max": 100
+        }
+      },
+      "columns": [
+        {
+          "logical": "new_event",
+          "display": "Событие",
+          "kind": "string",
+          "max": 60
+        },
+        {
+          "logical": "new_exam",
+          "display": "Экзамен",
+          "kind": "lookup",
+          "target": "new_exam"
+        },
+        {
+          "logical": "new_attempt",
+          "display": "Попытка",
+          "kind": "lookup",
+          "target": "new_examattempt"
+        },
+        {
+          "logical": "new_subjectid",
+          "display": "Идентификатор объекта",
+          "kind": "string",
+          "max": 100
+        },
+        {
+          "logical": "new_payload",
+          "display": "Данные",
+          "kind": "memo",
+          "max": 100000
+        },
+        {
+          "logical": "new_actor",
+          "display": "Кто",
+          "kind": "string",
+          "max": 200
+        }
+      ]
+    },
+    {
+      "logical": "new_certification",
+      "display": "Сертификат",
+      "plural": "Сертификаты",
+      "primary": {
+        "logical": "new_name",
+        "display": "Название",
+        "type": {
+          "kind": "autonumber",
+          "format": "CRT-{SEQNUM:5}",
+          "max": 100
+        }
+      },
+      "columns": [
+        {
+          "logical": "new_contact",
+          "display": "Сотрудник",
+          "kind": "lookup",
+          "target": "contact"
+        },
+        {
+          "logical": "new_exam",
+          "display": "Экзамен",
+          "kind": "lookup",
+          "target": "new_exam"
+        },
+        {
+          "logical": "new_attempt",
+          "display": "Попытка",
+          "kind": "lookup",
+          "target": "new_examattempt"
+        },
+        {
+          "logical": "new_issuedon",
+          "display": "Выдан",
+          "kind": "dateonly"
+        },
+        {
+          "logical": "new_validuntil",
+          "display": "Действует до",
+          "kind": "dateonly"
+        },
+        {
+          "logical": "new_status",
+          "display": "Статус",
+          "kind": "choice",
+          "options": [
+            "Действует",
+            "Истёк",
+            "Отозван"
+          ]
+        },
+        {
+          "logical": "new_revokereason",
+          "display": "Причина отзыва",
+          "kind": "memo",
+          "max": 2000
+        }
+      ]
+    }
+  ],
+  "extracolumns": {
+    "contact": [
+      {
+        "logical": "new_certstatus",
+        "display": "Статус сертификации",
+        "kind": "choice",
+        "options": [
+          "Нет",
+          "Действует",
+          "Истёк"
+        ]
+      },
+      {
+        "logical": "new_certvaliduntil",
+        "display": "Сертификат действует до",
+        "kind": "dateonly"
+      }
+    ]
+  }
+}
