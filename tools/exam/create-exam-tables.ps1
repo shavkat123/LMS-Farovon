@@ -99,8 +99,9 @@ function Invoke-Dv {
     for ($try = 1; $try -le 5; $try++) {
         try {
             if ($null -ne $json) {
-                $utf8 = [System.Text.Encoding]::UTF8.GetBytes($json)
-                return Invoke-RestMethod -Method $Method -Uri $uri -Headers $headers -Body $utf8 -ContentType 'application/json; charset=utf-8'
+                # Тело передаём строкой: на машине включён ConstrainedLanguage,
+                # там [System.Text.Encoding] недоступен. PowerShell 7 шлёт строку в UTF-8 сам.
+                return Invoke-RestMethod -Method $Method -Uri $uri -Headers $headers -Body $json -ContentType 'application/json; charset=utf-8'
             }
             return Invoke-RestMethod -Method $Method -Uri $uri -Headers $headers
         } catch {
