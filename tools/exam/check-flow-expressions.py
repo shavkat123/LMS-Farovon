@@ -96,15 +96,32 @@ def collect_strings(node, path, out):
         out.append((path, node))
 
 
+def subblocks(body):
+    """Вложенные наборы действий: ветки If, ветки Switch и его default."""
+    out = []
+    if not isinstance(body, dict):
+        return out
+    if isinstance(body.get('actions'), dict):
+        out.append(body['actions'])
+    els = body.get('else')
+    if isinstance(els, dict) and isinstance(els.get('actions'), dict):
+        out.append(els['actions'])
+    cases = body.get('cases')
+    if isinstance(cases, dict):
+        for c in cases.values():
+            if isinstance(c, dict) and isinstance(c.get('actions'), dict):
+                out.append(c['actions'])
+    default = body.get('default')
+    if isinstance(default, dict) and isinstance(default.get('actions'), dict):
+        out.append(default['actions'])
+    return out
+
+
 def action_names(actions, acc):
     for name, body in actions.items():
         acc.add(name)
-        if isinstance(body, dict):
-            if isinstance(body.get('actions'), dict):
-                action_names(body['actions'], acc)
-            els = body.get('else')
-            if isinstance(els, dict) and isinstance(els.get('actions'), dict):
-                action_names(els['actions'], acc)
+        for blk in subblocks(body):
+            action_names(blk, acc)
     return acc
 
 
@@ -141,11 +158,8 @@ def check_file(path):
             for target in (body.get('runAfter') or {}):
                 if target not in siblings:
                     problems.append('%s: runAfter указывает на «%s», которого нет на этом уровне' % (name, target))
-            if isinstance(body.get('actions'), dict):
-                check_run_after(body['actions'], set(body['actions'].keys()))
-            els = body.get('else')
-            if isinstance(els, dict) and isinstance(els.get('actions'), dict):
-                check_run_after(els['actions'], set(els['actions'].keys()))
+            for blk in subblocks(body):
+                check_run_after(blk, set(blk.keys()))
 
     check_run_after(definition.get('actions', {}), set(definition.get('actions', {}).keys()))
     return problems

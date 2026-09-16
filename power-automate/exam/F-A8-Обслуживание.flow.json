@@ -1,0 +1,330 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedcommondataserviceforapps_73c39"
+        },
+        "api": { "name": "shared_commondataserviceforapps" }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": { "defaultValue": {}, "type": "Object" },
+        "$authentication": { "defaultValue": {}, "type": "SecureObject" }
+      },
+      "triggers": {
+        "Раз_в_сутки": {
+          "type": "Recurrence",
+          "recurrence": {
+            "frequency": "Day",
+            "interval": 1,
+            "schedule": { "hours": [ "21" ], "minutes": [ 0 ] },
+            "timeZone": "UTC"
+          }
+        }
+      },
+      "actions": {
+        "Константы": {
+          "type": "Compose",
+          "runAfter": {},
+          "inputs": {
+            "examОпубликован": 100000001,
+            "qОдобрен": 100000001,
+            "qВыведен": 100000003,
+            "certДействует": 100000000,
+            "certИстёк": 100000001,
+            "type": { "single": 100000000, "multi": 100000001, "case": 100000002, "control": 100000003 },
+            "difficulty": { "basic": 100000000, "medium": 100000001, "advanced": 100000002 }
+          }
+        },
+        "Try": {
+          "type": "Scope",
+          "runAfter": { "Константы": [ "Succeeded" ] },
+          "actions": {
+            "Опубликованные_экзамены": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_exams",
+                  "$filter": "statecode eq 0 and new_status eq 100000001",
+                  "$select": "new_examid,new_name,new_paramsjson,new_configsnapshot",
+                  "$top": 50
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Цикл_экзаменов": {
+              "type": "Foreach",
+              "runAfter": { "Опубликованные_экзамены": [ "Succeeded" ] },
+              "foreach": "@outputs('Опубликованные_экзамены')?['body/value']",
+              "runtimeConfiguration": { "concurrency": { "repetitions": 1 } },
+              "actions": {
+                "P": {
+                  "type": "Compose",
+                  "runAfter": {},
+                  "inputs": "@if(empty(coalesce(items('Цикл_экзаменов')?['new_configsnapshot'], '')), json(coalesce(items('Цикл_экзаменов')?['new_paramsjson'], '{}')), json(items('Цикл_экзаменов')?['new_configsnapshot'])?['params'])"
+                },
+                "Показы_вопросов": {
+                  "type": "OpenApiConnection",
+                  "runAfter": { "P": [ "Succeeded" ] },
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_examticketitems",
+                      "fetchXml": "<fetch aggregate='true'><entity name='new_examticketitem'><attribute name='new_question' alias='qid' groupby='true' /><attribute name='new_examticketitemid' alias='cnt' aggregate='count' /><filter><condition attribute='new_revealjson' operator='not-null' /></filter><link-entity name='new_examattempt' from='new_examattemptid' to='new_attempt'><filter><condition attribute='new_exam' operator='eq' value='@{items('Цикл_экзаменов')?['new_examid']}' /></filter></link-entity></entity></fetch>"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Цикл_износа": {
+                  "type": "Foreach",
+                  "runAfter": { "Показы_вопросов": [ "Succeeded" ] },
+                  "foreach": "@outputs('Показы_вопросов')?['body/value']",
+                  "runtimeConfiguration": { "concurrency": { "repetitions": 5 } },
+                  "actions": {
+                    "Исчерпан_ли_вопрос": {
+                      "type": "If",
+                      "runAfter": {},
+                      "expression": {
+                        "greaterOrEquals": [
+                          "@int(coalesce(items('Цикл_износа')?['cnt'], 0))",
+                          "@int(coalesce(outputs('P')?['maxExposures'], 25))"
+                        ]
+                      },
+                      "actions": {
+                        "Вывести_из_банка": {
+                          "type": "OpenApiConnection",
+                          "runAfter": {},
+                          "inputs": {
+                            "host": {
+                              "connectionName": "shared_commondataserviceforapps",
+                              "operationId": "UpdateOnlyRecord",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                            },
+                            "parameters": {
+                              "entityName": "new_examquestions",
+                              "recordId": "@items('Цикл_износа')?['qid']",
+                              "item/new_exposures": "@int(coalesce(items('Цикл_износа')?['cnt'], 0))",
+                              "item/new_status": "@outputs('Константы')['qВыведен']"
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          }
+                        },
+                        "Журнал_вывода": {
+                          "type": "OpenApiConnection",
+                          "runAfter": { "Вывести_из_банка": [ "Succeeded" ] },
+                          "inputs": {
+                            "host": {
+                              "connectionName": "shared_commondataserviceforapps",
+                              "operationId": "CreateRecord",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                            },
+                            "parameters": {
+                              "entityName": "new_examlogs",
+                              "item/new_event": "QUESTION_RETIRED",
+                              "item/new_actor": "F-A8 Обслуживание",
+                              "item/new_subjectid": "@items('Цикл_износа')?['qid']",
+                              "item/new_payload": "@{concat('Показан в разборе ', string(items('Цикл_износа')?['cnt']), ' раз — это предел износа.')}",
+                              "item/new_exam@odata.bind": "/new_exams(@{items('Цикл_экзаменов')?['new_examid']})"
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {
+                          "Обновить_счётчик": {
+                            "type": "OpenApiConnection",
+                            "runAfter": {},
+                            "inputs": {
+                              "host": {
+                                "connectionName": "shared_commondataserviceforapps",
+                                "operationId": "UpdateOnlyRecord",
+                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                              },
+                              "parameters": {
+                                "entityName": "new_examquestions",
+                                "recordId": "@items('Цикл_износа')?['qid']",
+                                "item/new_exposures": "@int(coalesce(items('Цикл_износа')?['cnt'], 0))"
+                              },
+                              "authentication": "@parameters('$authentication')"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "Цикл_нехватки": {
+                  "type": "Foreach",
+                  "runAfter": { "Цикл_износа": [ "Succeeded" ] },
+                  "foreach": "@coalesce(outputs('P')?['blueprint'], json('[]'))",
+                  "runtimeConfiguration": { "concurrency": { "repetitions": 1 } },
+                  "actions": {
+                    "Порог_ячейки": {
+                      "type": "Compose",
+                      "runAfter": {},
+                      "inputs": "@mul(mul(int(items('Цикл_нехватки')?['count']), add(int(coalesce(outputs('P')?['maxAttempts'], 2)), 1)), int(coalesce(outputs('P')?['bankFactor'], 2)))"
+                    },
+                    "Осталось_в_ячейке": {
+                      "type": "OpenApiConnection",
+                      "runAfter": { "Порог_ячейки": [ "Succeeded" ] },
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_commondataserviceforapps",
+                          "operationId": "ListRecords",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "new_examquestions",
+                          "$filter": "statecode eq 0 and _new_exam_value eq '@{items('Цикл_экзаменов')?['new_examid']}' and _new_module_value eq '@{items('Цикл_нехватки')?['module']}' and new_type eq @{outputs('Константы')['type'][items('Цикл_нехватки')?['type']]} and new_difficulty eq @{outputs('Константы')['difficulty'][items('Цикл_нехватки')?['difficulty']]} and new_status eq 100000001",
+                          "$select": "new_examquestionid",
+                          "$top": "@outputs('Порог_ячейки')"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Если_мало": {
+                      "type": "If",
+                      "runAfter": { "Осталось_в_ячейке": [ "Succeeded" ] },
+                      "expression": {
+                        "less": [ "@length(outputs('Осталось_в_ячейке')?['body/value'])", "@outputs('Порог_ячейки')" ]
+                      },
+                      "actions": {
+                        "Журнал_нехватки": {
+                          "type": "OpenApiConnection",
+                          "runAfter": {},
+                          "inputs": {
+                            "host": {
+                              "connectionName": "shared_commondataserviceforapps",
+                              "operationId": "CreateRecord",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                            },
+                            "parameters": {
+                              "entityName": "new_examlogs",
+                              "item/new_event": "BANK_SHORTAGE",
+                              "item/new_actor": "F-A8 Обслуживание",
+                              "item/new_subjectid": "@items('Цикл_экзаменов')?['new_examid']",
+                              "item/new_payload": "@{concat('Ячейка «', items('Цикл_нехватки')?['type'], ' / ', items('Цикл_нехватки')?['difficulty'], ' / урок ', items('Цикл_нехватки')?['module'], '»: одобренных ', string(length(outputs('Осталось_в_ячейке')?['body/value'])), ' при пороге ', string(outputs('Порог_ячейки')), '. Нужно создать недостающие вопросы.')}",
+                              "item/new_exam@odata.bind": "/new_exams(@{items('Цикл_экзаменов')?['new_examid']})"
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          }
+                        }
+                      },
+                      "else": { "actions": {} }
+                    }
+                  }
+                }
+              }
+            },
+            "Истёкшие_сертификаты": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Цикл_экзаменов": [ "Succeeded" ] },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_certifications",
+                  "$filter": "statecode eq 0 and new_status eq 100000000 and new_validuntil lt @{utcNow('yyyy-MM-dd')}",
+                  "$select": "new_certificationid,new_validuntil,_new_contact_value",
+                  "$top": 500
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Цикл_истёкших": {
+              "type": "Foreach",
+              "runAfter": { "Истёкшие_сертификаты": [ "Succeeded" ] },
+              "foreach": "@outputs('Истёкшие_сертификаты')?['body/value']",
+              "runtimeConfiguration": { "concurrency": { "repetitions": 5 } },
+              "actions": {
+                "Пометить_истёкшим": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "UpdateOnlyRecord",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_certifications",
+                      "recordId": "@items('Цикл_истёкших')?['new_certificationid']",
+                      "item/new_status": "@outputs('Константы')['certИстёк']"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Журнал_истечения": {
+                  "type": "OpenApiConnection",
+                  "runAfter": { "Пометить_истёкшим": [ "Succeeded" ] },
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "CreateRecord",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_examlogs",
+                      "item/new_event": "CERT_EXPIRED",
+                      "item/new_actor": "F-A8 Обслуживание",
+                      "item/new_subjectid": "@items('Цикл_истёкших')?['new_certificationid']",
+                      "item/new_payload": "@{concat('Срок действия истёк ', string(items('Цикл_истёкших')?['new_validuntil']), '.')}"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "Catch": {
+          "type": "Scope",
+          "runAfter": { "Try": [ "Failed", "TimedOut" ] },
+          "actions": {
+            "Журнал_сбоя": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "CreateRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examlogs",
+                  "item/new_event": "FLOW_ERROR",
+                  "item/new_actor": "F-A8 Обслуживание",
+                  "item/new_subjectid": "@{workflow()?['run']?['name']}",
+                  "item/new_payload": "@{string(result('Try'))}"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}
