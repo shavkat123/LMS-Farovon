@@ -31,12 +31,34 @@
 
 {% comment %}── Контакты для выбора исполнителя в модалке: read по contact даёт Contacts Admin Manage (те же роли, что и гейт страницы) ──{% endcomment %}
 {% fetchxml assignees %}
-<fetch top="200">
+<fetch top="200" distinct="true">
   <entity name="contact">
     <attribute name="contactid" />
     <attribute name="fullname" />
     <filter>
       <condition attribute="statecode" operator="eq" value="0" />
+    </filter>
+    {% comment %}
+      Кого показываем. Таблица contact общая с платформой продаж — это второй сайт Power Pages в той же
+      среде (Sales-admin), поэтому «все активные контакты» тянули и менеджеров продаж.
+      Признак сотрудника ЛМС — веб-роль ИМЕННО этого сайта (N:N powerpagecomponent_mspp_webrole_contact,
+      powerpagecomponenttype=11). Роли проставлены 16.09.2026: Administrators 2, «Новый сотрудник» 16.
+      Условие прогресса оставлено страховкой: если новому человеку забудут выдать роль, но он начнёт
+      учиться, он не пропадёт из админки. Проверено на данных: 57 активных контактов -> 18 в списке.
+      Соединения внешние, отбор — общий filter type="or"; distinct обязателен, иначе строки размножатся.
+    {% endcomment %}
+    <link-entity name="powerpagecomponent_mspp_webrole_contact" from="contactid" to="contactid" link-type="outer" intersect="true" alias="wr1">
+      <link-entity name="powerpagecomponent" from="powerpagecomponentid" to="powerpagecomponentid" link-type="outer" alias="lmsrole">
+        <filter type="and">
+          <condition attribute="powerpagecomponenttype" operator="eq" value="11" />
+          <condition attribute="powerpagesiteid" operator="eq" value="{{ website.id | default: 'ef30e0ff-a538-f111-88b5-7ced8d76b3cc' }}" />
+        </filter>
+      </link-entity>
+    </link-entity>
+    <link-entity name="new_h5pprogress" from="new_user" to="contactid" link-type="outer" alias="lmsprog" />
+    <filter type="or">
+      <condition entityname="lmsrole" attribute="powerpagecomponentid" operator="not-null" />
+      <condition entityname="lmsprog" attribute="new_h5pprogressid" operator="not-null" />
     </filter>
     <order attribute="fullname" />
   </entity>
