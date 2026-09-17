@@ -1,0 +1,198 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Anthropic-Claude-LMS-Exam",
+    "description": "Вызов модели Claude для ИИ-экзаменатора: создание вопросов из материалов урока и проверка письменных ответов. Ключ вводится один раз при создании подключения и хранится в Power Platform, а не в коде.",
+    "version": "1.0"
+  },
+  "host": "api.anthropic.com",
+  "basePath": "/v1",
+  "schemes": [
+    "https"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "securityDefinitions": {
+    "api_key": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "x-api-key"
+    }
+  },
+  "security": [
+    {
+      "api_key": []
+    }
+  ],
+  "paths": {
+    "/messages": {
+      "post": {
+        "operationId": "CreateMessage",
+        "summary": "Создать сообщение",
+        "description": "Один синхронный вызов модели. Тело собирает поток: model, max_tokens, system, messages и при необходимости tools для структурированного ответа.",
+        "parameters": [
+          {
+            "name": "anthropic-version",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "default": "2023-06-01",
+            "x-ms-summary": "Версия API",
+            "x-ms-visibility": "internal"
+          },
+          {
+            "name": "anthropic-beta",
+            "in": "header",
+            "required": false,
+            "type": "string",
+            "x-ms-summary": "Бета-возможности",
+            "x-ms-visibility": "advanced"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ответ модели",
+            "schema": {
+              "type": "object"
+            }
+          },
+          "400": {
+            "description": "Некорректный запрос",
+            "schema": {
+              "type": "object"
+            }
+          },
+          "401": {
+            "description": "Ключ недействителен",
+            "schema": {
+              "type": "object"
+            }
+          },
+          "429": {
+            "description": "Превышен предел частоты — смотреть заголовок retry-after",
+            "schema": {
+              "type": "object"
+            }
+          },
+          "529": {
+            "description": "Сервис перегружен — повторить позже",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "/messages/batches": {
+      "post": {
+        "operationId": "CreateBatch",
+        "summary": "Создать пакет сообщений",
+        "description": "Пакетная обработка: дешевле обычного вызова, результат готовится асинхронно. Используется для массовой генерации вопросов.",
+        "parameters": [
+          {
+            "name": "anthropic-version",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "default": "2023-06-01",
+            "x-ms-summary": "Версия API",
+            "x-ms-visibility": "internal"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Пакет принят",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "/messages/batches/{batch_id}": {
+      "get": {
+        "operationId": "GetBatch",
+        "summary": "Состояние пакета",
+        "parameters": [
+          {
+            "name": "anthropic-version",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "default": "2023-06-01",
+            "x-ms-summary": "Версия API",
+            "x-ms-visibility": "internal"
+          },
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "x-ms-summary": "Идентификатор пакета"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Состояние пакета",
+            "schema": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "/messages/batches/{batch_id}/results": {
+      "get": {
+        "operationId": "GetBatchResults",
+        "summary": "Результаты пакета",
+        "description": "Отдаёт результаты построчным JSON (по строке на запрос).",
+        "parameters": [
+          {
+            "name": "anthropic-version",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "default": "2023-06-01",
+            "x-ms-summary": "Версия API",
+            "x-ms-visibility": "internal"
+          },
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "x-ms-summary": "Идентификатор пакета"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки результатов",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}
