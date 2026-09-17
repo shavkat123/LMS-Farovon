@@ -1,0 +1,486 @@
+{% comment %}
+  Прохождение экзамена (/exam?attempt=<id>).
+
+  Три состояния: «готовим билет» (поток ещё собирает задания), прохождение и завершение.
+
+  Важное про время: таймер считается от серверного дедлайна, а не от часов браузера.
+  Расхождение берём из заголовка Date ответа портала — иначе участник с уехавшими часами
+  увидит неправильный остаток, а решение о приёме ответа всё равно принимает поток.
+
+  Важное про ответы: каждый ответ — НОВАЯ запись new_examanswer, а не правка старой.
+  Поток завершения сам засчитает последний ответ, поданный в срок, остальные пометит
+  непринятыми. Поэтому страница не удаляет и не редактирует ответы.
+{% endcomment %}
+
+<style>
+  .exa-wrap { max-width: 1040px; margin: 0 auto; padding: 16px 16px 80px; }
+  .exa-top { position: sticky; top: 0; z-index: 20; background: #fff; border-bottom: 1px solid #E2E8F0;
+             display: flex; align-items: center; justify-content: space-between; gap: 16px;
+             padding: 12px 0; margin-bottom: 20px; flex-wrap: wrap; }
+  .exa-title { font-size: 18px; font-weight: 700; color: #0F172A; margin: 0; }
+  .exa-timer { font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 700; color: #0F172A;
+               background: #F1F5F9; border-radius: 10px; padding: 6px 14px; }
+  .exa-timer--warn { background: #FEF3C7; color: #B45309; }
+  .exa-timer--over { background: #FEE2E2; color: #B91C1C; }
+
+  .exa-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+  .exa-dot { width: 34px; height: 34px; border-radius: 9px; border: 1px solid #CBD5E1; background: #fff;
+             color: #334155; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .exa-dot--done { background: #DCFCE7; border-color: #86EFAC; color: #15803D; }
+  .exa-dot--current { outline: 2px solid #0F172A; outline-offset: 1px; }
+
+  .exa-item { background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; padding: 22px; margin-bottom: 16px; }
+  .exa-item h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: #94A3B8; margin: 0 0 8px; font-weight: 600; }
+  .exa-stem { font-size: 16px; line-height: 1.6; color: #0F172A; white-space: pre-wrap; margin: 0 0 16px; }
+
+  .exa-opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid #E2E8F0;
+             border-radius: 10px; margin-bottom: 8px; cursor: pointer; line-height: 1.5; color: #0F172A; }
+  .exa-opt:hover { border-color: #94A3B8; }
+  .exa-opt input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
+
+  .exa-text { width: 100%; min-height: 180px; border: 1px solid #CBD5E1; border-radius: 10px; padding: 12px;
+              font: inherit; line-height: 1.6; resize: vertical; }
+  .exa-count { text-align: right; color: #64748B; font-size: 13px; margin-top: 6px; }
+  .exa-count--over { color: #B91C1C; font-weight: 600; }
+
+  .exa-state { font-size: 13px; color: #64748B; margin-top: 8px; min-height: 18px; }
+  .exa-state--saved { color: #15803D; }
+  .exa-state--err { color: #B91C1C; }
+
+  .exa-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
+  .exa-btn { border: 0; border-radius: 10px; background: #15803D; color: #fff; font-size: 15px; font-weight: 600;
+             padding: 12px 22px; cursor: pointer; }
+  .exa-btn[disabled] { background: #CBD5E1; color: #64748B; cursor: not-allowed; }
+  .exa-btn-ghost { background: #fff; color: #334155; border: 1px solid #CBD5E1; }
+
+  .exa-note { color: #B45309; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px;
+              padding: 12px 14px; line-height: 1.5; margin-bottom: 16px; }
+  .exa-err { color: #B91C1C; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px;
+             padding: 12px 14px; line-height: 1.5; margin-bottom: 16px; }
+  .exa-center { text-align: center; color: #64748B; padding: 60px 20px; }
+
+  @media (max-width: 640px) {
+    .exa-top { position: static; }
+    .exa-item { padding: 16px; }
+  }
+</style>
+
+<div class="exa-wrap">
+  <div class="exa-top">
+    <h1 class="exa-title" id="exaTitle">Экзамен</h1>
+    <div class="exa-timer" id="exaTimer" style="display:none">--:--</div>
+  </div>
+  <div id="exaRoot" class="exa-center">Загружаем билет…</div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var ATTEMPT_ID = (function () {
+    var m = /[?&]attempt=([^&]+)/.exec(window.location.search);
+    return m ? decodeURIComponent(m[1]) : '';
+  })();
+  var CONTACT = '{{ user.id }}';
+  var POLL_MS = parseInt('{{ settings["Exam/PollIntervalMs"] | default: 3000 }}', 10) || 3000;
+
+  var STATUS = { prepare: 100000000, running: 100000001, submitted: 100000002,
+                 grading: 100000003, graded: 100000004, voided: 100000005, failed: 100000006 };
+  var TYPE = { single: 100000000, multi: 100000001, kase: 100000002, control: 100000003 };
+  var SUBMIT_FINISH = 100000000;
+
+  var root = document.getElementById('exaRoot');
+  var timerBox = document.getElementById('exaTimer');
+
+  var state = {
+    attempt: null,
+    items: [],
+    answers: {},       // id задания → что сейчас выбрано или написано
+    saved: {},         // id задания → что уже сохранено на сервере
+    skewMs: 0,         // расхождение часов браузера с сервером
+    deadline: null,
+    token: '',
+    finished: false
+  };
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function now() { return Date.now() + state.skewMs; }
+
+  function api(url) {
+    return fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+      .then(function (r) {
+        // Заголовок Date — единственный доступный источник серверного времени на статической странице.
+        var d = r.headers.get('date');
+        if (d) {
+          var server = new Date(d).getTime();
+          if (!isNaN(server)) { state.skewMs = server - Date.now(); }
+        }
+        return r.json();
+      });
+  }
+
+  function getToken() {
+    if (state.token) { return Promise.resolve(state.token); }
+    return fetch('/_layout/tokenhtml', { credentials: 'same-origin' })
+      .then(function (r) { return r.text(); })
+      .then(function (t) {
+        var m = t.match(/value="([^"]+)"/);
+        state.token = m ? m[1] : '';
+        return state.token;
+      });
+  }
+
+  function post(set, body) {
+    return getToken().then(function (tok) {
+      return fetch('/_api/' + set, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', '__RequestVerificationToken': tok },
+        credentials: 'same-origin',
+        body: JSON.stringify(body)
+      });
+    });
+  }
+
+  // Порядок вариантов свой у каждого участника и у каждого задания, но неизменный между
+  // перезагрузками: перемешивание детерминированное, seed = попытка + задание.
+  function seededShuffle(list, seed) {
+    var h = 2166136261;
+    for (var i = 0; i < seed.length; i++) {
+      h ^= seed.charCodeAt(i);
+      h = (h * 16777619) >>> 0;
+    }
+    var arr = list.slice();
+    for (var j = arr.length - 1; j > 0; j--) {
+      h ^= h << 13; h >>>= 0;
+      h ^= h >> 17;
+      h ^= h << 5; h >>>= 0;
+      var k = h % (j + 1);
+      var t = arr[j]; arr[j] = arr[k]; arr[k] = t;
+    }
+    return arr;
+  }
+
+  function loadAttempt() {
+    return api("/_api/new_examattempts(" + ATTEMPT_ID + ")?$select=new_examattemptid,new_name,new_status," +
+               "new_deadline,new_startedon,new_itemcount,new_errortext,_new_exam_value");
+  }
+
+  function loadItems() {
+    return api("/_api/new_examticketitems?$select=new_examticketitemid,new_order,new_type,new_modulename," +
+               "new_stem,new_optionsjson,new_points,new_answerlimitchars,new_status" +
+               "&$filter=_new_attempt_value eq " + ATTEMPT_ID + "&$orderby=new_order asc")
+      .then(function (j) { return j.value || []; });
+  }
+
+  function loadMyAnswers() {
+    // Показываем, что участник уже отвечал: берём последние ответы и раскладываем по заданиям.
+    return api("/_api/new_examanswers?$select=new_examanswerid,new_selected,new_text,createdon," +
+               "_new_ticketitem_value&$filter=_new_attempt_value eq " + ATTEMPT_ID +
+               "&$orderby=createdon desc&$top=200")
+      .then(function (j) {
+        var seen = {};
+        (j.value || []).forEach(function (a) {
+          var k = a._new_ticketitem_value;
+          if (!k || seen[k]) { return; }
+          seen[k] = true;
+          state.answers[k] = { selected: a.new_selected || '', text: a.new_text || '' };
+          state.saved[k] = JSON.stringify(state.answers[k]);
+        });
+      });
+  }
+
+  function waitForTicket() {
+    root.innerHTML = '<div class="exa-center"><p style="font-size:17px;color:#0F172A">Готовим ваш билет…</p>' +
+      '<p>Это занимает от нескольких секунд до минуты. Страницу можно не обновлять.</p></div>';
+    var tries = 0;
+    var tick = function () {
+      tries++;
+      loadAttempt().then(function (a) {
+        state.attempt = a;
+        if (a.new_status === STATUS.failed) { renderFailed(a); return; }
+        if (a.new_status === STATUS.running) { boot(); return; }
+        if (a.new_status >= STATUS.submitted && a.new_status !== STATUS.failed) {
+          window.location.href = '/exam-result?attempt=' + ATTEMPT_ID; return;
+        }
+        if (tries > 40) {
+          root.innerHTML = '<div class="exa-err">Билет собирается дольше обычного. ' +
+            'Обновите страницу через минуту, а если ничего не изменится — сообщите администратору аттестации.</div>';
+          return;
+        }
+        setTimeout(tick, POLL_MS);
+      }).catch(function () { setTimeout(tick, POLL_MS * 2); });
+    };
+    setTimeout(tick, POLL_MS);
+  }
+
+  function renderFailed(a) {
+    timerBox.style.display = 'none';
+    root.innerHTML = '<div class="exa-err"><strong>Экзамен начать не удалось.</strong><br>' +
+      esc(a.new_errortext || 'Причина не указана.') + '</div>' +
+      '<p><a class="exa-btn exa-btn-ghost" href="/certification">Вернуться к аттестации</a></p>';
+  }
+
+  function renderItem(item, index) {
+    var id = item.new_examticketitemid;
+    var isChoice = item.new_type === TYPE.single || item.new_type === TYPE.multi;
+    var multi = item.new_type === TYPE.multi;
+    var mine = state.answers[id] || { selected: '', text: '' };
+    var html = '';
+
+    html += '<div class="exa-item" id="item-' + esc(id) + '" data-index="' + index + '">';
+    html += '<h3>Задание ' + item.new_order + ' из ' + state.items.length +
+            (item.new_modulename ? ' · ' + esc(item.new_modulename) : '') +
+            ' · ' + (item.new_points || 0) + ' балл(ов)</h3>';
+    html += '<p class="exa-stem">' + esc(item.new_stem) + '</p>';
+
+    if (isChoice) {
+      var opts = [];
+      try { opts = JSON.parse(item.new_optionsjson || '[]'); } catch (e) { opts = []; }
+      opts = seededShuffle(opts, ATTEMPT_ID + ':' + id);
+      var chosen = (mine.selected || '').split('|').filter(Boolean);
+      if (multi) {
+        html += '<p style="color:#64748B;font-size:13px;margin:-8px 0 12px">Верных вариантов может быть несколько.</p>';
+      }
+      opts.forEach(function (o) {
+        var checked = chosen.indexOf(o.id) >= 0 ? ' checked' : '';
+        html += '<label class="exa-opt">' +
+          '<input type="' + (multi ? 'checkbox' : 'radio') + '" name="opt-' + esc(id) + '" value="' + esc(o.id) + '"' + checked + '>' +
+          '<span>' + esc(o.text) + '</span></label>';
+      });
+    } else {
+      var limit = item.new_answerlimitchars || 0;
+      html += '<textarea class="exa-text" id="text-' + esc(id) + '" ' +
+              (limit ? 'maxlength="' + limit + '" ' : '') +
+              'placeholder="Ваш ответ">' + esc(mine.text) + '</textarea>';
+      if (limit) {
+        html += '<div class="exa-count" id="count-' + esc(id) + '">' + (mine.text || '').length + ' / ' + limit + '</div>';
+      }
+    }
+
+    html += '<div class="exa-state" id="state-' + esc(id) + '"></div>';
+    html += '</div>';
+    return html;
+  }
+
+  function boot() {
+    Promise.all([loadItems(), loadMyAnswers()]).then(function (res) {
+      state.items = res[0];
+      if (!state.items.length) { waitForTicket(); return; }
+      state.deadline = state.attempt.new_deadline ? new Date(state.attempt.new_deadline).getTime() : null;
+      render();
+      startTimer();
+    });
+  }
+
+  function render() {
+    var html = '';
+    html += '<div class="exa-nav" id="exaNav"></div>';
+    state.items.forEach(function (it, i) { html += renderItem(it, i); });
+    html += '<div class="exa-actions">' +
+            '<span style="color:#64748B">Ответы сохраняются сами. Завершить можно в любой момент.</span>' +
+            '<button class="exa-btn" id="exaFinish">Завершить экзамен</button>' +
+            '</div><div id="exaFinishErr"></div>';
+    root.className = '';
+    root.innerHTML = html;
+
+    drawNav();
+    bindInputs();
+    document.getElementById('exaFinish').addEventListener('click', confirmFinish);
+  }
+
+  function drawNav() {
+    var nav = document.getElementById('exaNav');
+    if (!nav) { return; }
+    nav.innerHTML = state.items.map(function (it) {
+      var id = it.new_examticketitemid;
+      var a = state.answers[id];
+      var done = a && ((a.selected && a.selected.length) || (a.text && a.text.trim().length));
+      return '<button class="exa-dot' + (done ? ' exa-dot--done' : '') + '" data-goto="' + esc(id) + '">' + it.new_order + '</button>';
+    }).join('');
+    nav.querySelectorAll('[data-goto]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var el = document.getElementById('item-' + b.getAttribute('data-goto'));
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      });
+    });
+  }
+
+  var saveTimers = {};
+
+  function bindInputs() {
+    state.items.forEach(function (it) {
+      var id = it.new_examticketitemid;
+      var isChoice = it.new_type === TYPE.single || it.new_type === TYPE.multi;
+      if (isChoice) {
+        var box = document.getElementById('item-' + id);
+        box.querySelectorAll('input').forEach(function (inp) {
+          inp.addEventListener('change', function () {
+            var picked = [];
+            box.querySelectorAll('input:checked').forEach(function (c) { picked.push(c.value); });
+            state.answers[id] = { selected: picked.join('|'), text: '' };
+            drawNav();
+            queueSave(id, 0);     // выбор сохраняем сразу
+          });
+        });
+      } else {
+        var ta = document.getElementById('text-' + id);
+        var counter = document.getElementById('count-' + id);
+        var limit = it.new_answerlimitchars || 0;
+        ta.addEventListener('input', function () {
+          state.answers[id] = { selected: '', text: ta.value };
+          if (counter) {
+            counter.textContent = ta.value.length + ' / ' + limit;
+            counter.className = 'exa-count' + (limit && ta.value.length >= limit ? ' exa-count--over' : '');
+          }
+          drawNav();
+          queueSave(id, 1500);    // текст — с паузой, чтобы не плодить записи на каждую букву
+        });
+      }
+    });
+  }
+
+  function queueSave(id, delay) {
+    if (state.finished) { return; }
+    clearTimeout(saveTimers[id]);
+    // Ошибку фонового сохранения уже показали под заданием и поставили повтор — здесь её глушим.
+    saveTimers[id] = setTimeout(function () { saveAnswer(id).catch(function () {}); }, delay);
+  }
+
+  // Возвращает обещание: завершение экзамена обязано дождаться досохранения ответов.
+  function saveAnswer(id) {
+    var a = state.answers[id];
+    if (!a) { return Promise.resolve(); }
+    var payload = JSON.stringify(a);
+    if (state.saved[id] === payload) { return Promise.resolve(); }   // нечего сохранять
+
+    var box = document.getElementById('state-' + id);
+    if (box) { box.className = 'exa-state'; box.textContent = 'Сохраняем…'; }
+
+    return post('new_examanswers', {
+      new_name: 'Ответ на задание',
+      new_selected: a.selected || null,
+      new_text: a.text || null,
+      new_clientts: new Date(now()).toISOString(),
+      'new_ticketitem@odata.bind': '/new_examticketitems(' + id + ')',
+      'new_attempt@odata.bind': '/new_examattempts(' + ATTEMPT_ID + ')',
+      'new_contact@odata.bind': '/contacts(' + CONTACT + ')'
+    }).then(function (r) {
+      if (r.status !== 204 && r.status !== 201) {
+        return r.text().then(function (t) { throw new Error(t.slice(0, 200)); });
+      }
+      state.saved[id] = payload;
+      if (box) { box.className = 'exa-state exa-state--saved'; box.textContent = 'Сохранено'; }
+    }).catch(function (e) {
+      if (box) {
+        box.className = 'exa-state exa-state--err';
+        box.textContent = 'Не удалось сохранить. Повторим через несколько секунд.';
+      }
+      if (!state.finished) { setTimeout(function () { queueSave(id, 0); }, 5000); }
+      throw e;   // завершение должно узнать, что ответ не ушёл
+    });
+  }
+
+  function startTimer() {
+    if (!state.deadline) { return; }
+    timerBox.style.display = '';
+    var tick = function () {
+      var left = state.deadline - now();
+      if (left <= 0) {
+        timerBox.className = 'exa-timer exa-timer--over';
+        timerBox.textContent = 'Время вышло';
+        onTimeUp();
+        return;
+      }
+      var m = Math.floor(left / 60000);
+      var s = Math.floor((left % 60000) / 1000);
+      timerBox.textContent = m + ':' + ('0' + s).slice(-2);
+      timerBox.className = 'exa-timer' + (left < 5 * 60000 ? ' exa-timer--warn' : '');
+      setTimeout(tick, 1000);
+    };
+    tick();
+  }
+
+  function onTimeUp() {
+    if (state.finished) { return; }
+    state.finished = true;
+    root.querySelectorAll('input, textarea, button').forEach(function (el) { el.disabled = true; });
+    var note = document.createElement('div');
+    note.className = 'exa-note';
+    note.innerHTML = '<strong>Время вышло.</strong> Ответы больше не принимаются. ' +
+      'Попытку завершит система — результат появится на странице результата в течение нескольких минут. ' +
+      '<a href="/exam-result?attempt=' + esc(ATTEMPT_ID) + '">Перейти к результату</a>';
+    root.insertBefore(note, root.firstChild);
+  }
+
+  function confirmFinish() {
+    var unanswered = state.items.filter(function (it) {
+      var a = state.answers[it.new_examticketitemid];
+      return !a || (!(a.selected || '').length && !(a.text || '').trim().length);
+    }).length;
+    var msg = unanswered
+      ? 'Без ответа осталось заданий: ' + unanswered + '. Они будут засчитаны как неверные. Завершить экзамен?'
+      : 'Завершить экзамен? После завершения изменить ответы нельзя.';
+    if (window.confirm(msg)) { finish(); }
+  }
+
+  function finish() {
+    var btn = document.getElementById('exaFinish');
+    var err = document.getElementById('exaFinishErr');
+    btn.disabled = true;
+    btn.textContent = 'Завершаем…';
+    err.innerHTML = '';
+    state.finished = true;
+
+    // Досохраняем всё, что не успело уйти, и только потом отправляем завершение:
+    // поток принимает ответы по времени создания, поздний ответ он уже не засчитает.
+    var pending = Object.keys(state.answers).filter(function (id) {
+      return state.saved[id] !== JSON.stringify(state.answers[id]);
+    });
+    var flush = pending.map(function (id) { clearTimeout(saveTimers[id]); return saveAnswer(id); });
+
+    Promise.all(flush).then(function () {
+      return post('new_examsubmissions', {
+        new_name: 'Завершение попытки',
+        new_kind: SUBMIT_FINISH,
+        new_idempotencykey: ATTEMPT_ID + ':finish',
+        'new_attempt@odata.bind': '/new_examattempts(' + ATTEMPT_ID + ')',
+        'new_contact@odata.bind': '/contacts(' + CONTACT + ')'
+      });
+    }).then(function (r) {
+      if (r.status !== 204 && r.status !== 201) {
+        return r.text().then(function (t) { throw new Error(t.slice(0, 200)); });
+      }
+      window.location.href = '/exam-result?attempt=' + ATTEMPT_ID;
+    }).catch(function (e) {
+      btn.disabled = false;
+      btn.textContent = 'Завершить экзамен';
+      state.finished = false;
+      err.innerHTML = '<div class="exa-err">Не удалось завершить: ' + esc(e.message) +
+        '. Попробуйте ещё раз — ответы сохранены.</div>';
+    });
+  }
+
+  if (!ATTEMPT_ID) {
+    root.innerHTML = '<div class="exa-err">Не указана попытка. Начните экзамен со страницы ' +
+      '<a href="/certification">аттестации</a>.</div>';
+    return;
+  }
+
+  loadAttempt().then(function (a) {
+    if (a.error) { throw new Error(a.error.message || 'нет доступа к попытке'); }
+    state.attempt = a;
+    document.getElementById('exaTitle').textContent = 'Экзамен · попытка ' + (a.new_name || '');
+    if (a.new_status === STATUS.failed) { renderFailed(a); return; }
+    if (a.new_status === STATUS.prepare) { waitForTicket(); return; }
+    if (a.new_status === STATUS.running) { boot(); return; }
+    window.location.href = '/exam-result?attempt=' + ATTEMPT_ID;
+  }).catch(function (e) {
+    root.innerHTML = '<div class="exa-err">Не удалось открыть попытку: ' + esc(e.message) + '</div>';
+  });
+})();
+</script>

@@ -1,0 +1,317 @@
+{% comment %}
+  Аттестация — точка входа участника (/certification).
+
+  Что здесь есть: условия экзамена, история попыток, действующий сертификат и кнопка «Начать».
+  Чего здесь нет намеренно: никаких подсчётов. Страница только создаёт запись попытки —
+  всё остальное (сборка билета, проверки допуска, статусы) делают потоки. Если поток откажет
+  в допуске, он сам напишет причину в попытку, и мы её покажем.
+
+  Данные тянем на клиенте через Web API, а не Liquid/FetchXML: страница должна обновлять
+  состояние после создания попытки без перезагрузки.
+{% endcomment %}
+
+<style>
+  .exm-wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  .exm-h1 { font-size: 28px; font-weight: 700; color: #0F172A; margin: 0 0 4px; }
+  .exm-sub { color: #64748B; margin: 0 0 24px; }
+
+  .exm-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; padding: 20px 22px; margin-bottom: 16px; }
+  .exm-card h2 { font-size: 18px; font-weight: 600; color: #0F172A; margin: 0 0 12px; }
+
+  .exm-meta { display: flex; flex-wrap: wrap; gap: 20px 32px; margin-bottom: 4px; }
+  .exm-meta div { min-width: 140px; }
+  .exm-meta dt { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #94A3B8; margin-bottom: 2px; }
+  .exm-meta dd { margin: 0; font-size: 15px; color: #0F172A; font-weight: 500; }
+
+  .exm-rules { white-space: pre-wrap; color: #334155; line-height: 1.6; }
+
+  .exm-consent { display: flex; gap: 10px; align-items: flex-start; margin: 16px 0; color: #334155; line-height: 1.5; }
+  .exm-consent input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
+
+  .exm-btn { display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 10px;
+             background: #15803D; color: #fff; font-size: 15px; font-weight: 600; padding: 12px 22px; cursor: pointer; }
+  .exm-btn[disabled] { background: #CBD5E1; color: #64748B; cursor: not-allowed; }
+  .exm-btn-ghost { background: #fff; color: #15803D; border: 1px solid #15803D; }
+
+  .exm-note { margin-top: 10px; color: #B45309; background: #FFFBEB; border: 1px solid #FDE68A;
+              border-radius: 10px; padding: 10px 12px; line-height: 1.5; }
+  .exm-err { margin-top: 10px; color: #B91C1C; background: #FEF2F2; border: 1px solid #FECACA;
+             border-radius: 10px; padding: 10px 12px; line-height: 1.5; }
+
+  .exm-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .exm-table th { text-align: left; font-weight: 600; color: #64748B; font-size: 12px;
+                  text-transform: uppercase; letter-spacing: .04em; padding: 0 10px 8px 0; }
+  .exm-table td { padding: 10px 10px 10px 0; border-top: 1px solid #F1F5F9; color: #0F172A; }
+  .exm-pill { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+  .exm-pill--ok { background: #DCFCE7; color: #15803D; }
+  .exm-pill--no { background: #FEE2E2; color: #B91C1C; }
+  .exm-pill--wait { background: #E0F2FE; color: #0369A1; }
+  .exm-pill--void { background: #F1F5F9; color: #64748B; }
+
+  .exm-cert { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .exm-muted { color: #64748B; }
+  .exm-skeleton { color: #94A3B8; }
+
+  @media (max-width: 640px) {
+    .exm-meta { gap: 14px 20px; }
+    .exm-table thead { display: none; }
+    .exm-table td { display: block; border-top: 0; padding: 2px 0; }
+    .exm-table tbody tr { display: block; border-top: 1px solid #F1F5F9; padding: 10px 0; }
+  }
+</style>
+
+<div class="exm-wrap">
+  <h1 class="exm-h1">Аттестация</h1>
+  <p class="exm-sub">Итоговый экзамен по курсу наставничества</p>
+
+  <div id="exmRoot" class="exm-skeleton">Загружаем данные экзамена…</div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var CONTACT = '{{ user.id }}';
+  // Значения Choice заданы порядком в exam-schema.json и менять их нельзя — только дополнять.
+  var EXAM_PUBLISHED = 100000001;
+  var ATTEMPT = { prepare: 100000000, running: 100000001, submitted: 100000002,
+                  grading: 100000003, graded: 100000004, voided: 100000005, failed: 100000006 };
+  var RESULT = { passed: 100000000, failed: 100000001, voided: 100000002 };
+  var CERT = { active: 100000000, expired: 100000001, revoked: 100000002 };
+
+  var root = document.getElementById('exmRoot');
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function api(url) {
+    return fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+      .then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }); });
+  }
+
+  // Портал требует токен проверки запроса на каждую запись; без него ответ 403.
+  function token() {
+    return fetch('/_layout/tokenhtml', { credentials: 'same-origin' })
+      .then(function (r) { return r.text(); })
+      .then(function (t) { var m = t.match(/value="([^"]+)"/); return m ? m[1] : ''; });
+  }
+
+  // Портал отдаёт даты в UTC; показываем во времени портала (UTC+5).
+  function dt(v, withTime) {
+    if (!v) { return '—'; }
+    var d = new Date(v);
+    if (isNaN(d)) { return '—'; }
+    var shifted = new Date(d.getTime() + 5 * 3600 * 1000);
+    var s = shifted.getUTCDate() + '.' + ('0' + (shifted.getUTCMonth() + 1)).slice(-2) + '.' + shifted.getUTCFullYear();
+    if (withTime) {
+      s += ', ' + ('0' + shifted.getUTCHours()).slice(-2) + ':' + ('0' + shifted.getUTCMinutes()).slice(-2);
+    }
+    return s;
+  }
+
+  function num(v) { return (v == null ? 0 : v).toFixed ? Number(v).toFixed(2) : v; }
+
+  function load() {
+    return Promise.all([
+      api("/_api/new_exams?$select=new_examid,new_name,new_status,new_opens,new_closes,new_rules_ru," +
+          "new_consenttext,new_consentversion,new_paramsjson,new_certvalidmonths,new_publishedon" +
+          "&$filter=new_status eq " + EXAM_PUBLISHED + "&$orderby=new_publishedon desc&$top=1"),
+      api("/_api/new_examattempts?$select=new_examattemptid,new_name,new_attemptno,new_status,new_percent," +
+          "new_result,new_passed,new_isfinal,new_finalizedon,new_appealuntil,new_errortext,createdon," +
+          "_new_exam_value&$orderby=createdon desc&$top=20"),
+      api("/_api/new_certifications?$select=new_certificationid,new_name,new_status,new_issuedon," +
+          "new_validuntil,_new_exam_value&$orderby=new_issuedon desc&$top=10")
+    ]);
+  }
+
+  function attemptState(a) {
+    var s = a.new_status;
+    if (s === ATTEMPT.graded) {
+      if (a.new_result === RESULT.passed) { return ['Сдано', 'ok']; }
+      if (a.new_result === RESULT.voided) { return ['Аннулирована', 'void']; }
+      return ['Не сдано', 'no'];
+    }
+    if (s === ATTEMPT.voided) { return ['Аннулирована', 'void']; }
+    if (s === ATTEMPT.failed) { return ['Ошибка', 'no']; }
+    if (s === ATTEMPT.prepare) { return ['Готовим билет', 'wait']; }
+    if (s === ATTEMPT.running) { return ['Идёт', 'wait']; }
+    if (s === ATTEMPT.submitted || s === ATTEMPT.grading) { return ['На проверке', 'wait']; }
+    return ['—', 'void'];
+  }
+
+  function render(exam, attempts, certs) {
+    if (!exam) {
+      root.className = '';
+      root.innerHTML = '<div class="exm-card"><h2>Экзамен пока не объявлен</h2>' +
+        '<p class="exm-muted">Когда аттестация откроется, она появится здесь. ' +
+        'Проходить курс можно и сейчас — прогресс сохраняется.</p></div>';
+      return;
+    }
+
+    var params = {};
+    try { params = JSON.parse(exam.new_paramsjson || '{}'); } catch (e) { params = {}; }
+
+    var mine = attempts.filter(function (a) { return a._new_exam_value === exam.new_examid; });
+    var live = mine.filter(function (a) {
+      return a.new_status === ATTEMPT.prepare || a.new_status === ATTEMPT.running;
+    })[0];
+    var counted = mine.filter(function (a) { return a.new_status !== ATTEMPT.voided; });
+    var maxAttempts = params.maxAttempts == null ? 2 : params.maxAttempts;
+    var left = Math.max(0, maxAttempts - counted.length);
+
+    var now = Date.now();
+    var opensAt = exam.new_opens ? new Date(exam.new_opens).getTime() : null;
+    var closesAt = exam.new_closes ? new Date(exam.new_closes).getTime() : null;
+
+    // Причину недоступности показываем текстом: «серая кнопка без объяснений» — худший вариант.
+    var block = null;
+    if (opensAt && now < opensAt) { block = 'Экзамен откроется ' + dt(exam.new_opens, true) + '.'; }
+    else if (closesAt && now > closesAt) { block = 'Экзамен закрыт ' + dt(exam.new_closes, true) + '.'; }
+    else if (live) { block = 'У вас есть незавершённая попытка — сначала закончите её.'; }
+    else if (left === 0) { block = 'Попытки закончились. Если нужна дополнительная, обратитесь к администратору аттестации.'; }
+
+    var cert = certs.filter(function (c) {
+      return c._new_exam_value === exam.new_examid && c.new_status === CERT.active;
+    })[0];
+
+    var html = '';
+
+    html += '<div class="exm-card">';
+    html += '<h2>' + esc(exam.new_name) + '</h2>';
+    html += '<dl class="exm-meta">';
+    html += '<div><dt>Открыт</dt><dd>' + dt(exam.new_opens, true) + '</dd></div>';
+    html += '<div><dt>Закрывается</dt><dd>' + dt(exam.new_closes, true) + '</dd></div>';
+    html += '<div><dt>Время на билет</dt><dd>' + (params.ticketMinutes || 90) + ' мин</dd></div>';
+    html += '<div><dt>Проходной балл</dt><dd>' + (params.passPercent == null ? 75 : params.passPercent) + ' %</dd></div>';
+    html += '<div><dt>Попыток осталось</dt><dd>' + left + ' из ' + maxAttempts + '</dd></div>';
+    html += '</dl>';
+    if (exam.new_rules_ru) {
+      html += '<p class="exm-rules">' + esc(exam.new_rules_ru) + '</p>';
+    }
+    html += '</div>';
+
+    // Старт
+    html += '<div class="exm-card">';
+    html += '<h2>Начать экзамен</h2>';
+    if (block) {
+      html += '<div class="exm-note">' + esc(block) + '</div>';
+      if (live) {
+        html += '<p style="margin-top:12px"><a class="exm-btn exm-btn-ghost" href="/exam?attempt=' +
+                esc(live.new_examattemptid) + '">Вернуться к попытке</a></p>';
+      }
+    } else {
+      if (params.requireConsent) {
+        html += '<label class="exm-consent"><input type="checkbox" id="exmConsent">' +
+                '<span>' + esc(exam.new_consenttext || 'Я согласен на обработку моих ответов для оценки.') + '</span></label>';
+      }
+      html += '<button class="exm-btn" id="exmStart">Начать экзамен</button>';
+      html += '<div id="exmStartErr"></div>';
+    }
+    html += '</div>';
+
+    // История попыток
+    html += '<div class="exm-card"><h2>Мои попытки</h2>';
+    if (!mine.length) {
+      html += '<p class="exm-muted">Попыток пока не было.</p>';
+    } else {
+      html += '<table class="exm-table"><thead><tr><th>№</th><th>Дата</th><th>Результат</th><th>Процент</th><th></th></tr></thead><tbody>';
+      mine.forEach(function (a) {
+        var st = attemptState(a);
+        html += '<tr>';
+        html += '<td>' + (a.new_attemptno || '—') + '</td>';
+        html += '<td>' + dt(a.new_finalizedon || a.createdon, true) + '</td>';
+        html += '<td><span class="exm-pill exm-pill--' + st[1] + '">' + esc(st[0]) + '</span>' +
+                (a.new_isfinal ? ' <span class="exm-muted">— идёт в зачёт</span>' : '') + '</td>';
+        html += '<td>' + (a.new_status === ATTEMPT.graded ? num(a.new_percent) + ' %' : '—') + '</td>';
+        html += '<td>';
+        if (a.new_status === ATTEMPT.running || a.new_status === ATTEMPT.prepare) {
+          html += '<a href="/exam?attempt=' + esc(a.new_examattemptid) + '">Продолжить</a>';
+        } else if (a.new_status !== ATTEMPT.voided) {
+          html += '<a href="/exam-result?attempt=' + esc(a.new_examattemptid) + '">Результат</a>';
+        }
+        html += '</td></tr>';
+        if (a.new_errortext) {
+          html += '<tr><td colspan="5" class="exm-muted">' + esc(a.new_errortext) + '</td></tr>';
+        }
+      });
+      html += '</tbody></table>';
+    }
+    html += '</div>';
+
+    // Сертификат
+    if (cert) {
+      html += '<div class="exm-card exm-cert">';
+      html += '<div><h2 style="margin-bottom:4px">Сертификат ' + esc(cert.new_name) + '</h2>' +
+              '<p class="exm-muted" style="margin:0">Выдан ' + dt(cert.new_issuedon) +
+              ', действует до ' + dt(cert.new_validuntil) + '</p></div>';
+      html += '<a class="exm-btn exm-btn-ghost" href="/certificate?id=' + esc(cert.new_certificationid) + '">Открыть</a>';
+      html += '</div>';
+    }
+
+    root.className = '';
+    root.innerHTML = html;
+
+    var startBtn = document.getElementById('exmStart');
+    if (startBtn) {
+      startBtn.addEventListener('click', function () { start(exam, params); });
+    }
+  }
+
+  function start(exam, params) {
+    var btn = document.getElementById('exmStart');
+    var errBox = document.getElementById('exmStartErr');
+    var consent = document.getElementById('exmConsent');
+
+    if (params.requireConsent && (!consent || !consent.checked)) {
+      errBox.innerHTML = '<div class="exm-note">Чтобы начать, отметьте согласие.</div>';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Готовим билет…';
+    errBox.innerHTML = '';
+
+    token().then(function (tok) {
+      var body = {
+        'new_exam@odata.bind': '/new_exams(' + exam.new_examid + ')',
+        'new_contact@odata.bind': '/contacts(' + CONTACT + ')'
+      };
+      if (params.requireConsent) {
+        body.new_consentgiven = true;
+        body.new_consentversion = exam.new_consentversion || '';
+      }
+      return fetch('/_api/new_examattempts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', '__RequestVerificationToken': tok },
+        credentials: 'same-origin',
+        body: JSON.stringify(body)
+      });
+    }).then(function (r) {
+      if (r.status !== 204 && r.status !== 201) {
+        return r.text().then(function (t) { throw new Error(t.slice(0, 300)); });
+      }
+      var id = r.headers.get('entityid') || (r.headers.get('odata-entityid') || '').replace(/.*\(|\)/g, '');
+      if (!id) { throw new Error('портал не вернул идентификатор попытки'); }
+      window.location.href = '/exam?attempt=' + id;
+    }).catch(function (e) {
+      btn.disabled = false;
+      btn.textContent = 'Начать экзамен';
+      errBox.innerHTML = '<div class="exm-err">Не удалось начать экзамен. Попробуйте ещё раз, ' +
+        'а если повторится — покажите администратору: ' + esc(e.message) + '</div>';
+    });
+  }
+
+  load().then(function (res) {
+    var exam = (res[0].body.value || [])[0] || null;
+    var attempts = res[1].body.value || [];
+    var certs = res[2].body.value || [];
+    render(exam, attempts, certs);
+  }).catch(function (e) {
+    root.className = '';
+    root.innerHTML = '<div class="exm-err">Не удалось загрузить данные аттестации: ' + esc(e.message) + '</div>';
+  });
+})();
+</script>
