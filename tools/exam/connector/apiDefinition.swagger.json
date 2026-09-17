@@ -45,6 +45,15 @@
             "x-ms-visibility": "internal"
           },
           {
+            "name": "anthropic-workspace-id",
+            "in": "header",
+            "required": false,
+            "type": "string",
+            "x-ms-summary": "Идентификатор рабочего пространства",
+            "description": "Нужен только если ключ не привязан к одному рабочему пространству: такой ключ без этого заголовка отвечает ошибкой 400. Ключ, выпущенный внутрь workspace, заголовок не требует.",
+            "x-ms-visibility": "advanced"
+          },
+          {
             "name": "anthropic-beta",
             "in": "header",
             "required": false,
@@ -111,6 +120,15 @@
             "x-ms-visibility": "internal"
           },
           {
+            "name": "anthropic-workspace-id",
+            "in": "header",
+            "required": false,
+            "type": "string",
+            "x-ms-summary": "Идентификатор рабочего пространства",
+            "description": "Нужен только если ключ не привязан к одному рабочему пространству: такой ключ без этого заголовка отвечает ошибкой 400. Ключ, выпущенный внутрь workspace, заголовок не требует.",
+            "x-ms-visibility": "advanced"
+          },
+          {
             "name": "body",
             "in": "body",
             "required": true,
@@ -144,6 +162,15 @@
             "x-ms-visibility": "internal"
           },
           {
+            "name": "anthropic-workspace-id",
+            "in": "header",
+            "required": false,
+            "type": "string",
+            "x-ms-summary": "Идентификатор рабочего пространства",
+            "description": "Нужен только если ключ не привязан к одному рабочему пространству: такой ключ без этого заголовка отвечает ошибкой 400. Ключ, выпущенный внутрь workspace, заголовок не требует.",
+            "x-ms-visibility": "advanced"
+          },
+          {
             "name": "batch_id",
             "in": "path",
             "required": true,
@@ -175,6 +202,15 @@
             "default": "2023-06-01",
             "x-ms-summary": "Версия API",
             "x-ms-visibility": "internal"
+          },
+          {
+            "name": "anthropic-workspace-id",
+            "in": "header",
+            "required": false,
+            "type": "string",
+            "x-ms-summary": "Идентификатор рабочего пространства",
+            "description": "Нужен только если ключ не привязан к одному рабочему пространству: такой ключ без этого заголовка отвечает ошибкой 400. Ключ, выпущенный внутрь workspace, заголовок не требует.",
+            "x-ms-visibility": "advanced"
           },
           {
             "name": "batch_id",
