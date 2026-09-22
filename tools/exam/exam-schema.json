@@ -824,7 +824,7 @@
           "logical": "new_earned",
           "display": "Набрано",
           "kind": "decimal",
-          "precision": 2
+          "precision": 4
         },
         {
           "logical": "new_revealjson",

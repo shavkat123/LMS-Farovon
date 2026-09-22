@@ -1544,7 +1544,8 @@
       }
       box.innerHTML = note(pub ? 'success' : 'info', '<b>' + (pub ? 'Опубликован ' : 'Закрыт. Был опубликован ') + esc(A.dt(e.new_publishedon)) + '.</b>' +
         (S.pubLog && S.pubLog.new_payload ? ' ' + esc(S.pubLog.new_payload) + '.' : '') +
-        '<div style="margin-top:4px;">Правила билета и набор вопросов заморожены в снимке. Новые и выведенные вопросы на билеты этого экзамена не влияют.</div>');
+        '<div style="margin-top:4px;">Правила билета и набор вопросов заморожены в снимке. Новые вопросы в билеты этого экзамена не попадут, а выведенные из банка больше не выпадают.</div>') +
+        stateActions(e, pub);
       return;
     }
     btn.hidden = false;
@@ -1557,6 +1558,58 @@
     }).join('') + '</ul>' +
       (blocking.length ? note('warn', 'Кнопка станет доступна, когда будут выполнены все пункты с ✗.') : '');
     btn.disabled = S.publishing || S.lessonSaving || blocking.length > 0;
+  }
+  /*
+    Закрыть досрочно / открыть снова. Повторно опубликовать экзамен с портала нельзя: снимок уже есть,
+    а стереть его страница не может. Поэтому закрытый экзамен открываем заново сменой статуса —
+    поток публикации видит готовый снимок и ничего не пересобирает, экзамен работает по тем же
+    правилам и тому же набору вопросов, что и при первой публикации.
+  */
+  function windowOk(e) {
+    var o = e.new_opens ? new Date(e.new_opens).getTime() : NaN, c = e.new_closes ? new Date(e.new_closes).getTime() : NaN;
+    return !isNaN(o) && !isNaN(c) && o < c && c > A.now();
+  }
+  function stateActions(e, pub) {
+    if (pub) {
+      return '<div class="exad-actions exad-actions--end" style="margin-top:12px;">' +
+        '<button type="button" class="adm-btn adm-btn--danger-ghost" data-act="close-exam"><i class="bi bi-stop-circle" aria-hidden="true"></i> Закрыть досрочно</button></div>';
+    }
+    var ok = windowOk(e);
+    return (ok ? '' : note('info', 'Чтобы открыть экзамен снова, задайте в разделе «Основное» новое окончание (позже текущего момента) и сохраните.')) +
+      '<div class="exad-actions exad-actions--end" style="margin-top:12px;">' +
+      '<button type="button" class="adm-btn adm-btn--primary" data-act="reopen-exam"' + (ok ? '' : ' disabled') + '><i class="bi bi-play-circle" aria-hidden="true"></i> Открыть снова</button></div>';
+  }
+  function setExamStatus(btn, status, busyText, doneText) {
+    A.busy(btn, true, busyText);
+    return A.patch('new_exams', S.id, { new_status: status }).then(function () {
+      // Поток публикации срабатывает на смену статуса; при готовом снимке он сразу выходит.
+      // Короткая пауза и повторное чтение — чтобы показать фактический статус, а не ожидаемый.
+      return new Promise(function (r) { setTimeout(r, 4000); });
+    }).then(function () {
+      return A.api('/_api/new_exams(' + S.id + ')?$select=new_status');
+    }).then(function (x) {
+      if (x.new_status === status) { A.toast(doneText, 'ok'); setTimeout(function () { location.reload(); }, 900); }
+      else { A.busy(btn, false); A.toast('Статус экзамена не изменился — обновите страницу и проверьте журнал экзамена.', 'err'); }
+    }, function (err) { A.busy(btn, false); A.toast('Не удалось изменить статус: ' + err.message, 'err'); });
+  }
+  function doCloseExam(btn) {
+    var html = '<p>Экзамен исчезнет со страницы аттестации, и начать новую попытку будет нельзя.</p><ul>' +
+      '<li>Уже начатые попытки не прерываются — их можно завершить до конца таймера.</li>' +
+      '<li>Результаты, сертификаты и снимок сохраняются. Открыть экзамен снова можно здесь же.</li></ul>';
+    A.confirmBox('Закрыть экзамен сейчас?', html, 'Закрыть', true).then(function (ok) {
+      if (ok) { setExamStatus(btn, V.EXAM_CLOSED, 'Закрываем…', 'Экзамен закрыт'); }
+    });
+  }
+  function doReopenExam(btn) {
+    var e = S.exam;
+    if (!windowOk(e)) { A.toast('Сначала задайте новое окно проведения в разделе «Основное» и сохраните.', 'err'); return; }
+    var html = '<p>Экзамен снова появится на странице аттестации: с ' + esc(A.dt(e.new_opens)) + ' по ' + esc(A.dt(e.new_closes)) + '.</p><ul>' +
+      '<li>Работает снимок первой публикации: те же правила билета и набор вопросов. Вопросы, добавленные позже, в билеты не попадут, выведенные из банка — не выпадут.</li>' +
+      '<li>Прежние попытки и результаты сохраняются; лимит попыток сотрудников считается с их учётом.</li></ul>' +
+      (S.otherPublished.length ? note('warn', 'Сейчас опубликован другой экзамен. Участники видят только опубликованный последним — проверьте, какой из них окажется на странице аттестации.') : '');
+    A.confirmBox('Открыть экзамен снова?', html, 'Открыть').then(function (ok) {
+      if (ok) { setExamStatus(btn, V.EXAM_PUBLISHED, 'Открываем…', 'Экзамен снова открыт'); }
+    });
   }
   function doPublish(btn) {
     var list = publishChecks();
@@ -1689,6 +1742,8 @@
     else if (act === 'create-missing') { createMissing(t); }
     else if (act === 'job-notes') { toggleNotes(t); }
     else if (act === 'publish') { doPublish(t); }
+    else if (act === 'close-exam') { doCloseExam(t); }
+    else if (act === 'reopen-exam') { doReopenExam(t); }
     else if (act === 'reload') { location.reload(); }
   });
   root.addEventListener('input', function (ev) {
