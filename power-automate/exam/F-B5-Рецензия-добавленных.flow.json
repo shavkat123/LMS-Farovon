@@ -1,0 +1,104 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedcommondataserviceforapps_73c39"
+        },
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "Когда_вопрос_добавлен_или_возвращён": {
+          "type": "OpenApiConnectionWebhook",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "SubscribeWebhookTrigger",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "subscriptionRequest/message": 4,
+              "subscriptionRequest/entityname": "new_examquestion",
+              "subscriptionRequest/scope": 4,
+              "subscriptionRequest/filteringattributes": "new_status"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runtimeConfiguration": {
+            "concurrency": {
+              "runs": 2
+            }
+          }
+        }
+      },
+      "actions": {
+        "_Зачем": {
+          "type": "Compose",
+          "runAfter": {},
+          "inputs": "Вопросы, созданные заказом LMS, рецензирует сам поток создания (F-B3). Этот поток ловит всё остальное: банк, собранный вне LMS, вопросы методиста и вопросы, которые вернули на повторную проверку, поставив статус «На проверке». Одновременно — не больше двух рецензий, чтобы не упереться в предел частоты запросов API."
+        },
+        "Нужна_рецензия": {
+          "type": "If",
+          "runAfter": {
+            "_Зачем": [
+              "Succeeded"
+            ]
+          },
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@triggerOutputs()?['body/new_status']",
+                  100000000
+                ]
+              },
+              {
+                "equals": [
+                  "@empty(coalesce(triggerOutputs()?['body/_new_job_value'], ''))",
+                  true
+                ]
+              }
+            ]
+          },
+          "actions": {
+            "Отправить_на_рецензию": {
+              "type": "Workflow",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "workflowReferenceName": "b1b40010-e5c9-4d7a-9a61-2026092200b4"
+                },
+                "body": {
+                  "text": "@{triggerOutputs()?['body/new_examquestionid']}"
+                }
+              }
+            }
+          },
+          "else": {
+            "actions": {}
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}

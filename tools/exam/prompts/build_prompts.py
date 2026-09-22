@@ -273,6 +273,11 @@ PROMPTS = [
     dict(code="GEN_CASE", text=GEN_CASE, schema=CASE_SCHEMA, model="claude-sonnet-5", effort="medium", max_tokens=8000),
     dict(code="GEN_CONTROL", text=GEN_CONTROL, schema=CONTROL_SCHEMA, model="claude-sonnet-5", effort="medium", max_tokens=8000),
     dict(code="REVIEW", text=REVIEW, schema=REVIEW_SCHEMA, model="claude-opus-5", effort="medium", max_tokens=6000),
+    # v2 — тот же рецензент на Sonnet 5 (22.09.2026). Стартовый банк пишет Opus прямо в чате,
+    # чтобы не тратить кредиты API, и рецензент обязан быть другой моделью. Побочный эффект:
+    # проверка дешевле примерно в 2,5 раза. Когда банк начнёт пополняться генератором LMS
+    # (он на Sonnet), рецензента стоит вернуть на Opus новой версией.
+    dict(code="REVIEW", version=2, text=REVIEW, schema=REVIEW_SCHEMA, model="claude-sonnet-5", effort="medium", max_tokens=6000),
 ]
 
 EFFORT_CHOICE = {"low": 100000000, "medium": 100000001, "high": 100000002}
@@ -284,7 +289,7 @@ def main():
         schema_text = json.dumps(p["schema"], ensure_ascii=False, separators=(",", ":"))
         out.append({
             "code": p["code"],
-            "version": 1,
+            "version": p.get("version", 1),
             "model": p["model"],
             "effort": p["effort"],
             "effortChoice": EFFORT_CHOICE[p["effort"]],
@@ -292,8 +297,8 @@ def main():
             "systemText": p["text"],
             "schemaJson": schema_text,
         })
-        print('  %-12s %-16s effort=%-6s max_tokens=%-5d текст %4d знаков, схема %4d знаков'
-              % (p["code"], p["model"], p["effort"], p["max_tokens"], len(p["text"]), len(schema_text)))
+        print('  %-12s v%d %-16s effort=%-6s max_tokens=%-5d текст %4d знаков, схема %4d знаков'
+              % (p["code"], p.get("version", 1), p["model"], p["effort"], p["max_tokens"], len(p["text"]), len(schema_text)))
     path = os.path.join(HERE, 'prompts.json')
     io.open(path, 'w', encoding='utf-8', newline='\n').write(json.dumps(out, ensure_ascii=False, indent=2) + '\n')
     print('сохранено:', path)
