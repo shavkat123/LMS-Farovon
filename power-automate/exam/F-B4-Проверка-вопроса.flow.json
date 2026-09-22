@@ -40,6 +40,7 @@
             "typeControl": 100000003,
             "qОдобрен": 100000001,
             "qОтклонён": 100000002,
+            "qВыведен": 100000003,
             "promptУтверждён": 100000001,
             "difficultyName": { "100000000": "basic", "100000001": "medium", "100000002": "advanced" },
             "typeName": { "100000000": "single", "100000001": "multi", "100000002": "case", "100000003": "control" },
@@ -172,15 +173,30 @@
                   "runAfter": { "Решил_так_же": [ "Succeeded" ] },
                   "inputs": "@and(equals(outputs('Рецензия')?['verdict'], 'accept'), outputs('Все_проверки'), outputs('Решил_так_же'))"
                 },
+                "Статус_перед_записью": {
+                  "type": "OpenApiConnection",
+                  "description": "Рецензия идёт минуты; за это время администратор может вывести вопрос. Перечитываем статус прямо перед записью, чтобы поздний вердикт не вернул выведенный вопрос в банк.",
+                  "runAfter": { "Одобрить": [ "Succeeded" ] },
+                  "inputs": {
+                    "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "GetItem", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                    "parameters": { "entityName": "new_examquestions", "recordId": "@triggerBody()?['text']", "$select": "new_status" },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Выведен_во_время_проверки": {
+                  "type": "Compose",
+                  "runAfter": { "Статус_перед_записью": [ "Succeeded" ] },
+                  "inputs": "@equals(outputs('Статус_перед_записью')?['body/new_status'], outputs('Константы')['qВыведен'])"
+                },
                 "Записать_решение": {
                   "type": "OpenApiConnection",
-                  "runAfter": { "Одобрить": [ "Succeeded" ] },
+                  "runAfter": { "Выведен_во_время_проверки": [ "Succeeded" ] },
                   "inputs": {
                     "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "UpdateOnlyRecord", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
                     "parameters": {
                       "entityName": "new_examquestions",
                       "recordId": "@triggerBody()?['text']",
-                      "item/new_status": "@if(outputs('Одобрить'), outputs('Константы')['qОдобрен'], outputs('Константы')['qОтклонён'])",
+                      "item/new_status": "@if(outputs('Выведен_во_время_проверки'), outputs('Константы')['qВыведен'], if(outputs('Одобрить'), outputs('Константы')['qОдобрен'], outputs('Константы')['qОтклонён']))",
                       "item/new_reviewjson": "@{body('Вызов_рецензента')?['outputText']}",
                       "item/new_reviewfirstpass": "@outputs('Одобрить')"
                     },
@@ -197,7 +213,7 @@
                       "item/new_event": "@{if(outputs('Одобрить'), 'QUESTION_APPROVED', 'QUESTION_REJECTED')}",
                       "item/new_actor": "F-B4 Проверка вопроса",
                       "item/new_subjectid": "@triggerBody()?['text']",
-                      "item/new_payload": "@{concat('вердикт=', coalesce(outputs('Рецензия')?['verdict'], ''), '; проверки=', string(outputs('Все_проверки')), '; решил_так_же=', string(outputs('Решил_так_же')), '; ', coalesce(outputs('Рецензия')?['comment'], ''))}",
+                      "item/new_payload": "@{concat('вердикт=', coalesce(outputs('Рецензия')?['verdict'], ''), '; проверки=', string(outputs('Все_проверки')), '; решил_так_же=', string(outputs('Решил_так_же')), '; ', coalesce(outputs('Рецензия')?['comment'], ''), if(outputs('Выведен_во_время_проверки'), ' [статус оставлен «Выведен»: администратор вывел вопрос, пока шла проверка]', ''))}",
                       "item/new_exam@odata.bind": "/new_exams(@{outputs('Вопрос')?['body/_new_exam_value']})"
                     },
                     "authentication": "@parameters('$authentication')"
@@ -210,7 +226,7 @@
                   "inputs": {
                     "statusCode": 200,
                     "body": {
-                      "approved": "@outputs('Одобрить')",
+                      "approved": "@and(outputs('Одобрить'), not(outputs('Выведен_во_время_проверки')))",
                       "inputTokens": "@body('Вызов_рецензента')?['inputTokens']",
                       "outputTokens": "@body('Вызов_рецензента')?['outputTokens']",
                       "costUsd": "@body('Вызов_рецензента')?['costUsd']"
@@ -229,15 +245,25 @@
               },
               "else": {
                 "actions": {
+                  "Статус_без_рецензии": {
+                    "type": "OpenApiConnection",
+                    "description": "Тот же принцип, что и при удачной рецензии: сбой рецензента не должен превращать выведенный администратором вопрос в «Отклонён».",
+                    "runAfter": {},
+                    "inputs": {
+                      "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "GetItem", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                      "parameters": { "entityName": "new_examquestions", "recordId": "@triggerBody()?['text']", "$select": "new_status" },
+                      "authentication": "@parameters('$authentication')"
+                    }
+                  },
                   "Отклонить_без_рецензии": {
                     "type": "OpenApiConnection",
-                    "runAfter": {},
+                    "runAfter": { "Статус_без_рецензии": [ "Succeeded" ] },
                     "inputs": {
                       "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "UpdateOnlyRecord", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
                       "parameters": {
                         "entityName": "new_examquestions",
                         "recordId": "@triggerBody()?['text']",
-                        "item/new_status": "@outputs('Константы')['qОтклонён']",
+                        "item/new_status": "@if(equals(outputs('Статус_без_рецензии')?['body/new_status'], outputs('Константы')['qВыведен']), outputs('Константы')['qВыведен'], outputs('Константы')['qОтклонён'])",
                         "item/new_reviewjson": "@{concat('{\"error\":\"рецензент не ответил\",\"code\":\"', body('Вызов_рецензента')?['errorCode'], '\"}')}",
                         "item/new_reviewfirstpass": false
                       },

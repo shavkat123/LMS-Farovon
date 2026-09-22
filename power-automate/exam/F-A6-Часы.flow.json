@@ -154,7 +154,7 @@
                       "entityName": "new_examattempts",
                       "recordId": "@items('Цикл_зависших')?['new_examattemptid']",
                       "item/new_status": "@outputs('Константы')['attemptОшибка']",
-                      "item/new_errortext": "Билет не собрался за отведённое время. Попытка не начиналась, её можно создать заново."
+                      "item/new_errortext": "Билет не собрался за отведённое время. Эта попытка не засчитывается — можно начать заново."
                     },
                     "authentication": "@parameters('$authentication')"
                   }

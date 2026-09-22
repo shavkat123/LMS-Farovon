@@ -49,7 +49,10 @@
             "qВыведен": 100000003,
             "attemptАннулирован": 100000005,
             "resultАннулировано": 100000002,
-            "itemНейтрализован": 100000003
+            "itemНейтрализован": 100000003,
+            "attemptОценён": 100000004,
+            "attemptОшибка": 100000006,
+            "attemptНезавершённые": [ 100000000, 100000001, 100000002, 100000003 ]
           }
         },
         "Результат": {
@@ -133,10 +136,70 @@
                         "authentication": "@parameters('$authentication')"
                       }
                     },
+                    "Попытки_экзамена": {
+                      "type": "OpenApiConnection",
+                      "description": "Статусы попыток читаем одним запросом по экзамену, а не запросом на каждое задание. Аннулированные и попытки с ошибкой сюда не попадают: их задания и сами попытки нейтрализация не трогает.",
+                      "runAfter": { "Задания_с_вопросом": [ "Succeeded" ] },
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_commondataserviceforapps",
+                          "operationId": "ListRecords",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "new_examattempts",
+                          "$filter": "_new_exam_value eq '@{triggerOutputs()?['body/_new_exam_value']}' and new_status ne @{outputs('Константы')['attemptАннулирован']} and new_status ne @{outputs('Константы')['attemptОшибка']}",
+                          "$select": "new_examattemptid,new_status",
+                          "$top": 5000
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Оценённые_попытки": {
+                      "type": "Query",
+                      "runAfter": { "Попытки_экзамена": [ "Succeeded" ] },
+                      "inputs": {
+                        "from": "@outputs('Попытки_экзамена')?['body/value']",
+                        "where": "@equals(item()?['new_status'], outputs('Константы')['attemptОценён'])"
+                      }
+                    },
+                    "Id_оценённых": {
+                      "type": "Select",
+                      "runAfter": { "Оценённые_попытки": [ "Succeeded" ] },
+                      "inputs": {
+                        "from": "@body('Оценённые_попытки')",
+                        "select": "@item()?['new_examattemptid']"
+                      }
+                    },
+                    "Незавершённые_попытки": {
+                      "type": "Query",
+                      "runAfter": { "Id_оценённых": [ "Succeeded" ] },
+                      "inputs": {
+                        "from": "@outputs('Попытки_экзамена')?['body/value']",
+                        "where": "@contains(outputs('Константы')['attemptНезавершённые'], item()?['new_status'])"
+                      }
+                    },
+                    "Id_незавершённых": {
+                      "type": "Select",
+                      "runAfter": { "Незавершённые_попытки": [ "Succeeded" ] },
+                      "inputs": {
+                        "from": "@body('Незавершённые_попытки')",
+                        "select": "@item()?['new_examattemptid']"
+                      }
+                    },
+                    "Задания_к_пометке": {
+                      "type": "Query",
+                      "description": "Помечаем только задания оценённых и незавершённых попыток. Задание аннулированной попытки или попытки с ошибкой (а также чужого экзамена) не попадает ни в один список и остаётся как было.",
+                      "runAfter": { "Id_незавершённых": [ "Succeeded" ] },
+                      "inputs": {
+                        "from": "@outputs('Задания_с_вопросом')?['body/value']",
+                        "where": "@or(contains(body('Id_оценённых'), item()?['_new_attempt_value']), contains(body('Id_незавершённых'), item()?['_new_attempt_value']))"
+                      }
+                    },
                     "Цикл_нейтрализации": {
                       "type": "Foreach",
-                      "runAfter": { "Задания_с_вопросом": [ "Succeeded" ] },
-                      "foreach": "@outputs('Задания_с_вопросом')?['body/value']",
+                      "runAfter": { "Задания_к_пометке": [ "Succeeded" ] },
+                      "foreach": "@body('Задания_к_пометке')",
                       "runtimeConfiguration": { "concurrency": { "repetitions": 10 } },
                       "actions": {
                         "Пометить_нейтрализованным": {
@@ -172,10 +235,21 @@
                       "runAfter": { "Затронутые_попытки": [ "Succeeded" ] },
                       "inputs": "@union(body('Затронутые_попытки'), json('[]'))"
                     },
+                    "Попытки_к_пересчёту": {
+                      "type": "Compose",
+                      "description": "F-A5 зовём только для оценённых попыток. Незавершённую он завершил бы принудительно и показал бы правильные ответы, пока сотрудник ещё отвечает; флаг new_neutralized он учтёт сам, когда попытка завершится обычным порядком.",
+                      "runAfter": { "Уникальные_попытки": [ "Succeeded" ] },
+                      "inputs": "@intersection(outputs('Уникальные_попытки'), body('Id_оценённых'))"
+                    },
+                    "Незавершённые_затронутые": {
+                      "type": "Compose",
+                      "runAfter": { "Попытки_к_пересчёту": [ "Succeeded" ] },
+                      "inputs": "@intersection(outputs('Уникальные_попытки'), body('Id_незавершённых'))"
+                    },
                     "Цикл_пересчёта": {
                       "type": "Foreach",
-                      "runAfter": { "Уникальные_попытки": [ "Succeeded" ] },
-                      "foreach": "@outputs('Уникальные_попытки')",
+                      "runAfter": { "Незавершённые_затронутые": [ "Succeeded" ] },
+                      "foreach": "@outputs('Попытки_к_пересчёту')",
                       "runtimeConfiguration": { "concurrency": { "repetitions": 1 } },
                       "actions": {
                         "Пересчитать_попытку": {
@@ -213,7 +287,7 @@
                       "runAfter": { "Вывести_вопрос": [ "Succeeded" ] },
                       "inputs": {
                         "name": "Результат",
-                        "value": "@{concat('Вопрос нейтрализован в ', string(length(outputs('Задания_с_вопросом')?['body/value'])), ' заданиях, пересчитано попыток: ', string(length(outputs('Уникальные_попытки'))), '. Вопрос выведен из банка.')}"
+                        "value": "@{concat('Вопрос нейтрализован в ', string(length(body('Задания_к_пометке'))), ' заданиях. Попыток пересчитано: ', string(length(outputs('Попытки_к_пересчёту'))), '; помечено в незавершённых (пересчитаются при обычном завершении): ', string(length(outputs('Незавершённые_затронутые'))), '; пропущено (аннулированные, с ошибкой или вне экзамена — не тронуты): ', string(sub(length(outputs('Уникальные_попытки')), add(length(outputs('Попытки_к_пересчёту')), length(outputs('Незавершённые_затронутые'))))), '. Вопрос выведен из банка.')}"
                       }
                     }
                   }

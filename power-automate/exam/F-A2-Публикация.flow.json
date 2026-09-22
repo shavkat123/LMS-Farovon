@@ -52,6 +52,7 @@
             "examОпубликован": 100000001,
             "qОдобрен": 100000001,
             "promptУтверждён": 100000001,
+            "лимит_errortext": 3900,
             "type": {
               "single": 100000000,
               "multi": 100000001,
@@ -459,9 +460,19 @@
                     ]
                   },
                   "actions": {
+                    "Текст_ошибок": {
+                      "type": "Compose",
+                      "description": "Столбец new_errortext вмещает 4000 символов: длинный список ошибок ронял обновление, и Catch затирал его общим текстом. В экзамен пишем не больше лимита, полный список — в EXAM_PUBLISH_FAILED.",
+                      "runAfter": {},
+                      "inputs": "@{join(variables('Ошибки'), '\n')}"
+                    },
                     "Вернуть_в_черновик": {
                       "type": "OpenApiConnection",
-                      "runAfter": {},
+                      "runAfter": {
+                        "Текст_ошибок": [
+                          "Succeeded"
+                        ]
+                      },
                       "inputs": {
                         "host": {
                           "connectionName": "shared_commondataserviceforapps",
@@ -472,7 +483,7 @@
                           "entityName": "new_exams",
                           "recordId": "@triggerOutputs()?['body/new_examid']",
                           "item/new_status": "@outputs('Константы')['examЧерновик']",
-                          "item/new_errortext": "@{join(variables('Ошибки'), '\n')}"
+                          "item/new_errortext": "@{if(greater(length(outputs('Текст_ошибок')), outputs('Константы')['лимит_errortext']), concat(substring(outputs('Текст_ошибок'), 0, outputs('Константы')['лимит_errortext']), '… (полный список — в журнале экзамена)'), outputs('Текст_ошибок'))}"
                         },
                         "authentication": "@parameters('$authentication')"
                       }
@@ -495,7 +506,7 @@
                           "item/new_event": "EXAM_PUBLISH_FAILED",
                           "item/new_actor": "F-A2 Публикация",
                           "item/new_subjectid": "@triggerOutputs()?['body/new_examid']",
-                          "item/new_payload": "@{join(variables('Ошибки'), '\n')}",
+                          "item/new_payload": "@{outputs('Текст_ошибок')}",
                           "item/new_exam@odata.bind": "/new_exams(@{triggerOutputs()?['body/new_examid']})"
                         },
                         "authentication": "@parameters('$authentication')"

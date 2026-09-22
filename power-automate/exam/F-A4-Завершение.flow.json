@@ -40,6 +40,7 @@
           "runAfter": {},
           "inputs": {
             "kindВремяИстекло": 100000001,
+            "attemptИдёт": 100000001,
             "attemptСдан": 100000002,
             "attemptПроверяется": 100000003,
             "itemНеОтвечен": 100000000,
@@ -120,9 +121,43 @@
               },
               "else": { "actions": {} }
             },
+            "Попытка_не_идёт": {
+              "type": "If",
+              "description": "Завершаем только попытку в статусе «Идёт». Поздняя или повторная отправка не должна вернуть в «Сдан» попытку, которую администратор аннулировал, и не должна заново оценивать уже сданную или оценённую: отправку помечаем обработанной, попытку не трогаем. Автоматическое завершение по времени (F-A6) создаётся только для попыток в «Идёт», поэтому проходит эту проверку.",
+              "runAfter": { "Чужая_отправка": [ "Succeeded" ] },
+              "expression": {
+                "not": { "equals": [ "@outputs('Попытка')?['body/new_status']", "@outputs('Константы')['attemptИдёт']" ] }
+              },
+              "actions": {
+                "Отметить_отправку_без_завершения": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "UpdateOnlyRecord",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_examsubmissions",
+                      "recordId": "@triggerOutputs()?['body/new_examsubmissionid']",
+                      "item/new_processedon": "@{utcNow()}",
+                      "item/new_result": "@{concat('Попытка уже не идёт (статус ', string(coalesce(outputs('Попытка')?['body/new_status'], 'не задан')), ') — завершение не требуется')}"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Выход_не_идёт": {
+                  "type": "Terminate",
+                  "runAfter": { "Отметить_отправку_без_завершения": [ "Succeeded" ] },
+                  "inputs": { "runStatus": "Succeeded" }
+                }
+              },
+              "else": { "actions": {} }
+            },
             "Экзамен": {
               "type": "OpenApiConnection",
-              "runAfter": { "Чужая_отправка": [ "Succeeded" ] },
+              "runAfter": { "Попытка_не_идёт": [ "Succeeded" ] },
               "inputs": {
                 "host": {
                   "connectionName": "shared_commondataserviceforapps",

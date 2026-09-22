@@ -570,6 +570,7 @@
             },
             "Обновить_попытку": {
               "type": "OpenApiConnection",
+              "description": "При аннулировании снимаем new_isfinal в том же обновлении, что и статус: цикл отметок итога обходит только неаннулированные попытки, поэтому иначе аннулированная попытка могла остаться «итоговой». В остальных режимах флаг сохраняется как был — его переставит цикл отметок.",
               "runAfter": {
                 "Результат": [
                   "Succeeded"
@@ -590,6 +591,7 @@
                   "item/new_result": "@outputs('Результат')",
                   "item/new_blockscores": "@{string(variables('Блоки'))}",
                   "item/new_status": "@if(equals(triggerBody()?['text_1'], 'Аннулирование'), outputs('Константы')['attemptАннулирован'], outputs('Константы')['attemptОценён'])",
+                  "item/new_isfinal": "@if(equals(triggerBody()?['text_1'], 'Аннулирование'), false, coalesce(outputs('Попытка')?['body/new_isfinal'], false))",
                   "item/new_resultversion": "@add(int(coalesce(outputs('Попытка')?['body/new_resultversion'], 0)), 1)"
                 },
                 "authentication": "@parameters('$authentication')"
@@ -892,6 +894,7 @@
             },
             "Сертификаты_сотрудника": {
               "type": "OpenApiConnection",
+              "description": "Берём только действующие сертификаты: отозванный или истёкший не должен мешать выдать новый после повторной сдачи, а при несдаче отзывать повторно уже отозванные (и писать CERT_REVOKED каждый раз) незачем.",
               "runAfter": {
                 "Цикл_отметок_итога": [
                   "Succeeded"
@@ -905,7 +908,7 @@
                 },
                 "parameters": {
                   "entityName": "new_certifications",
-                  "$filter": "statecode eq 0 and _new_exam_value eq '@{outputs('Попытка')?['body/_new_exam_value']}' and _new_contact_value eq '@{outputs('Попытка')?['body/_new_contact_value']}'",
+                  "$filter": "statecode eq 0 and _new_exam_value eq '@{outputs('Попытка')?['body/_new_exam_value']}' and _new_contact_value eq '@{outputs('Попытка')?['body/_new_contact_value']}' and new_status eq @{outputs('Константы')['certДействует']}",
                   "$select": "new_certificationid,new_status,new_validuntil",
                   "$top": 10
                 },

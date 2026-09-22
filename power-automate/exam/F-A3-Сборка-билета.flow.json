@@ -50,6 +50,7 @@
             "itemНеОтвечен": 100000000,
             "actionДопПопытка": 100000002,
             "actionВыполнено": 100000001,
+            "questionВыведен": 100000003,
             "type": { "single": 100000000, "multi": 100000001, "case": 100000002, "control": 100000003 },
             "difficulty": { "basic": 100000000, "medium": 100000001, "advanced": 100000002 }
           }
@@ -249,6 +250,7 @@
             },
             "Попытки_сотрудника": {
               "type": "OpenApiConnection",
+              "description": "Попытки в статусе «Ошибка» (отказ в допуске или сбой сборки) не считаются, как и аннулированные: попытка не состоялась, а иначе они съедали лимит, сдвигали номер попытки и навсегда блокировали пересдачу (у них нет итога «Не сдано»).",
               "runAfter": { "Проверка_согласия": [ "Succeeded" ] },
               "inputs": {
                 "host": {
@@ -258,7 +260,7 @@
                 },
                 "parameters": {
                   "entityName": "new_examattempts",
-                  "$filter": "statecode eq 0 and _new_exam_value eq '@{outputs('Попытка')?['body/_new_exam_value']}' and _new_contact_value eq '@{outputs('Попытка')?['body/_new_contact_value']}' and new_status ne 100000005",
+                  "$filter": "statecode eq 0 and _new_exam_value eq '@{outputs('Попытка')?['body/_new_exam_value']}' and _new_contact_value eq '@{outputs('Попытка')?['body/_new_contact_value']}' and new_status ne @{outputs('Константы')['attemptАннулирован']} and new_status ne @{outputs('Константы')['attemptОшибка']}",
                   "$select": "new_examattemptid,new_status,new_result,new_finalizedon,new_appealuntil,new_attemptno,new_percent",
                   "$orderby": "createdon asc",
                   "$top": 50
@@ -444,9 +446,36 @@
                 "select": "@item()?['_new_question_value']"
               }
             },
+            "Выведенные_вопросы": {
+              "type": "OpenApiConnection",
+              "description": "Пул берётся из снимка публикации, а статус вопроса после публикации может смениться на «Выведен» (в том числе при нейтрализации через F-A7). Такие вопросы не должны попадать в новые билеты — читаем текущий статус из банка.",
+              "runAfter": { "Исключённые": [ "Succeeded" ] },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examquestions",
+                  "$filter": "_new_exam_value eq '@{outputs('Попытка')?['body/_new_exam_value']}' and new_status eq @{outputs('Константы')['questionВыведен']}",
+                  "$select": "new_examquestionid",
+                  "$top": 5000
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Выведенные_ид": {
+              "type": "Select",
+              "runAfter": { "Выведенные_вопросы": [ "Succeeded" ] },
+              "inputs": {
+                "from": "@outputs('Выведенные_вопросы')?['body/value']",
+                "select": "@item()?['new_examquestionid']"
+              }
+            },
             "Использование": {
               "type": "OpenApiConnection",
-              "runAfter": { "Исключённые": [ "Succeeded" ] },
+              "runAfter": { "Выведенные_ид": [ "Succeeded" ] },
               "inputs": {
                 "host": {
                   "connectionName": "shared_commondataserviceforapps",
@@ -505,10 +534,11 @@
                   "actions": {
                     "Пул_ячейки": {
                       "type": "Query",
+                      "description": "Кроме уже встречавшихся сотруднику вопросов, исключаются выведенные из банка после публикации (Выведенные_ид).",
                       "runAfter": {},
                       "inputs": {
                         "from": "@outputs('Допущенные')",
-                        "where": "@and(equals(item()?['type'], outputs('Константы')['type'][items('Цикл_ячеек')?['type']]), equals(item()?['module'], items('Цикл_ячеек')?['module']), equals(item()?['difficulty'], outputs('Константы')['difficulty'][items('Цикл_ячеек')?['difficulty']]), not(contains(body('Исключённые'), item()?['id'])), not(contains(variables('ВыбранныеВсе'), item()?['id'])))"
+                        "where": "@and(equals(item()?['type'], outputs('Константы')['type'][items('Цикл_ячеек')?['type']]), equals(item()?['module'], items('Цикл_ячеек')?['module']), equals(item()?['difficulty'], outputs('Константы')['difficulty'][items('Цикл_ячеек')?['difficulty']]), not(contains(body('Исключённые'), item()?['id'])), not(contains(body('Выведенные_ид'), item()?['id'])), not(contains(variables('ВыбранныеВсе'), item()?['id'])))"
                       }
                     },
                     "Ключи_пула": {
@@ -541,10 +571,11 @@
                         },
                         "Резерв": {
                           "type": "Query",
+                          "description": "Добор тоже не должен брать выведенные вопросы — иначе они вернулись бы в билет через замену.",
                           "runAfter": { "Ид_взятых": [ "Succeeded" ] },
                           "inputs": {
                             "from": "@outputs('Допущенные')",
-                            "where": "@and(equals(item()?['type'], outputs('Константы')['type'][items('Цикл_ячеек')?['type']]), not(contains(body('Исключённые'), item()?['id'])), not(contains(variables('ВыбранныеВсе'), item()?['id'])), not(contains(body('Ид_взятых'), item()?['id'])))"
+                            "where": "@and(equals(item()?['type'], outputs('Константы')['type'][items('Цикл_ячеек')?['type']]), not(contains(body('Исключённые'), item()?['id'])), not(contains(body('Выведенные_ид'), item()?['id'])), not(contains(variables('ВыбранныеВсе'), item()?['id'])), not(contains(body('Ид_взятых'), item()?['id'])))"
                           }
                         },
                         "Ключи_резерва": {

@@ -106,42 +106,94 @@
                         ]
                       },
                       "actions": {
-                        "Вывести_из_банка": {
+                        "Статус_вопроса": {
                           "type": "OpenApiConnection",
+                          "description": "Статус читаем только у вопросов, достигших предела: иначе уже выведенный вопрос каждую ночь заново «выводится» и пишет QUESTION_RETIRED в журнал.",
                           "runAfter": {},
                           "inputs": {
                             "host": {
                               "connectionName": "shared_commondataserviceforapps",
-                              "operationId": "UpdateOnlyRecord",
+                              "operationId": "GetItem",
                               "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
                             },
                             "parameters": {
                               "entityName": "new_examquestions",
                               "recordId": "@items('Цикл_износа')?['qid']",
-                              "item/new_exposures": "@int(coalesce(items('Цикл_износа')?['cnt'], 0))",
-                              "item/new_status": "@outputs('Константы')['qВыведен']"
+                              "$select": "new_status"
                             },
                             "authentication": "@parameters('$authentication')"
                           }
                         },
-                        "Журнал_вывода": {
-                          "type": "OpenApiConnection",
-                          "runAfter": { "Вывести_из_банка": [ "Succeeded" ] },
-                          "inputs": {
-                            "host": {
-                              "connectionName": "shared_commondataserviceforapps",
-                              "operationId": "CreateRecord",
-                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
-                            },
-                            "parameters": {
-                              "entityName": "new_examlogs",
-                              "item/new_event": "QUESTION_RETIRED",
-                              "item/new_actor": "F-A8 Обслуживание",
-                              "item/new_subjectid": "@items('Цикл_износа')?['qid']",
-                              "item/new_payload": "@{concat('Показан в разборе ', string(items('Цикл_износа')?['cnt']), ' раз — это предел износа.')}",
-                              "item/new_exam@odata.bind": "/new_exams(@{items('Цикл_экзаменов')?['new_examid']})"
-                            },
-                            "authentication": "@parameters('$authentication')"
+                        "Уже_выведен": {
+                          "type": "If",
+                          "description": "Выведенный вопрос не трогаем повторно — только обновляем счётчик показов. Вывод и запись в журнал — один раз, при переходе предела.",
+                          "runAfter": { "Статус_вопроса": [ "Succeeded" ] },
+                          "expression": {
+                            "equals": [
+                              "@outputs('Статус_вопроса')?['body/new_status']",
+                              "@outputs('Константы')['qВыведен']"
+                            ]
+                          },
+                          "actions": {
+                            "Счётчик_выведенного": {
+                              "type": "OpenApiConnection",
+                              "runAfter": {},
+                              "inputs": {
+                                "host": {
+                                  "connectionName": "shared_commondataserviceforapps",
+                                  "operationId": "UpdateOnlyRecord",
+                                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                                },
+                                "parameters": {
+                                  "entityName": "new_examquestions",
+                                  "recordId": "@items('Цикл_износа')?['qid']",
+                                  "item/new_exposures": "@int(coalesce(items('Цикл_износа')?['cnt'], 0))"
+                                },
+                                "authentication": "@parameters('$authentication')"
+                              }
+                            }
+                          },
+                          "else": {
+                            "actions": {
+                              "Вывести_из_банка": {
+                                "type": "OpenApiConnection",
+                                "runAfter": {},
+                                "inputs": {
+                                  "host": {
+                                    "connectionName": "shared_commondataserviceforapps",
+                                    "operationId": "UpdateOnlyRecord",
+                                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                                  },
+                                  "parameters": {
+                                    "entityName": "new_examquestions",
+                                    "recordId": "@items('Цикл_износа')?['qid']",
+                                    "item/new_exposures": "@int(coalesce(items('Цикл_износа')?['cnt'], 0))",
+                                    "item/new_status": "@outputs('Константы')['qВыведен']"
+                                  },
+                                  "authentication": "@parameters('$authentication')"
+                                }
+                              },
+                              "Журнал_вывода": {
+                                "type": "OpenApiConnection",
+                                "runAfter": { "Вывести_из_банка": [ "Succeeded" ] },
+                                "inputs": {
+                                  "host": {
+                                    "connectionName": "shared_commondataserviceforapps",
+                                    "operationId": "CreateRecord",
+                                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                                  },
+                                  "parameters": {
+                                    "entityName": "new_examlogs",
+                                    "item/new_event": "QUESTION_RETIRED",
+                                    "item/new_actor": "F-A8 Обслуживание",
+                                    "item/new_subjectid": "@items('Цикл_износа')?['qid']",
+                                    "item/new_payload": "@{concat('Показан в разборе ', string(items('Цикл_износа')?['cnt']), ' раз — это предел износа.')}",
+                                    "item/new_exam@odata.bind": "/new_exams(@{items('Цикл_экзаменов')?['new_examid']})"
+                                  },
+                                  "authentication": "@parameters('$authentication')"
+                                }
+                              }
+                            }
                           }
                         }
                       },
