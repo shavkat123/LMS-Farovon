@@ -176,6 +176,20 @@ def check_file(path):
                 check_secure(blk)
 
     check_secure(definition.get('actions', {}))
+
+    # Пояснение к действию (description) — не длиннее 256 знаков: длиннее поток не сохраняется
+    # (ActionDescriptionTooLong), приезжает черновиком и не включается кликом, пока не укоротить.
+    def check_descriptions(actions):
+        for name, body in actions.items():
+            if not isinstance(body, dict):
+                continue
+            desc = body.get('description')
+            if isinstance(desc, str) and len(desc) > 256:
+                problems.append('%s: пояснение длиннее 256 знаков (%d) — поток не сохранится' % (name, len(desc)))
+            for blk in subblocks(body):
+                check_descriptions(blk)
+
+    check_descriptions(definition.get('actions', {}))
     return problems
 
 
