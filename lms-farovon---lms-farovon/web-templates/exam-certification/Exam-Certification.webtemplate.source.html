@@ -78,6 +78,8 @@
                   grading: 100000003, graded: 100000004, voided: 100000005, failed: 100000006 };
   var RESULT = { passed: 100000000, failed: 100000001, voided: 100000002 };
   var CERT = { active: 100000000, expired: 100000001, revoked: 100000002 };
+  var ACTION_EXTRA = 100000002;   // вид действия администратора «Дополнительная попытка»
+  var ACTION_DONE = 100000001;    // статус действия «Выполнено»
 
   var root = document.getElementById('exmRoot');
 
@@ -123,7 +125,12 @@
           "new_result,new_passed,new_isfinal,new_finalizedon,new_appealuntil,new_errortext,createdon," +
           "_new_exam_value&$orderby=createdon desc&$top=20"),
       api("/_api/new_certifications?$select=new_certificationid,new_name,new_status,new_issuedon," +
-          "new_validuntil,_new_exam_value&$orderby=new_issuedon desc&$top=10")
+          "new_validuntil,_new_exam_value&$orderby=new_issuedon desc&$top=10"),
+      // Дополнительные попытки от администратора: поток сборки билета прибавляет их к лимиту, и страница
+      // должна считать так же, иначе кнопка «Начать» пропадёт, хотя попытка выдана. Участник видит
+      // только записи о себе (право на чтение своих действий администратора).
+      api("/_api/new_examadminactions?$select=new_examadminactionid,new_kind,new_status,_new_exam_value" +
+          "&$filter=new_kind eq " + ACTION_EXTRA + " and new_status eq " + ACTION_DONE + "&$top=50")
     ]);
   }
 
@@ -142,7 +149,7 @@
     return ['—', 'void'];
   }
 
-  function render(exam, attempts, certs) {
+  function render(exam, attempts, certs, extras) {
     if (!exam) {
       root.className = '';
       root.innerHTML = '<div class="exm-card"><h2>Экзамен пока не объявлен</h2>' +
@@ -158,9 +165,32 @@
     var live = mine.filter(function (a) {
       return a.new_status === ATTEMPT.prepare || a.new_status === ATTEMPT.running;
     })[0];
-    var counted = mine.filter(function (a) { return a.new_status !== ATTEMPT.voided; });
-    var maxAttempts = params.maxAttempts == null ? 2 : params.maxAttempts;
+    // Как в потоке сборки билета: аннулированные попытки и попытки с ошибкой (отказ в допуске,
+    // билет не собрался) не состоялись и в лимит не идут.
+    var counted = mine.filter(function (a) { return a.new_status !== ATTEMPT.voided && a.new_status !== ATTEMPT.failed; });
+    var extra = (extras || []).filter(function (x) { return x._new_exam_value === exam.new_examid; }).length;
+    var maxAttempts = (params.maxAttempts == null ? 2 : params.maxAttempts) + extra;
     var left = Math.max(0, maxAttempts - counted.length);
+
+    // Правила пересдачи те же, что проверяет поток: новая попытка возможна только после «Не сдано»,
+    // когда закрылось окно апелляции и прошла пауза между попытками. Лучше сказать об этом заранее,
+    // чем создать попытку, которую поток тут же отклонит.
+    var last = counted.filter(function (a) { return a.new_status !== ATTEMPT.prepare && a.new_status !== ATTEMPT.running; })[0] || null;
+    var retakeBlock = null;
+    if (last) {
+      var pauseDays = params.minIntervalDays == null ? 0 : params.minIntervalDays;
+      var readyAt = 0;
+      if (last.new_appealuntil) { readyAt = Math.max(readyAt, new Date(last.new_appealuntil).getTime()); }
+      if (last.new_finalizedon) { readyAt = Math.max(readyAt, new Date(last.new_finalizedon).getTime() + pauseDays * 86400000); }
+      if (last.new_status === ATTEMPT.submitted || last.new_status === ATTEMPT.grading) {
+        retakeBlock = 'Предыдущая попытка ещё проверяется — новая станет доступна после её оценки.';
+      } else if (last.new_result === RESULT.passed) {
+        retakeBlock = 'Экзамен сдан — пересдача не требуется.';
+      } else if (last.new_result === RESULT.failed && readyAt > Date.now()) {
+        retakeBlock = 'Пересдача откроется ' + dt(new Date(readyAt).toISOString(), true) +
+          ' — после окончания срока апелляции и паузы между попытками.';
+      }
+    }
 
     var now = Date.now();
     var opensAt = exam.new_opens ? new Date(exam.new_opens).getTime() : null;
@@ -171,6 +201,7 @@
     if (opensAt && now < opensAt) { block = 'Экзамен откроется ' + dt(exam.new_opens, true) + '.'; }
     else if (closesAt && now > closesAt) { block = 'Экзамен закрыт ' + dt(exam.new_closes, true) + '.'; }
     else if (live) { block = 'У вас есть незавершённая попытка — сначала закончите её.'; }
+    else if (retakeBlock) { block = retakeBlock; }
     else if (left === 0) { block = 'Попытки закончились. Если нужна дополнительная, обратитесь к администратору аттестации.'; }
 
     var cert = certs.filter(function (c) {
@@ -186,7 +217,8 @@
     html += '<div><dt>Закрывается</dt><dd>' + dt(exam.new_closes, true) + '</dd></div>';
     html += '<div><dt>Время на билет</dt><dd>' + (params.ticketMinutes || 90) + ' мин</dd></div>';
     html += '<div><dt>Проходной балл</dt><dd>' + (params.passPercent == null ? 75 : params.passPercent) + ' %</dd></div>';
-    html += '<div><dt>Попыток осталось</dt><dd>' + left + ' из ' + maxAttempts + '</dd></div>';
+    html += '<div><dt>Попыток осталось</dt><dd>' + left + ' из ' + maxAttempts +
+            (extra ? ' <span class="exm-muted">(с дополнительными: ' + extra + ')</span>' : '') + '</dd></div>';
     html += '</dl>';
     if (exam.new_rules_ru) {
       html += '<p class="exm-rules">' + esc(exam.new_rules_ru) + '</p>';
@@ -224,7 +256,8 @@
         html += '<td>' + (a.new_attemptno || '—') + '</td>';
         html += '<td>' + dt(a.new_finalizedon || a.createdon, true) + '</td>';
         html += '<td><span class="exm-pill exm-pill--' + st[1] + '">' + esc(st[0]) + '</span>' +
-                (a.new_isfinal ? ' <span class="exm-muted">— идёт в зачёт</span>' : '') + '</td>';
+                (a.new_isfinal && a.new_status === ATTEMPT.graded ? ' <span class="exm-muted">— идёт в зачёт</span>' :
+                 a.new_status === ATTEMPT.voided || a.new_status === ATTEMPT.failed ? ' <span class="exm-muted">— не считается</span>' : '') + '</td>';
         html += '<td>' + (a.new_status === ATTEMPT.graded ? num(a.new_percent) + ' %' : '—') + '</td>';
         html += '<td>';
         if (a.new_status === ATTEMPT.running || a.new_status === ATTEMPT.prepare) {
@@ -308,7 +341,8 @@
     var exam = (res[0].body.value || [])[0] || null;
     var attempts = res[1].body.value || [];
     var certs = res[2].body.value || [];
-    render(exam, attempts, certs);
+    var extras = (res[3] && res[3].body && res[3].body.value) || [];   // не прочиталось — считаем без прибавки
+    render(exam, attempts, certs, extras);
   }).catch(function (e) {
     root.className = '';
     root.innerHTML = '<div class="exm-err">Не удалось загрузить данные аттестации: ' + esc(e.message) + '</div>';
