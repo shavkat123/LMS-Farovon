@@ -162,6 +162,20 @@ def check_file(path):
                 check_run_after(blk, set(blk.keys()))
 
     check_run_after(definition.get('actions', {}), set(definition.get('actions', {}).keys()))
+
+    # Скрытие данных: у Compose, Query и Select Power Automate разрешает прятать только входы —
+    # выходы у них те же данные, и поток с «outputs» не сохраняется (InvalidSecureDataConfiguration).
+    def check_secure(actions):
+        for name, body in actions.items():
+            if not isinstance(body, dict):
+                continue
+            sd = (body.get('runtimeConfiguration') or {}).get('secureData') or {}
+            if body.get('type') in ('Compose', 'Query', 'Select') and 'outputs' in (sd.get('properties') or []):
+                problems.append('%s (%s): secureData с outputs не поддерживается — только inputs' % (name, body.get('type')))
+            for blk in subblocks(body):
+                check_secure(blk)
+
+    check_secure(definition.get('actions', {}))
     return problems
 
 

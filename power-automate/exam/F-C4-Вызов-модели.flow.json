@@ -1,0 +1,492 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedcommondataserviceforapps_73c39"
+        },
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        }
+      },
+      "shared_new-5fanthropic-2dclaude-2dlms-2dexam-5f94b9addf05db1db1": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_AnthropicClaudeLMSExam"
+        },
+        "api": {
+          "name": "shared_new-5fanthropic-2dclaude-2dlms-2dexam-5f94b9addf05db1db1"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "Button",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "title": "promptCode",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Код промпта, например GEN_SINGLE"
+                },
+                "text_1": {
+                  "title": "model",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Модель"
+                },
+                "text_2": {
+                  "title": "effort",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "low | medium | high"
+                },
+                "text_3": {
+                  "title": "maxTokens",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Предел выходных токенов"
+                },
+                "text_4": {
+                  "title": "systemText",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Системный промпт"
+                },
+                "text_5": {
+                  "title": "contentJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Массив content-блоков сообщения пользователя, строкой JSON"
+                },
+                "text_6": {
+                  "title": "schemaJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "JSON-схема ответа, пусто — без структурированного ответа"
+                },
+                "text_7": {
+                  "title": "purpose",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Зачем вызов: для журнала"
+                },
+                "text_8": {
+                  "title": "idempotencyKey",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Ключ вызова: для журнала"
+                }
+              },
+              "required": [
+                "text",
+                "text_1",
+                "text_2",
+                "text_3",
+                "text_4",
+                "text_5",
+                "text_6",
+                "text_7",
+                "text_8"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Цены": {
+          "type": "Compose",
+          "runAfter": {},
+          "inputs": {
+            "_о_ценах": "Долларов за миллион токенов. Цель — контроль бюджета, не бухгалтерия: кешированные токены считаются как обычные.",
+            "opus_in": 5,
+            "opus_out": 25,
+            "sonnet_in": 2,
+            "sonnet_out": 10
+          }
+        },
+        "Старт": {
+          "type": "Compose",
+          "runAfter": {
+            "Цены": [
+              "Succeeded"
+            ]
+          },
+          "inputs": "@utcNow()"
+        },
+        "Настройки_вывода": {
+          "type": "Compose",
+          "runAfter": {
+            "Старт": [
+              "Succeeded"
+            ]
+          },
+          "inputs": "@if(empty(coalesce(triggerBody()?['text_6'], '')), json(concat('{\"effort\":\"', coalesce(triggerBody()?['text_2'], 'medium'), '\"}')), json(concat('{\"effort\":\"', coalesce(triggerBody()?['text_2'], 'medium'), '\",\"format\":{\"type\":\"json_schema\",\"schema\":', triggerBody()?['text_6'], '}}')))"
+        },
+        "Тело_запроса": {
+          "type": "Compose",
+          "runAfter": {
+            "Настройки_вывода": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "model": "@{triggerBody()?['text_1']}",
+            "max_tokens": "@int(coalesce(triggerBody()?['text_3'], '4000'))",
+            "system": [
+              {
+                "type": "text",
+                "text": "@{triggerBody()?['text_4']}"
+              }
+            ],
+            "messages": [
+              {
+                "role": "user",
+                "content": "@json(triggerBody()?['text_5'])"
+              }
+            ],
+            "output_config": "@outputs('Настройки_вывода')"
+          }
+        },
+        "Try": {
+          "type": "Scope",
+          "runAfter": {
+            "Тело_запроса": [
+              "Succeeded"
+            ]
+          },
+          "actions": {
+            "Вызов_модели": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_new-5fanthropic-2dclaude-2dlms-2dexam-5f94b9addf05db1db1",
+                  "operationId": "CreateMessage",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_new-5fanthropic-2dclaude-2dlms-2dexam-5f94b9addf05db1db1"
+                },
+                "parameters": {
+                  "anthropic-version": "2023-06-01",
+                  "body": "@outputs('Тело_запроса')"
+                },
+                "authentication": "@parameters('$authentication')",
+                "retryPolicy": {
+                  "type": "exponential",
+                  "count": 4,
+                  "interval": "PT15S",
+                  "minimumInterval": "PT10S",
+                  "maximumInterval": "PT2M"
+                }
+              },
+              "runtimeConfiguration": {
+                "secureData": {
+                  "properties": [
+                    "inputs",
+                    "outputs"
+                  ]
+                }
+              }
+            },
+            "Текстовые_блоки": {
+              "type": "Query",
+              "runAfter": {
+                "Вызов_модели": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@coalesce(body('Вызов_модели')?['content'], json('[]'))",
+                "where": "@equals(item()?['type'], 'text')"
+              },
+              "runtimeConfiguration": {
+                "secureData": {
+                  "properties": [
+                    "inputs"
+                  ]
+                }
+              }
+            },
+            "Итог_успеха": {
+              "type": "Compose",
+              "runAfter": {
+                "Текстовые_блоки": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "ok": "@equals(coalesce(body('Вызов_модели')?['stop_reason'], ''), 'end_turn')",
+                "stopReason": "@{coalesce(body('Вызов_модели')?['stop_reason'], '')}",
+                "modelUsed": "@{coalesce(body('Вызов_модели')?['model'], triggerBody()?['text_1'])}",
+                "outputText": "@{if(greater(length(body('Текстовые_блоки')), 0), coalesce(first(body('Текстовые_блоки'))?['text'], ''), '')}",
+                "inputTokens": "@int(coalesce(body('Вызов_модели')?['usage']?['input_tokens'], 0))",
+                "outputTokens": "@int(coalesce(body('Вызов_модели')?['usage']?['output_tokens'], 0))",
+                "errorCode": "",
+                "errorText": ""
+              },
+              "runtimeConfiguration": {
+                "secureData": {
+                  "properties": [
+                    "inputs"
+                  ]
+                }
+              }
+            },
+            "Стоимость": {
+              "type": "Compose",
+              "runAfter": {
+                "Итог_успеха": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": "@if(contains(toLower(outputs('Итог_успеха')?['modelUsed']), 'opus'), div(add(mul(float(outputs('Итог_успеха')?['inputTokens']), outputs('Цены')['opus_in']), mul(float(outputs('Итог_успеха')?['outputTokens']), outputs('Цены')['opus_out'])), 1000000), div(add(mul(float(outputs('Итог_успеха')?['inputTokens']), outputs('Цены')['sonnet_in']), mul(float(outputs('Итог_успеха')?['outputTokens']), outputs('Цены')['sonnet_out'])), 1000000))"
+            },
+            "Задержка": {
+              "type": "Compose",
+              "runAfter": {
+                "Стоимость": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": "@div(sub(ticks(utcNow()), ticks(outputs('Старт'))), 10000)"
+            },
+            "Журнал_вызова": {
+              "type": "OpenApiConnection",
+              "runAfter": {
+                "Сводка_журнала": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "CreateRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examlogs",
+                  "item/new_event": "AI_CALL",
+                  "item/new_actor": "F-C4 Вызов модели",
+                  "item/new_subjectid": "@{triggerBody()?['text_8']}",
+                  "item/new_payload": "@{string(outputs('Сводка_журнала'))}"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Сводка_журнала": {
+              "type": "Compose",
+              "runAfter": {
+                "Задержка": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "purpose": "@{triggerBody()?['text_7']}",
+                "prompt": "@{triggerBody()?['text']}",
+                "model": "@{outputs('Итог_успеха')?['modelUsed']}",
+                "stopReason": "@{outputs('Итог_успеха')?['stopReason']}",
+                "inputTokens": "@outputs('Итог_успеха')?['inputTokens']",
+                "outputTokens": "@outputs('Итог_успеха')?['outputTokens']",
+                "costUsd": "@outputs('Стоимость')",
+                "latencyMs": "@outputs('Задержка')"
+              }
+            },
+            "Ответ": {
+              "type": "Response",
+              "kind": "Http",
+              "runAfter": {
+                "Журнал_вызова": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "statusCode": 200,
+                "body": {
+                  "ok": "@outputs('Итог_успеха')?['ok']",
+                  "stopReason": "@{outputs('Итог_успеха')?['stopReason']}",
+                  "modelUsed": "@{outputs('Итог_успеха')?['modelUsed']}",
+                  "outputText": "@{outputs('Итог_успеха')?['outputText']}",
+                  "inputTokens": "@outputs('Итог_успеха')?['inputTokens']",
+                  "outputTokens": "@outputs('Итог_успеха')?['outputTokens']",
+                  "costUsd": "@outputs('Стоимость')",
+                  "errorCode": "",
+                  "errorText": "",
+                  "latencyMs": "@outputs('Задержка')"
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "stopReason": {
+                      "type": "string"
+                    },
+                    "modelUsed": {
+                      "type": "string"
+                    },
+                    "outputText": {
+                      "type": "string"
+                    },
+                    "inputTokens": {
+                      "type": "integer"
+                    },
+                    "outputTokens": {
+                      "type": "integer"
+                    },
+                    "costUsd": {
+                      "type": "number"
+                    },
+                    "errorCode": {
+                      "type": "string"
+                    },
+                    "errorText": {
+                      "type": "string"
+                    },
+                    "latencyMs": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              },
+              "runtimeConfiguration": {
+                "secureData": {
+                  "properties": [
+                    "inputs"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "Catch": {
+          "type": "Scope",
+          "runAfter": {
+            "Try": [
+              "Failed",
+              "TimedOut"
+            ]
+          },
+          "actions": {
+            "Код_ошибки": {
+              "type": "Compose",
+              "runAfter": {},
+              "inputs": "@{coalesce(string(outputs('Вызов_модели')?['statusCode']), 'нет ответа')}"
+            },
+            "Текст_ошибки": {
+              "type": "Compose",
+              "runAfter": {
+                "Код_ошибки": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": "@{coalesce(body('Вызов_модели')?['error']?['message'], body('Вызов_модели')?['message'], 'вызов модели не удался')}"
+            },
+            "Журнал_сбоя": {
+              "type": "OpenApiConnection",
+              "runAfter": {
+                "Текст_ошибки": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "CreateRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examlogs",
+                  "item/new_event": "AI_CALL_FAILED",
+                  "item/new_actor": "F-C4 Вызов модели",
+                  "item/new_subjectid": "@{triggerBody()?['text_8']}",
+                  "item/new_payload": "@{concat('purpose=', triggerBody()?['text_7'], '; prompt=', triggerBody()?['text'], '; status=', outputs('Код_ошибки'), '; error=', outputs('Текст_ошибки'))}"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Ответ_с_ошибкой": {
+              "type": "Response",
+              "kind": "Http",
+              "runAfter": {
+                "Журнал_сбоя": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "statusCode": 200,
+                "body": {
+                  "ok": false,
+                  "stopReason": "",
+                  "modelUsed": "@{triggerBody()?['text_1']}",
+                  "outputText": "",
+                  "inputTokens": 0,
+                  "outputTokens": 0,
+                  "costUsd": 0,
+                  "errorCode": "@{outputs('Код_ошибки')}",
+                  "errorText": "@{outputs('Текст_ошибки')}",
+                  "latencyMs": "@div(sub(ticks(utcNow()), ticks(outputs('Старт'))), 10000)"
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "stopReason": {
+                      "type": "string"
+                    },
+                    "modelUsed": {
+                      "type": "string"
+                    },
+                    "outputText": {
+                      "type": "string"
+                    },
+                    "inputTokens": {
+                      "type": "integer"
+                    },
+                    "outputTokens": {
+                      "type": "integer"
+                    },
+                    "costUsd": {
+                      "type": "number"
+                    },
+                    "errorCode": {
+                      "type": "string"
+                    },
+                    "errorText": {
+                      "type": "string"
+                    },
+                    "latencyMs": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}
