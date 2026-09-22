@@ -1,0 +1,655 @@
+{% comment %}
+  Exam Admin Common — общее для четырёх страниц администратора аттестации:
+  /admin/exams, /admin/exam-setup, /admin/exam-bank, /admin/exam-results.
+
+  Подключается include'ом ВНУТРИ ролевого гейта «Аттестация: администратор» — вне гейта
+  здесь нечего показывать. Даёт:
+  - window.ExamAdm: запросы к Web API портала, названия значений наборов выбора, форматирование
+    дат и чисел, всплывающие сообщения и окна подтверждения, опрос состояния, выгрузку CSV,
+    раскладку билета «урок × тип × сложность» (методичка 7.3) и параметры экзамена по умолчанию;
+  - стили .exad-* поверх общих примитивов .adm-* из customtheme.css.
+
+  Значения наборов выбора идут от 100000000 в порядке из tools/exam/exam-schema.json.
+  Порядок менять нельзя — только дописывать в конец.
+{% endcomment %}
+<div id="exadCfg" hidden
+     data-contact="{{ user.id }}"
+     data-poll="{{ settings['Exam/PollIntervalMs'] | default: '3000' | escape }}"
+     data-support="{{ settings['Exam/SupportContact'] | default: '' | escape }}"></div>
+
+<style>
+  /*
+    Страница вставлена в студийную разметку (.container → .columnBlockLayout), где колонка —
+    flex-элемент с min-width:auto: она не может стать уже самой широкой таблицы, и на телефоне
+    страница расползалась до 1100–1300 px. Колонку ограничиваем шириной экрана, а обёртка таблиц
+    не отдаёт свою ширину наружу (contain) — таблица прокручивается внутри неё.
+  */
+  .columnBlockLayout:has(> .exad) { flex: 1 1 100%; min-width: 0; max-width: 100%; }
+  .exad { max-width: 1280px; min-width: 0; margin: 0 auto; padding: 8px 0 48px; }
+  .exad a.exad-link, .exad .exad-link { color: var(--adm-primary) !important; text-decoration: none; font-weight: 600; }
+  .exad a.exad-link:hover { text-decoration: underline; }
+  .exad-head { margin: 4px 0 16px; }
+  .exad-head h1 { font-size: 20px; font-weight: 700; color: var(--adm-fg-1); margin: 4px 0 4px; line-height: 1.3; }
+  .exad-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .exad-head-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+  .exad-back { font-size: 12px; font-weight: 600; color: var(--adm-fg-2) !important; text-decoration: none; display: inline-flex; gap: 4px; align-items: center; }
+  .exad-back:hover { color: var(--adm-primary) !important; }
+  .exad-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--adm-border-1); margin: 12px 0 16px; overflow-x: auto; }
+  .exad-tabs a { padding: 9px 14px; font-size: 13px; font-weight: 600; color: var(--adm-fg-2) !important; text-decoration: none;
+                 border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+  .exad-tabs a:hover { color: var(--adm-fg-1) !important; }
+  .exad-tabs a.is-active { color: var(--adm-primary) !important; border-bottom-color: var(--adm-primary); }
+  .exad-section { margin-bottom: 16px; }
+  .exad-card-body { padding: 16px; }
+  .exad-muted { color: var(--adm-fg-2); font-size: 12px; }
+  .exad-small { font-size: 12px; }
+  .exad-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px 16px; }
+  .exad-grid--2 { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  .exad-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .exad-field > label, .exad-label { font-size: 12px; font-weight: 600; color: var(--adm-fg-2); }
+  .exad-field .exad-hint { font-size: 11px; color: var(--adm-fg-3); }
+  .exad select.adm-input, .exad textarea.adm-input { width: 100%; }
+  .exad textarea.adm-input { min-height: 84px; resize: vertical; font-family: inherit; line-height: 1.45; padding-top: 8px; padding-bottom: 8px; }
+  .exad input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--adm-primary); }
+  .exad-check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--adm-fg-1); }
+  .exad-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .exad-actions--end { justify-content: flex-end; }
+  .exad-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .exad-scroll { overflow-x: auto; contain: inline-size; }
+  .exad-scroll > .adm-table { min-width: 640px; }
+  .exad .adm-table td { vertical-align: top; }
+  .exad-note { border-radius: var(--adm-radius-md); padding: 10px 12px; font-size: 13px; line-height: 1.45; border: 1px solid; margin-bottom: 12px; }
+  .exad-note--info { background: var(--adm-primary-50); border-color: var(--adm-primary-100); color: var(--adm-fg-1); }
+  .exad-note--warn { background: var(--adm-warn-50); border-color: #F5D9A8; color: #7C4A03; }
+  .exad-note--danger { background: var(--adm-danger-50); border-color: #F3C4C4; color: #7F1D1D; }
+  .exad-note--success { background: var(--adm-success-50); border-color: #BBE3C7; color: #14532D; }
+  .exad-note ul { margin: 6px 0 0; padding-left: 18px; }
+  .exad-note b { font-weight: 700; }
+  .exad-pre { white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px;
+              background: var(--adm-bg-muted); border-radius: var(--adm-radius-sm); padding: 8px 10px; margin: 0; max-height: 320px; overflow: auto; }
+  .exad-cell-short { background: var(--adm-danger-50) !important; color: #7F1D1D; }
+  .exad-cell-ok { background: var(--adm-success-50) !important; }
+  .exad-empty { padding: 28px 16px; text-align: center; color: var(--adm-fg-2); font-size: 13px; }
+  .exad-spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--adm-border-2); border-top-color: var(--adm-primary);
+               border-radius: 50%; animation: exad-spin .8s linear infinite; vertical-align: -2px; }
+  @keyframes exad-spin { to { transform: rotate(360deg); } }
+  .exad-opt { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border-radius: var(--adm-radius-sm); font-size: 13px; }
+  .exad-opt--ok { background: var(--adm-success-50); }
+  .exad-opt .exad-opt-id { font-weight: 700; min-width: 16px; color: var(--adm-fg-2); }
+  .exad-opt .exad-opt-mis { display: block; font-size: 11px; color: var(--adm-fg-3); margin-top: 2px; }
+  .exad-toast { position: fixed; right: 16px; bottom: 16px; z-index: 2000; max-width: min(420px, calc(100vw - 32px)); padding: 12px 14px;
+                border-radius: var(--adm-radius-md); background: var(--adm-fg-1); color: #fff; font-size: 13px; line-height: 1.4;
+                box-shadow: var(--adm-shadow-pop); opacity: 0; transform: translateY(8px); transition: opacity .2s, transform .2s; pointer-events: none; }
+  .exad-toast.is-show { opacity: 1; transform: none; pointer-events: auto; }
+  .exad-toast--ok { background: var(--adm-success); }
+  .exad-toast--err { background: var(--adm-danger); }
+  .exad-modal { position: fixed; inset: 0; z-index: 1990; background: rgba(11, 18, 32, .45); display: flex; align-items: flex-start; justify-content: center;
+                padding: 48px 16px; overflow-y: auto; }
+  .exad-modal[hidden] { display: none; }
+  .exad-dialog { background: #fff; border-radius: var(--adm-radius-lg); box-shadow: var(--adm-shadow-pop); width: 100%; max-width: 640px; font-family: 'Inter', ui-sans-serif, sans-serif; }
+  .exad-dialog--wide { max-width: 920px; }
+  .exad-dialog-head { padding: 14px 16px; border-bottom: 1px solid var(--adm-border-1); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .exad-dialog-head h2 { font-size: 15px; font-weight: 700; margin: 0; color: var(--adm-fg-1); }
+  .exad-dialog-body { padding: 16px; font-size: 13px; color: var(--adm-fg-1); }
+  .exad-dialog-foot { padding: 12px 16px; border-top: 1px solid var(--adm-border-1); display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+  .exad-dialog-err { color: var(--adm-danger); font-size: 12px; margin-right: auto; align-self: center; }
+  .exad-x { background: none; border: 0; font-size: 18px; line-height: 1; color: var(--adm-fg-2); cursor: pointer; padding: 4px; }
+  @media (max-width: 640px) {
+    .exad-head h1 { font-size: 18px; }
+    .exad-modal { padding: 16px 8px; }
+  }
+</style>
+
+<div id="exadToast" class="exad-toast" role="status" aria-live="polite"></div>
+<div id="exadModal" class="exad-modal" hidden>
+  <div class="exad-dialog" role="dialog" aria-modal="true" aria-labelledby="exadModalTitle">
+    <div class="exad-dialog-head">
+      <h2 id="exadModalTitle"></h2>
+      <button type="button" class="exad-x" data-exad-cancel aria-label="Закрыть">&times;</button>
+    </div>
+    <div class="exad-dialog-body" id="exadModalBody"></div>
+    <div class="exad-dialog-foot">
+      <span class="exad-dialog-err" id="exadModalErr"></span>
+      <button type="button" class="adm-btn adm-btn--ghost" data-exad-cancel id="exadModalCancel">Отмена</button>
+      <button type="button" class="adm-btn adm-btn--primary" id="exadModalOk">Подтвердить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  if (window.ExamAdm) { return; }
+
+  var cfgEl = document.getElementById('exadCfg');
+  var CFG = {
+    contact: cfgEl ? (cfgEl.getAttribute('data-contact') || '') : '',
+    pollMs: (cfgEl && parseInt(cfgEl.getAttribute('data-poll'), 10)) || 3000,
+    support: cfgEl ? (cfgEl.getAttribute('data-support') || '') : ''
+  };
+  var skewMs = 0;
+
+  /* ── Значения наборов выбора (от 100000000 в порядке exam-schema.json) ─────────────── */
+  function seq(labels) { var o = {}; for (var i = 0; i < labels.length; i++) { o[100000000 + i] = labels[i]; } return o; }
+  var ENUM = {
+    examStatus: seq(['Черновик', 'Опубликован', 'Закрыт']),
+    moduleStatus: seq(['Нет текста', 'Распознаётся', 'Текст готов', 'Вопросы созданы']),
+    sourceKind: seq(['Текст озвучки', 'H5P-урок курса', 'Файл PPTX', 'Файл PDF']),
+    narrationSource: seq(['Нет', 'Заметки PPTX', 'Документ (DOCX, TXT)', 'Расшифровка видео (VTT)']),
+    slideSource: seq(['Текст H5P', 'Картинка H5P', 'Вопрос H5P', 'PPTX', 'PDF']),
+    slideStatus: seq(['Текст готов', 'Нужно распознать', 'Распознано', 'Ошибка']),
+    qType: seq(['Одиночный', 'Множественный', 'Кейс', 'Контрольный']),
+    qDifficulty: seq(['Базовый', 'Средний', 'Продвинутый']),
+    qStatus: seq(['На проверке', 'Одобрен', 'Отклонён', 'Выведен']),
+    qSource: seq(['ИИ', 'Вручную']),
+    jobStatus: seq(['Создано', 'Выполняется', 'Готово', 'Частично', 'Ошибка']),
+    promptStatus: seq(['Черновик', 'Утверждён', 'Выведен']),
+    promptEffort: seq(['low', 'medium', 'high']),
+    attemptStatus: seq(['Готовится', 'Идёт', 'Сдан', 'Проверяется', 'Оценён', 'Аннулирован', 'Ошибка']),
+    attemptResult: seq(['Сдано', 'Не сдано', 'Аннулировано']),
+    itemStatus: seq(['Не отвечен', 'Отвечен', 'Оценён', 'Нейтрализован', 'Ошибка оценки']),
+    submissionKind: seq(['Завершить', 'Время истекло']),
+    gradeRun: seq(['Первичная', 'Апелляция-2', 'Арбитр-3', 'Переоценка после сбоя']),
+    gradeStatus: seq(['Ожидает', 'Готово', 'Ошибка', 'Отказ модели']),
+    appealStatus: seq(['Подана', 'Отклонена', 'В работе', 'Рассмотрена', 'Ошибка']),
+    actionKind: seq(['Нейтрализовать вопрос', 'Аннулировать попытку', 'Дополнительная попытка', 'Переоценить после сбоя']),
+    actionStatus: seq(['Создано', 'Выполнено', 'Ошибка']),
+    certStatus: seq(['Действует', 'Истёк', 'Отозван'])
+  };
+  /* Именованные значения, чтобы в коде страниц не было «магических» чисел */
+  var V = {
+    EXAM_DRAFT: 100000000, EXAM_PUBLISHED: 100000001, EXAM_CLOSED: 100000002,
+    MODULE_NOTEXT: 100000000, MODULE_RECOGNIZING: 100000001, MODULE_TEXTREADY: 100000002, MODULE_QUESTIONS: 100000003,
+    KIND_NARRATION: 100000000, KIND_H5P: 100000001, KIND_PPTX: 100000002, KIND_PDF: 100000003,
+    NARR_NONE: 100000000, NARR_PPTX: 100000001, NARR_DOC: 100000002, NARR_VTT: 100000003,
+    Q_REVIEW: 100000000, Q_APPROVED: 100000001, Q_REJECTED: 100000002, Q_RETIRED: 100000003,
+    SRC_AI: 100000000, SRC_MANUAL: 100000001,
+    JOB_CREATED: 100000000, JOB_RUNNING: 100000001, JOB_DONE: 100000002, JOB_PARTIAL: 100000003, JOB_ERROR: 100000004,
+    PROMPT_APPROVED: 100000001,
+    ATT_PREPARING: 100000000, ATT_RUNNING: 100000001, ATT_SUBMITTED: 100000002, ATT_GRADING: 100000003,
+    ATT_GRADED: 100000004, ATT_ANNULLED: 100000005, ATT_ERROR: 100000006,
+    RES_PASSED: 100000000, RES_FAILED: 100000001, RES_ANNULLED: 100000002,
+    ACT_NEUTRALIZE: 100000000, ACT_ANNUL: 100000001, ACT_EXTRA: 100000002, ACT_REGRADE: 100000003,
+    ACTST_CREATED: 100000000, ACTST_DONE: 100000001, ACTST_ERROR: 100000002
+  };
+  /* Коды типов и уровней, которые читают потоки (blueprint, specjson) */
+  var TYPES = ['single', 'multi', 'case', 'control'];
+  var DIFFS = ['basic', 'medium', 'advanced'];
+  var CODE = {
+    type: { 100000000: 'single', 100000001: 'multi', 100000002: 'case', 100000003: 'control' },
+    typeValue: { single: 100000000, multi: 100000001, 'case': 100000002, control: 100000003 },
+    difficulty: { 100000000: 'basic', 100000001: 'medium', 100000002: 'advanced' },
+    difficultyValue: { basic: 100000000, medium: 100000001, advanced: 100000002 }
+  };
+  var LABEL = {
+    type: { single: 'Одиночный выбор', multi: 'Множественный выбор', 'case': 'Кейс', control: 'Контрольный вопрос' },
+    typeShort: { single: 'Одиночный', multi: 'Множеств.', 'case': 'Кейс', control: 'Контрольный' },
+    difficulty: { basic: 'Базовый', medium: 'Средний', advanced: 'Продвинутый' },
+    difficultyShort: { basic: 'Баз.', medium: 'Сред.', advanced: 'Прод.' }
+  };
+  /* Баллы вопроса по типу — как у потока создания вопросов F-B3 */
+  var POINTS = { single: 1, multi: 1, 'case': 10, control: 5 };
+
+  /* Цвет плашки статуса: success | danger | warn | info | neutral */
+  var PILL = {
+    examStatus: { 100000000: 'neutral', 100000001: 'success', 100000002: 'info' },
+    moduleStatus: { 100000000: 'danger', 100000001: 'warn', 100000002: 'info', 100000003: 'success' },
+    qStatus: { 100000000: 'warn', 100000001: 'success', 100000002: 'danger', 100000003: 'neutral' },
+    jobStatus: { 100000000: 'neutral', 100000001: 'info', 100000002: 'success', 100000003: 'warn', 100000004: 'danger' },
+    promptStatus: { 100000000: 'neutral', 100000001: 'success', 100000002: 'neutral' },
+    attemptStatus: { 100000000: 'neutral', 100000001: 'info', 100000002: 'info', 100000003: 'warn', 100000004: 'success', 100000005: 'neutral', 100000006: 'danger' },
+    attemptResult: { 100000000: 'success', 100000001: 'danger', 100000002: 'neutral' },
+    itemStatus: { 100000000: 'neutral', 100000001: 'info', 100000002: 'success', 100000003: 'warn', 100000004: 'danger' },
+    gradeStatus: { 100000000: 'neutral', 100000001: 'success', 100000002: 'danger', 100000003: 'danger' },
+    appealStatus: { 100000000: 'info', 100000001: 'danger', 100000002: 'warn', 100000003: 'success', 100000004: 'danger' },
+    actionStatus: { 100000000: 'info', 100000001: 'success', 100000002: 'danger' },
+    certStatus: { 100000000: 'success', 100000001: 'neutral', 100000002: 'danger' }
+  };
+
+  /* Проверки рецензента (new_reviewjson.checks) — подписи для администратора */
+  var REVIEW_CHECKS = [
+    ['wording', 'Формулировка'],
+    ['unambiguous', 'Однозначность'],
+    ['matches_material', 'Соответствие материалу урока'],
+    ['difficulty_matches', 'Уровень сложности'],
+    ['distractors_plausible', 'Правдоподобные неверные варианты'],
+    ['rubric_usable', 'Пригодность критериев оценки'],
+    ['no_bias', 'Без предвзятости']
+  ];
+
+  /* События журнала (new_examlog.new_event) — пояснения для администратора */
+  var LOG_EVENTS = {
+    EXAM_PUBLISHED: 'Экзамен опубликован, снимок записан',
+    EXAM_PUBLISH_FAILED: 'Публикация не прошла проверку',
+    EXAM_CLOSED: 'Экзамен закрыт по окончании срока',
+    ATTEMPT_CREATED: 'Попытка отклонена при допуске',
+    ATTEMPT_TICKET_READY: 'Билет собран',
+    TICKET_CELL_SUBSTITUTED: 'Ячейка билета добрана вопросами другого урока или уровня',
+    TICKET_DUPLICATE_FINGERPRINT: 'Билет совпал с билетом другой попытки',
+    ATTEMPT_PREPARE_TIMEOUT: 'Билет не собрался вовремя',
+    ATTEMPT_SUBMITTED: 'Участник завершил попытку',
+    ATTEMPT_EXPIRED: 'Время попытки истекло',
+    ANSWER_REJECTED_LATE: 'Завершение от другого участника отклонено',
+    RESULT_FINAL: 'Результат подсчитан',
+    CERT_ISSUED: 'Сертификат выдан',
+    CERT_REVOKED: 'Сертификат отозван',
+    CERT_EXPIRED: 'Срок сертификата истёк',
+    ACTION_EXECUTED: 'Действие администратора выполнено',
+    QUESTION_RETIRED: 'Вопрос выведен по износу',
+    BANK_SHORTAGE: 'В банке не хватает вопросов для ячейки',
+    AI_JOB_DONE: 'Задание ИИ завершено',
+    QUESTION_APPROVED: 'Рецензент одобрил вопрос',
+    QUESTION_REJECTED: 'Рецензент отклонил вопрос',
+    AI_CALL: 'Вызов модели',
+    AI_CALL_FAILED: 'Вызов модели не удался',
+    FLOW_ERROR: 'Сбой потока'
+  };
+
+  /* ── Мелочи ────────────────────────────────────────────────────────────────────────── */
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt2(n) { var x = Number(n); if (n == null || n === '' || isNaN(x)) { return '—'; } return x.toFixed(2).replace('.', ','); }
+  function fmtInt(n) { var x = Number(n); if (n == null || n === '' || isNaN(x)) { return '—'; } return String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
+  function money(n) { var x = Number(n); if (n == null || n === '' || isNaN(x)) { return '—'; } return '$' + x.toFixed(2).replace('.', ','); }
+  function pct(part, total) { if (!total) { return '—'; } return Math.round(part * 100 / total) + '%'; }
+  function pad2(n) { return ('0' + n).slice(-2); }
+  /* Дата и время из UTC в поясе портала (UTC+5) */
+  function dt(v, withTime) {
+    if (!v) { return '—'; }
+    var d = new Date(v); if (isNaN(d)) { return '—'; }
+    var s = new Date(d.getTime() + 5 * 3600 * 1000);
+    var out = pad2(s.getUTCDate()) + '.' + pad2(s.getUTCMonth() + 1) + '.' + s.getUTCFullYear();
+    if (withTime !== false) { out += ' ' + pad2(s.getUTCHours()) + ':' + pad2(s.getUTCMinutes()); }
+    return out;
+  }
+  /* Столбцы «только дата» (выдан, действует до) — без сдвига */
+  function day(v) { if (!v) { return '—'; } var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v)); return m ? m[3] + '.' + m[2] + '.' + m[1] : '—'; }
+  /* Поле <input type="datetime-local"> ⇄ UTC ISO (портал в UTC+5) */
+  function toInput(iso) { if (!iso) { return ''; } var d = new Date(iso); if (isNaN(d)) { return ''; } return new Date(d.getTime() + 5 * 3600 * 1000).toISOString().slice(0, 16); }
+  function fromInput(v) { if (!v) { return null; } if (v.length === 16) { v += ':00'; } var d = new Date(v + '+05:00'); return isNaN(d) ? null : d.toISOString(); }
+  function now() { return Date.now() + skewMs; }
+  function guidFromUrl(name) {
+    var m = new RegExp('[?&]' + name + '=([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})(?:&|$)').exec(location.search);
+    return m ? m[1].toLowerCase() : '';
+  }
+  function isGuid(s) { return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(s || '')); }
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) { return crypto.randomUUID(); }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+    });
+  }
+  function chunk(arr, n) { var out = []; for (var i = 0; i < arr.length; i += n) { out.push(arr.slice(i, i + n)); } return out; }
+  function uniq(arr) { var s = {}, out = []; arr.forEach(function (x) { if (x && !s[x]) { s[x] = 1; out.push(x); } }); return out; }
+  /* JSON из потоков бывает «почти JSON» (True/False из string(bool)) или просто текстом */
+  function parseJson(s, fallback) {
+    if (s == null || s === '') { return fallback; }
+    if (typeof s === 'object') { return s; }
+    try { return JSON.parse(s); } catch (e) { /* ниже — мягкая попытка */ }
+    try { return JSON.parse(String(s).replace(/\bTrue\b/g, 'true').replace(/\bFalse\b/g, 'false')); } catch (e2) { return fallback; }
+  }
+  /* Ключ дублей — как у загрузчика банка: пробелы схлопнуты, нижний регистр, 400 знаков */
+  function contentHash(stem) { return String(stem || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 400); }
+  function pill(enumName, value, text) {
+    var label = text != null ? text : ((ENUM[enumName] && ENUM[enumName][value]) || (value == null ? '—' : String(value)));
+    var kind = (PILL[enumName] && PILL[enumName][value]) || 'neutral';
+    return '<span class="adm-pill adm-pill--' + kind + ' adm-pill--dot">' + esc(label) + '</span>';
+  }
+  function label(enumName, value) { return (ENUM[enumName] && ENUM[enumName][value]) || '—'; }
+
+  /* ── Web API портала ───────────────────────────────────────────────────────────────── */
+  function readSkew(r) {
+    var d = r.headers.get('date');
+    if (d) { var t = new Date(d).getTime(); if (!isNaN(t)) { skewMs = t - Date.now(); } }
+  }
+  function fail(r) {
+    return r.text().then(function (t) {
+      var msg = t, code = '';
+      try { var j = JSON.parse(t); if (j.error) { msg = j.error.message || j.error.code || t; code = j.error.code || ''; } } catch (e) { /* не JSON */ }
+      var er = new Error('Ошибка ' + r.status + (msg ? ': ' + String(msg).slice(0, 300) : ''));
+      er.status = r.status; er.code = code;
+      throw er;
+    });
+  }
+  function api(url) {
+    return fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { readSkew(r); return r.ok ? r.json() : fail(r); });
+  }
+  /* Все строки с переходом по @odata.nextLink, не больше maxRows */
+  function apiAll(url, maxRows) {
+    var rows = [], limit = maxRows || 5000;
+    function step(u) {
+      return api(u).then(function (j) {
+        rows = rows.concat(j.value || []);
+        var next = j['@odata.nextLink'];
+        if (next && rows.length < limit) { return step(next); }
+        return rows.slice(0, limit);
+      });
+    }
+    return step(url);
+  }
+  /* Свежий токен на каждую запись: после долгого простоя старый протухает */
+  function token() {
+    return fetch('/_layout/tokenhtml', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { return r.text(); })
+      .then(function (t) { var m = t.match(/value="([^"]+)"/); return m ? m[1] : ''; });
+  }
+  function send(method, url, body) {
+    return token().then(function (tok) {
+      return fetch(url, {
+        method: method, credentials: 'same-origin',
+        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'OData-MaxVersion': '4.0', 'OData-Version': '4.0', '__RequestVerificationToken': tok }
+      });
+    }).then(function (r) {
+      readSkew(r);
+      if (!r.ok) { return fail(r); }
+      var id = r.headers.get('entityid') || ((r.headers.get('odata-entityid') || '').match(/\(([0-9a-fA-F-]{36})\)/) || [])[1] || '';
+      return { status: r.status, id: String(id).toLowerCase() };
+    });
+  }
+  function post(set, body) { return send('POST', '/_api/' + set, body); }
+  function patch(set, id, body) { return send('PATCH', '/_api/' + set + '(' + id + ')', body); }
+  function del(set, id) { return send('DELETE', '/_api/' + set + '(' + id + ')'); }
+
+  /* Имена участников: /_api/contacts порциями по 25 id */
+  function contactNames(ids) {
+    var list = uniq((ids || []).filter(isGuid)), map = {};
+    return Promise.all(chunk(list, 25).map(function (part) {
+      var f = part.map(function (id) { return 'contactid eq ' + id; }).join(' or ');
+      return api('/_api/contacts?$select=contactid,fullname,emailaddress1&$filter=' + encodeURIComponent(f) + '&$top=50')
+        .then(function (j) { (j.value || []).forEach(function (c) { map[String(c.contactid).toLowerCase()] = { name: c.fullname || '—', email: c.emailaddress1 || '' }; }); });
+    })).then(function () { return map; });
+  }
+
+  /* Экзамен для шапки страниц настройки, банка и результатов */
+  function loadExam(id) {
+    return api('/_api/new_exams(' + id + ')?$select=new_examid,new_name,new_status,new_opens,new_closes,new_publishedon,new_paramsjson,' +
+      'new_rules_ru,new_consenttext,new_consentversion,new_certvalidmonths,_new_course_value');
+  }
+
+  /* ── Сообщения и окна ──────────────────────────────────────────────────────────────── */
+  var toastTimer = null;
+  function toast(msg, kind) {
+    var el = document.getElementById('exadToast'); if (!el) { return; }
+    el.className = 'exad-toast' + (kind === 'ok' ? ' exad-toast--ok' : kind === 'err' ? ' exad-toast--err' : '');
+    el.textContent = msg;
+    void el.offsetWidth; el.classList.add('is-show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('is-show'); }, kind === 'err' ? 7000 : 3500);
+  }
+  /*
+    Окно с произвольным содержимым. opts: { title, html, okText, cancelText, danger, wide, noCancel,
+    validate(body) → текст ошибки или '', onOpen(body) }.
+    Возвращает Promise: элемент тела окна (для чтения полей), если нажали «Подтвердить», иначе null.
+  */
+  var modalBusy = false;
+  function modal(opts) {
+    opts = opts || {};
+    var box = document.getElementById('exadModal');
+    if (!box || modalBusy) { return Promise.resolve(null); }
+    modalBusy = true;
+    var dlg = box.querySelector('.exad-dialog');
+    var body = document.getElementById('exadModalBody');
+    var ok = document.getElementById('exadModalOk');
+    var cancel = document.getElementById('exadModalCancel');
+    var err = document.getElementById('exadModalErr');
+    document.getElementById('exadModalTitle').textContent = opts.title || 'Подтверждение';
+    body.innerHTML = opts.html || '';
+    err.textContent = '';
+    ok.textContent = opts.okText || 'Подтвердить';
+    ok.className = 'adm-btn ' + (opts.danger ? 'adm-btn--danger-ghost' : 'adm-btn--primary');
+    cancel.textContent = opts.cancelText || 'Отмена';
+    cancel.style.display = opts.noCancel ? 'none' : '';
+    dlg.className = 'exad-dialog' + (opts.wide ? ' exad-dialog--wide' : '');
+    box.hidden = false;
+    if (typeof opts.onOpen === 'function') { opts.onOpen(body); }
+    var first = body.querySelector('input, textarea, select');
+    (first || ok).focus();
+    return new Promise(function (resolve) {
+      function close(result) {
+        box.hidden = true; modalBusy = false;
+        ok.removeEventListener('click', onOk);
+        box.removeEventListener('click', onBox);
+        document.removeEventListener('keydown', onKey);
+        resolve(result);
+      }
+      function onOk() {
+        var msg = typeof opts.validate === 'function' ? opts.validate(body) : '';
+        if (msg) { err.textContent = msg; return; }
+        close(body);
+      }
+      function onBox(e) {
+        if (e.target === box || (e.target.closest && e.target.closest('[data-exad-cancel]'))) { close(null); }
+      }
+      function onKey(e) { if (e.key === 'Escape') { close(null); } }
+      ok.addEventListener('click', onOk);
+      box.addEventListener('click', onBox);
+      document.addEventListener('keydown', onKey);
+    });
+  }
+  function confirmBox(title, html, okText, danger) {
+    return modal({ title: title, html: html, okText: okText, danger: danger }).then(function (b) { return !!b; });
+  }
+  /* Кнопка «занята» на время запроса: защита от двойного нажатия */
+  function busy(btn, on, text) {
+    if (!btn) { return; }
+    if (on) { btn.disabled = true; btn.setAttribute('data-exad-text', btn.innerHTML); btn.innerHTML = '<span class="exad-spin"></span> ' + esc(text || 'Подождите…'); }
+    else { btn.disabled = false; var t = btn.getAttribute('data-exad-text'); if (t != null) { btn.innerHTML = t; } }
+  }
+
+  /*
+    Опрос состояния после действия, которое выполняет поток. check() → Promise<boolean> (готово?).
+    opts: { interval, maxTries, onError(err) }. Возвращает Promise<boolean>: true — дождались,
+    false — вышли по числу попыток. Ошибки сети не прерывают опрос, а удваивают паузу.
+  */
+  function poll(check, opts) {
+    opts = opts || {};
+    var interval = opts.interval || CFG.pollMs, maxTries = opts.maxTries || 60, tries = 0;
+    return new Promise(function (resolve) {
+      function tick(delay) {
+        setTimeout(function () {
+          tries++;
+          Promise.resolve().then(check).then(function (done) {
+            if (done) { resolve(true); } else if (tries >= maxTries) { resolve(false); } else { tick(interval); }
+          }, function (e) {
+            if (typeof opts.onError === 'function') { opts.onError(e); }
+            if (tries >= maxTries) { resolve(false); } else { tick(interval * 2); }
+          });
+        }, delay);
+      }
+      tick(opts.immediate ? 0 : interval);
+    });
+  }
+
+  /* Выгрузка CSV: разделитель «;», BOM для Excel, защита от формул в ячейках */
+  function csv(filename, header, rows) {
+    function cell(v) {
+      var c = v == null ? '' : String(v);
+      if (/^[=+\-@]/.test(c)) { c = "'" + c; }
+      if (/[";\n\r]/.test(c)) { c = '"' + c.replace(/"/g, '""') + '"'; }
+      return c;
+    }
+    var lines = [header.map(cell).join(';')].concat(rows.map(function (r) { return r.map(cell).join(';'); }));
+    var blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  /*
+    Шапка страниц одного экзамена: «← Все экзамены», название, статус и вкладки.
+    active: 'setup' | 'bank' | 'results'.
+  */
+  function examHeader(el, exam, active, subtitle) {
+    if (!el) { return; }
+    var id = exam && exam.new_examid ? exam.new_examid : '';
+    var q = '?id=' + encodeURIComponent(id);
+    var tabs = [['setup', 'Настройка', '/admin/exam-setup'], ['bank', 'Банк вопросов', '/admin/exam-bank'], ['results', 'Результаты', '/admin/exam-results']];
+    el.innerHTML =
+      '<div class="exad-head">' +
+        '<a class="exad-back" href="/admin/exams"><i class="bi bi-arrow-left" aria-hidden="true"></i> Все экзамены</a>' +
+        '<div class="exad-head-row"><h1>' + esc(exam ? exam.new_name : 'Экзамен') + '</h1>' +
+          (exam ? pill('examStatus', exam.new_status) : '') + '</div>' +
+        (subtitle ? '<p>' + subtitle + '</p>' : '') +
+      '</div>' +
+      '<nav class="exad-tabs" aria-label="Разделы экзамена">' + tabs.map(function (t) {
+        return '<a href="' + t[2] + q + '"' + (t[0] === active ? ' class="is-active" aria-current="page"' : '') + '>' + t[1] + '</a>';
+      }).join('') + '</nav>';
+  }
+
+  /* ── Параметры экзамена (методичка 3.5.1; потоки F-A2…F-A8) ────────────────────────── */
+  /*
+    Письменные блоки (кейс, контрольный) по умолчанию выключены: потоки оценки письменных
+    ответов (F-C1…F-C3) ещё не подключены, и попытки с такими заданиями навсегда останутся
+    «Проверяется». Веса блоков сохранены как в методичке — при count 0 блок не участвует.
+  */
+  var DEFAULT_PARAMS = {
+    blocks: [{ type: 'single', count: 10, weight: 20 }, { type: 'multi', count: 8, weight: 25 },
+             { type: 'case', count: 0, weight: 45 }, { type: 'control', count: 0, weight: 10 }],
+    difficulty: { basic: 30, medium: 45, advanced: 25 },
+    modules: [],
+    blueprint: [],
+    passPercent: 75, casePassMinPercent: 60, multiMode: 'penalty',
+    attemptRule: 'best', maxAttempts: 2, minIntervalDays: 7,
+    bankFactor: 2, maxExposures: 25, revealMode: 'full', neutralizeRule: 'exclude',
+    appealWindowHours: 72, appealThresholdPct: 10, appealCanLower: false, gradingSlaHours: 24,
+    ticketMinutes: 90, answerLimitChars: { 'case': 1500, control: 600 }, requireConsent: true,
+    prompts: { TRIAGE: 1, GRADE_CASE: 1, GRADE_CONTROL: 1, APPEAL: 1, ARBITER: 1 },
+    models: { grader: 'claude-opus-5', appeal: 'claude-sonnet-5', arbiter: 'claude-opus-5', triage: 'claude-sonnet-5', substitute: 'claude-sonnet-5' },
+    effort: { grader: 'medium', appeal: 'medium', arbiter: 'high', triage: 'low' }
+  };
+  var PROMPT_CODES = ['TRIAGE', 'GRADE_CASE', 'GRADE_CONTROL', 'APPEAL', 'ARBITER'];
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function toInt(v, def) { var n = parseInt(v, 10); return isNaN(n) ? def : n; }
+  function toNum(v, def) { var n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? def : n; }
+  function pick(v, allowed, def) { return allowed.indexOf(v) >= 0 ? v : def; }
+  /*
+    Приводит параметры к виду, который читают потоки: все ключи явно (у потоков свои умолчания,
+    и они расходятся с методичкой), целые — целыми (потоки зовут int()), логические — true/false,
+    блоки — в порядке single → multi → case → control (F-A3 идёт по массиву по порядку).
+  */
+  function normalizeParams(raw) {
+    var d = DEFAULT_PARAMS, p = raw && typeof raw === 'object' ? raw : {}, out = {};
+    var byType = {};
+    (Array.isArray(p.blocks) ? p.blocks : []).forEach(function (b) { if (b && TYPES.indexOf(b.type) >= 0) { byType[b.type] = b; } });
+    out.blocks = d.blocks.map(function (db) {
+      var b = byType[db.type] || {};
+      return { type: db.type, count: Math.max(0, toInt(b.count, db.count)), weight: Math.max(0, toNum(b.weight, db.weight)) };
+    });
+    var pd = p.difficulty || {};
+    out.difficulty = {};
+    DIFFS.forEach(function (k) { out.difficulty[k] = Math.max(0, toNum(pd[k], d.difficulty[k])); });
+    out.modules = (Array.isArray(p.modules) ? p.modules : []).filter(function (m) { return m && isGuid(m.id); })
+      .map(function (m) { return { id: String(m.id).toLowerCase(), weight: Math.max(0, toNum(m.weight, 1)) }; });
+    out.blueprint = (Array.isArray(p.blueprint) ? p.blueprint : []).filter(function (c) {
+      return c && TYPES.indexOf(c.type) >= 0 && DIFFS.indexOf(c.difficulty) >= 0 && isGuid(c.module) && toInt(c.count, 0) > 0;
+    }).map(function (c) { return { type: c.type, module: String(c.module).toLowerCase(), difficulty: c.difficulty, count: toInt(c.count, 0) }; });
+    out.passPercent = Math.min(100, Math.max(0, toNum(p.passPercent, d.passPercent)));
+    out.casePassMinPercent = Math.min(100, Math.max(0, toNum(p.casePassMinPercent, d.casePassMinPercent)));
+    out.multiMode = pick(p.multiMode, ['penalty', 'allOrNothing', 'perOption'], d.multiMode);
+    out.attemptRule = pick(p.attemptRule, ['best', 'last'], d.attemptRule);
+    out.maxAttempts = Math.max(1, toInt(p.maxAttempts, d.maxAttempts));
+    out.minIntervalDays = Math.max(0, toInt(p.minIntervalDays, d.minIntervalDays));
+    out.bankFactor = Math.max(1, toInt(p.bankFactor, d.bankFactor));
+    out.maxExposures = Math.max(1, toInt(p.maxExposures, d.maxExposures));
+    out.revealMode = pick(p.revealMode, ['full', 'correctnessOnly'], d.revealMode);
+    out.neutralizeRule = pick(p.neutralizeRule, ['exclude', 'creditAll'], d.neutralizeRule);
+    out.appealWindowHours = Math.max(0, toInt(p.appealWindowHours, d.appealWindowHours));
+    out.appealThresholdPct = Math.max(0, toNum(p.appealThresholdPct, d.appealThresholdPct));
+    out.appealCanLower = p.appealCanLower === true;
+    out.gradingSlaHours = Math.max(1, toInt(p.gradingSlaHours, d.gradingSlaHours));
+    out.ticketMinutes = Math.max(1, toInt(p.ticketMinutes, d.ticketMinutes));
+    var al = p.answerLimitChars || {};
+    out.answerLimitChars = { 'case': Math.max(1, toInt(al['case'], d.answerLimitChars['case'])), control: Math.max(1, toInt(al.control, d.answerLimitChars.control)) };
+    out.requireConsent = p.requireConsent === undefined ? d.requireConsent : p.requireConsent === true;
+    var pp = p.prompts || {};
+    out.prompts = {};
+    PROMPT_CODES.forEach(function (c) { out.prompts[c] = Math.max(1, toInt(pp[c], d.prompts[c])); });
+    out.models = Object.assign({}, d.models, p.models && typeof p.models === 'object' ? p.models : {});
+    out.effort = Object.assign({}, d.effort, p.effort && typeof p.effort === 'object' ? p.effort : {});
+    return out;
+  }
+
+  /* ── Раскладка «урок × тип × сложность» (методичка 3.5.2, код 7.3) ─────────────────── */
+  function largestRemainder(total, rows) {            // rows: [{key, w, order}]
+    var sum = rows.reduce(function (s, r) { return s + r.w; }, 0) || 1;
+    var r2 = rows.map(function (r) { var x = total * r.w / sum; return { key: r.key, w: r.w, order: r.order, n: Math.floor(x), f: x - Math.floor(x) }; });
+    var left = total - r2.reduce(function (s, r) { return s + r.n; }, 0);
+    r2.slice().sort(function (a, b) { return b.f - a.f || b.w - a.w || a.order - b.order; })
+      .forEach(function (r) { if (left > 0) { r.n++; left--; } });
+    var out = {}; r2.forEach(function (r) { out[r.key] = r.n; }); return out;
+  }
+  function difficultySeq(n, split) {                  // Сент-Лагю: точные итоги и равномерное чередование уровней
+    var keys = Object.keys(split);
+    var t = largestRemainder(n, keys.map(function (k, i) { return { key: k, w: split[k], order: i }; }));
+    var g = {}, out = [];
+    Object.keys(t).forEach(function (k) { g[k] = 0; });
+    for (var i = 0; i < n; i++) {
+      var best = null, v = -1;
+      for (var k in t) { if (g[k] < t[k] && t[k] / (2 * g[k] + 1) > v) { v = t[k] / (2 * g[k] + 1); best = k; } }
+      out.push(best); g[best]++;
+    }
+    return out;
+  }
+  /* p.blocks, p.difficulty, p.modules = [{id, weight}] → [{type, module, difficulty, count}] */
+  function buildBlueprint(p) {
+    if (!p.modules || !p.modules.length) { throw new Error('Нет уроков для раскладки'); }
+    var cells = {};
+    p.blocks.filter(function (b) { return b.count > 0; }).forEach(function (b) {
+      var q = largestRemainder(b.count, p.modules.map(function (m, i) { return { key: m.id, w: m.weight, order: i }; }));
+      var sq = difficultySeq(b.count, p.difficulty);
+      var order = Object.keys(q).filter(function (k) { return q[k] > 0; }).sort(function (a, c) { return q[c] - q[a]; });
+      var left = Object.assign({}, q), i = 0;
+      while (i < b.count) {                             // слоты уроков по кругу; каждому — следующий уровень сложности
+        for (var j = 0; j < order.length; j++) {
+          var m = order[j];
+          if (left[m] > 0 && i < b.count) {
+            left[m]--;
+            var key = b.type + '|' + m + '|' + sq[i++];
+            cells[key] = (cells[key] || 0) + 1;
+          }
+        }
+      }
+    });
+    return Object.keys(cells).map(function (k) {
+      var parts = k.split('|'); return { type: parts[0], module: parts[1], difficulty: parts[2], count: cells[k] };
+    });
+  }
+  function cellKey(type, module, difficulty) { return type + '|' + String(module).toLowerCase() + '|' + difficulty; }
+  /* Сколько одобренных вопросов нужно в ячейке — тот же порог, что у F-A2 и F-A8 */
+  function requiredFor(count, p) { return count * (p.maxAttempts + 1) * p.bankFactor; }
+  /* Сколько заказать у ИИ по ячейке (кнопка «Создать недостающее»); approved: { cellKey: n } */
+  function needForCell(cell, p, approved) {
+    return Math.max(0, requiredFor(cell.count, p) - (approved[cellKey(cell.type, cell.module, cell.difficulty)] || 0));
+  }
+
+  /* ── Вопрос банка ──────────────────────────────────────────────────────────────────── */
+  function options(q) { var o = parseJson(q && q.new_optionsjson, []); return Array.isArray(o) ? o : []; }
+  /* Совпал ли слепой ответ рецензента с ключом: { key: 'a|c', pick: 'a|c', match: bool|null } */
+  function blindMatch(q) {
+    var rv = parseJson(q && q.new_reviewjson, null);
+    var key = options(q).filter(function (o) { return o.correct; }).map(function (o) { return o.id; }).sort().join('|');
+    if (!rv || !Array.isArray(rv.answer_option_ids) || !key) { return { key: key, pick: '', match: null }; }
+    var pk = rv.answer_option_ids.slice().sort().join('|');
+    return { key: key, pick: pk, match: pk === key };
+  }
+
+  window.ExamAdm = {
+    cfg: CFG, ENUM: ENUM, V: V, TYPES: TYPES, DIFFS: DIFFS, CODE: CODE, LABEL: LABEL, POINTS: POINTS, PILL: PILL,
+    REVIEW_CHECKS: REVIEW_CHECKS, LOG_EVENTS: LOG_EVENTS, PROMPT_CODES: PROMPT_CODES, DEFAULT_PARAMS: DEFAULT_PARAMS,
+    esc: esc, fmt2: fmt2, fmtInt: fmtInt, money: money, pct: pct, dt: dt, day: day, toInput: toInput, fromInput: fromInput,
+    now: now, guidFromUrl: guidFromUrl, isGuid: isGuid, uuid: uuid, chunk: chunk, uniq: uniq, parseJson: parseJson,
+    contentHash: contentHash, pill: pill, label: label, clone: clone, toInt: toInt, toNum: toNum,
+    api: api, apiAll: apiAll, post: post, patch: patch, del: del, contactNames: contactNames, loadExam: loadExam,
+    toast: toast, modal: modal, confirmBox: confirmBox, busy: busy, poll: poll, csv: csv, examHeader: examHeader,
+    normalizeParams: normalizeParams, largestRemainder: largestRemainder, difficultySeq: difficultySeq,
+    buildBlueprint: buildBlueprint, cellKey: cellKey, requiredFor: requiredFor, needForCell: needForCell,
+    options: options, blindMatch: blindMatch
+  };
+})();
+</script>

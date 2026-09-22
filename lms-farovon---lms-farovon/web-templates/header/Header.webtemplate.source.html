@@ -24,6 +24,15 @@
 {% endif %}
 {% assign is_admin_role = false %}
 {% if is_hr or is_nastavnik or is_rukovoditel or is_sysadmin %}{% assign is_admin_role = true %}{% endif %}
+{% comment %}
+  Администратор аттестации — отдельная роль и отдельный раздел меню. В общий is_admin_role её
+  не добавляем: наставники сами сдают экзамен, а общий админ-гейт их пускает. Тёмный rail
+  показываем и тем, у кого есть только эта роль, но в нём им виден один раздел «Аттестация».
+{% endcomment %}
+{% assign is_exam_admin = false %}
+{% if user %}{% if user.roles contains 'Аттестация: администратор' %}{% assign is_exam_admin = true %}{% endif %}{% endif %}
+{% assign show_adm_rail = false %}
+{% if is_admin_role or is_exam_admin %}{% assign show_adm_rail = true %}{% endif %}
 
 {% comment %}
   Раздел /admin — тёмный admin-rail вместо белого сайдбара.
@@ -367,14 +376,14 @@
 </style>
 
 <!-- Контекст сайдбара выбирается на клиенте (обходит кеш page.url в шапке) -->
-<script>(function(){var adm={% if is_admin_role %}true{% else %}false{% endif %};document.documentElement.classList.add((adm && /^\/admin(\/|$)/.test(location.pathname))?'ctx-admin':'ctx-portal');})();</script>
+<script>(function(){var adm={% if show_adm_rail %}true{% else %}false{% endif %};document.documentElement.classList.add((adm && /^\/admin(\/|$)/.test(location.pathname))?'ctx-admin':'ctx-portal');})();</script>
 
 <!-- ═══ SIDEBAR ═══ -->
 <aside class="fv-shell" id="fvSidebar" aria-label="Основная навигация">
-  {% if is_admin_role %}
+  {% if show_adm_rail %}
   <div class="fv-ctx fv-ctx--admin">
   <!-- ── Admin Console: тёмный rail (дизайн-кит ui_kits/admin) ── -->
-  <a href="/admin" class="fv-shell-brand">
+  <a href="{% if is_admin_role %}/admin{% else %}/admin/exams{% endif %}" class="fv-shell-brand">
     <span class="fv-adm-logo-box"><img src="/logo%201.png" alt="Farovon" onerror="this.style.display='none'" /></span>
     <span>
       <span class="fv-shell-brand-name">Farovon LMS</span>
@@ -386,6 +395,7 @@
     {% assign cur = page.url %}
     {% comment %}Пункт «Мероприятия» ведёт на /events: страницы /admin/events в сайте нет, ссылка на неё давала 404{% endcomment %}
     {% assign adm_secs = 'Обзор~Дашборд;/admin;grid-1x2,Аналитика;/admin/reports;bar-chart-line|Люди~Сотрудники;/admin/users;people,Группы;/admin/groups;diagram-3,Роли;/admin/roles;shield-check,Центр адаптации;/admin/adaptation-center;person-check,Задачи;/admin/tasks;kanban|Коммуникации~Форум;/admin/forum;chat-dots,Рассылки;/admin/broadcasts;send,Мероприятия;/events;calendar3|Контент~Курсы;/admin/courses;book,Траектории;/admin/paths;signpost-split,Библиотека;/admin/library;collection-play,Тесты;/admin/tests;clipboard-check,Загрузить урок;/admin/h5p-upload;cloud-upload|Система~Настройки;/admin/settings;gear,Интеграции;/admin/integrations;plug,Журнал;/admin/audit;file-text' | split: '|' %}
+    {% if is_admin_role %}
     {% for sec in adm_secs %}
       {% assign sec_parts = sec | split: '~' %}
       <div class="fv-shell-section">{{ sec_parts[0] }}</div>
@@ -403,13 +413,24 @@
         {% endfor %}
       </ul>
     {% endfor %}
+    {% endif %}
+    {% if is_exam_admin %}
+      <div class="fv-shell-section">Аттестация</div>
+      <ul>
+        <li>
+          <a href="/admin/exams" class="fv-adm-link" aria-label="Экзамены">
+            <i class="bi bi-patch-check" aria-hidden="true"></i><span>Экзамены</span>
+          </a>
+        </li>
+      </ul>
+    {% endif %}
   </nav>
 
   <div class="fv-adm-user">
     <div class="fv-user-avatar" style="width:32px;height:32px;font-size:11px;">{{ initials }}</div>
     <div style="flex:1;min-width:0;">
       <div class="fv-adm-user-name">{{ user.fullname | escape }}</div>
-      <div class="fv-adm-user-role">{% if is_hr %}HR{% elsif is_nastavnik %}Наставник{% elsif is_rukovoditel %}Руководитель{% else %}Администратор{% endif %} · Admin</div>
+      <div class="fv-adm-user-role">{% if is_hr %}HR{% elsif is_nastavnik %}Наставник{% elsif is_rukovoditel %}Руководитель{% elsif is_sysadmin %}Администратор{% elsif is_exam_admin %}Аттестация{% else %}Администратор{% endif %} · Admin</div>
     </div>
   </div>
   <a href="{{ sitemarkers['Home'].url | default: '/' }}" class="fv-adm-back"><i class="bi bi-arrow-left" aria-hidden="true"></i> Вернуться на портал</a>
@@ -455,15 +476,25 @@
         {% endfor %}
       </ul>
 
-      {% if is_admin_role %}
+      {% if show_adm_rail %}
       <div class="fv-shell-section">Система</div>
       <ul>
+        {% if is_admin_role %}
         <li>
           <a href="/admin" class="fv-shell-link" aria-label="Админ-консоль">
             <span class="fv-shell-ico" style="background:#0E1A35;color:#C7D2E8;"><i class="bi bi-shield-lock" aria-hidden="true"></i></span>
             <span>Админ-консоль</span>
           </a>
         </li>
+        {% endif %}
+        {% if is_exam_admin %}
+        <li>
+          <a href="/admin/exams" class="fv-shell-link" aria-label="Аттестация">
+            <span class="fv-shell-ico" style="background:#0E1A35;color:#C7D2E8;"><i class="bi bi-patch-check" aria-hidden="true"></i></span>
+            <span>Аттестация</span>
+          </a>
+        </li>
+        {% endif %}
       </ul>
       {% endif %}
 
@@ -740,6 +771,9 @@
       else if (href !== '/' && path.indexOf(href + '/') === 0 && href.length > prefixLen) { prefix = a; prefixLen = href.length; }
     });
     var target = exact || prefix;
+    // Страницы экзамена (/admin/exam-setup, -bank, -results) — дочерние по смыслу к «Экзамены»,
+    // но не по адресу: по префиксу их поймал бы «Дашборд» (/admin), поэтому проверка идёт первой.
+    if (/^\/admin\/exam-/.test(path)) { target = document.querySelector('.fv-adm-link[href="/admin/exams"]') || target; }
     if (target) target.classList.add('active');
   })();
 

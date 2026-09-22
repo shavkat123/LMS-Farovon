@@ -411,7 +411,7 @@
 - adx_name: Webapi/new_exammodule/fields
   adx_sitesettingid: ec0ebfed-95a7-4140-b217-0fdcb64e25da
   adx_source: 0
-  adx_value: new_exammoduleid,new_name,new_exam,_new_exam_value,new_order,new_section,new_weight,new_sourcekind,new_file,new_h5pcontent,_new_h5pcontent_value,new_text,new_narration,new_narrationsource,new_textchars,new_extractedon,new_status,createdon
+  adx_value: new_exammoduleid,new_name,new_exam,_new_exam_value,new_order,new_section,new_weight,new_sourcekind,new_file,new_h5pcontent,_new_h5pcontent_value,new_text,new_narration,new_narrationsource,new_textchars,new_extractedon,new_status,createdon,statecode
 - adx_name: Webapi/new_examslide/enabled
   adx_sitesettingid: 20f5dd85-f958-4540-b814-292e9a2a9d2c
   adx_source: 0
@@ -427,7 +427,7 @@
 - adx_name: Webapi/new_examquestion/fields
   adx_sitesettingid: 29eb26db-15fd-456c-8ee9-c7a7c7bb4520
   adx_source: 0
-  adx_value: new_examquestionid,new_name,new_exam,_new_exam_value,new_module,_new_module_value,new_type,new_difficulty,new_stem,new_optionsjson,new_explanation,new_reference,new_rubricjson,new_points,new_slides,new_sourcequote,new_status,new_reviewjson,new_reviewfirstpass,new_source,new_job,_new_job_value,new_contenthash,new_exposures,new_version,new_parentquestion,_new_parentquestion_value,createdon
+  adx_value: new_examquestionid,new_name,new_exam,_new_exam_value,new_module,_new_module_value,new_type,new_difficulty,new_stem,new_optionsjson,new_explanation,new_reference,new_rubricjson,new_points,new_slides,new_sourcequote,new_status,new_reviewjson,new_reviewfirstpass,new_source,new_job,_new_job_value,new_contenthash,new_exposures,new_version,new_parentquestion,_new_parentquestion_value,createdon,statecode
 - adx_name: Webapi/new_aijob/enabled
   adx_sitesettingid: 14a8710a-9c08-496d-bbea-968acd5557e0
   adx_source: 0
@@ -443,7 +443,7 @@
 - adx_name: Webapi/new_aiprompt/fields
   adx_sitesettingid: 4fbd6e24-7f66-4dd6-8f72-2a0a8441a5d9
   adx_source: 0
-  adx_value: new_aipromptid,new_name,new_code,new_version,new_status,new_systemtext,new_schemajson,new_model,new_effort,new_maxtokens,createdon
+  adx_value: new_aipromptid,new_name,new_code,new_version,new_status,new_systemtext,new_schemajson,new_model,new_effort,new_maxtokens,createdon,statecode
 - adx_name: Webapi/new_examgrade/enabled
   adx_sitesettingid: 5ffa4e35-05a7-4cc6-94d2-208470d78294
   adx_source: 0

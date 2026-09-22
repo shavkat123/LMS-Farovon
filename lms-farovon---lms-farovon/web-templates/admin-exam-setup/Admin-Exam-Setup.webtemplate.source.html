@@ -1,0 +1,1725 @@
+{% comment %}
+  Admin Exam Setup — настройка одного экзамена (/admin/exam-setup?id=<экзамен>).
+  Разделы: основное, билет и правила, уроки (текст озвучки), раскладка билета, создание
+  вопросов ИИ, публикация. Общие помощники и стили — шаблон Exam Admin Common (window.ExamAdm).
+
+  Доступ — только роль «Аттестация: администратор». Общий гейт админки (HR, Наставник и т.д.)
+  здесь не годится: наставники сами сдают этот экзамен.
+
+  Текст ошибки публикации и снимок параметров закрыты для Web API, поэтому читаются здесь,
+  на сервере. Снимок в страницу не выводится (до 1 МБ) — только признак, что он есть.
+  Страница не может очистить снимок, поэтому после первой публикации параметры билета
+  заблокированы навсегда: повторная публикация молча взяла бы старый снимок.
+{% endcomment %}
+{% assign ex_is_admin = false %}
+{% if user and user.roles contains 'Аттестация: администратор' %}{% assign ex_is_admin = true %}{% endif %}
+{% unless ex_is_admin %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только роли «Аттестация: администратор».</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+{% include 'Exam Admin Common' %}
+
+{% comment %}
+  Проверка id до fetchxml: ровно 36 знаков и только цифры, буквы a-f и дефисы.
+  Иначе кривой параметр в адресе ронял бы fetchxml ошибкой вместо понятного сообщения.
+{% endcomment %}
+{% assign exs_id = request.params['id'] | default: '' | downcase | xml_escape %}
+{% assign exs_len = exs_id | size %}
+{% assign exs_rest = exs_id | remove: '0' | remove: '1' | remove: '2' | remove: '3' | remove: '4' | remove: '5' | remove: '6' | remove: '7' | remove: '8' | remove: '9' | remove: 'a' | remove: 'b' | remove: 'c' | remove: 'd' | remove: 'e' | remove: 'f' | remove: '-' %}
+{% assign exs_rest_len = exs_rest | size %}
+{% assign exs_found = false %}
+{% if exs_len == 36 and exs_rest_len == 0 %}
+{% fetchxml exs_one %}
+<fetch top="1">
+  <entity name="new_exam">
+    <attribute name="new_examid" />
+    <attribute name="new_status" />
+    <attribute name="new_errortext" />
+    <attribute name="new_configsnapshot" />
+    <filter><condition attribute="new_examid" operator="eq" value="{{ exs_id }}" /></filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign exs = exs_one.results.entities | first %}
+{% if exs %}{% assign exs_found = true %}{% endif %}
+{% endif %}
+
+{% if exs_found %}
+{% assign exs_snap = exs.new_configsnapshot | default: '' %}
+{% assign exs_snap_len = exs_snap | size %}
+
+<style>
+  .exs-num { max-width: 130px; }
+  .exad-scroll > .adm-table.exs-narrow { min-width: 380px; }
+  .exad .adm-cardhead { flex-wrap: wrap; gap: 8px; }
+  .exs-head-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .exs-sm { padding: 4px 10px; font-size: 12px; }
+  .exs-c { text-align: center !important; white-space: nowrap; }
+  .exs-layout th, .exs-layout td { padding-left: 8px; padding-right: 8px; }
+  .exs-lname { font-weight: 600; }
+  .exs-total td { border-top: 2px solid var(--adm-border-2); background: #FAFBFC; }
+  .exs-sub td { background: var(--adm-bg-muted); font-size: 12px; line-height: 1.45; }
+  .exs-check { list-style: none; margin: 0 0 12px; padding: 0; }
+  .exs-check li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--adm-border-1); font-size: 13px; line-height: 1.45; }
+  .exs-check li:last-child { border-bottom: 0; }
+  .exs-mark { flex: 0 0 20px; width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+              font-weight: 700; font-size: 12px; color: #fff; margin-top: 1px; }
+  .exs-mark--ok { background: var(--adm-success); }
+  .exs-mark--bad { background: var(--adm-danger); }
+  .exs-mark--warn { background: #B45309; }
+  .exs-detail { display: block; font-size: 12px; color: var(--adm-fg-2); margin-top: 2px; }
+  details.exs-more { margin-top: 16px; border-top: 1px solid var(--adm-border-1); padding-top: 12px; }
+  details.exs-more summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var(--adm-fg-2); }
+  .exs-kv { margin: 10px 0 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 16px; font-size: 13px; }
+  .exs-kv dt { font-weight: 400; color: var(--adm-fg-2); }
+  .exs-kv dd { margin: 0; font-weight: 600; text-align: right; word-break: break-word; }
+  .exs-sub-title { font-size: 13px; font-weight: 700; color: var(--adm-fg-1); margin: 18px 0 8px; }
+  .exs-head-cell { max-width: 360px; font-size: 12px; color: var(--adm-fg-2); }
+  @media (max-width: 640px) {
+    .exad .adm-cardhead { padding: 12px 14px; }
+    .exad .exad-card-body { padding: 12px; }
+  }
+</style>
+
+<div class="container adm-scope exad" id="exsRoot"
+     data-exam="{{ exs.new_examid }}"
+     data-status="{{ exs.new_status.value }}"
+     data-has-snapshot="{% if exs_snap_len > 0 %}1{% else %}0{% endif %}">
+  <textarea id="exsErr" hidden readonly>{{ exs.new_errortext | escape }}</textarea>
+
+  <div id="exsHead"></div>
+  <div id="exsLoading" class="exad-empty"><span class="exad-spin"></span> Загружаем экзамен…</div>
+
+  <div id="exsMain" hidden>
+    <div id="exsErrBox"></div>
+
+    <!-- 1. Основное -->
+    <section class="adm-card exad-section" id="exsBasics">
+      <div class="adm-cardhead"><div class="adm-cardhead-title">Основное</div></div>
+      <div class="exad-card-body">
+        <div id="exsBasicsNote"></div>
+        <div class="exad-grid">
+          <div class="exad-field">
+            <label for="exsName">Название</label>
+            <input id="exsName" class="adm-input" maxlength="200" autocomplete="off">
+          </div>
+          <div class="exad-field">
+            <label for="exsCourse">Курс</label>
+            <select id="exsCourse" class="adm-input"></select>
+            <span class="exad-hint" id="exsCourseHint">Необязательно. Курс, по материалам которого проводится экзамен.</span>
+          </div>
+          <div class="exad-field">
+            <label for="exsOpens">Начало</label>
+            <input id="exsOpens" type="datetime-local" class="adm-input">
+            <span class="exad-hint">Время по Душанбе (UTC+5). До начала экзамен сдавать нельзя.</span>
+          </div>
+          <div class="exad-field">
+            <label for="exsCloses">Окончание</label>
+            <input id="exsCloses" type="datetime-local" class="adm-input">
+            <span class="exad-hint">После окончания экзамен закроется сам.</span>
+          </div>
+          <div class="exad-field">
+            <label for="exsCertMonths">Срок действия сертификата, мес.</label>
+            <input id="exsCertMonths" type="number" min="1" max="120" step="1" class="adm-input">
+            <span class="exad-hint">Если оставить пустым — 12 месяцев.</span>
+          </div>
+          <div class="exad-field">
+            <label for="exsConsentVer">Версия согласия</label>
+            <input id="exsConsentVer" class="adm-input" maxlength="20" autocomplete="off">
+            <span class="exad-hint">Меняйте версию каждый раз, когда меняете текст согласия.</span>
+          </div>
+        </div>
+        <div class="exad-field" style="margin-top:12px;">
+          <label for="exsRules">Правила экзамена</label>
+          <textarea id="exsRules" class="adm-input" rows="5" maxlength="10000"></textarea>
+          <span class="exad-hint">Участник видит их перед началом попытки.</span>
+        </div>
+        <div class="exad-field" style="margin-top:12px;">
+          <label for="exsConsent">Текст согласия</label>
+          <textarea id="exsConsent" class="adm-input" rows="4" maxlength="10000"></textarea>
+          <span class="exad-hint">Участник подтверждает его отметкой перед началом, если в разделе «Билет и правила» включено «Требовать согласие».</span>
+        </div>
+        <div class="exad-actions exad-actions--end" style="margin-top:12px;">
+          <button type="button" class="adm-btn adm-btn--primary" data-act="save-basics">Сохранить</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Билет и правила -->
+    <section class="adm-card exad-section" id="exsParams">
+      <div class="adm-cardhead">
+        <div class="adm-cardhead-title">Билет и правила</div>
+        <span class="exad-muted" id="exsParamsState"></span>
+      </div>
+      <div class="exad-card-body">
+        <div id="exsParamsLock"></div>
+        <div id="exsParamsInfo"></div>
+
+        <div class="exs-sub-title" style="margin-top:0;">Состав билета</div>
+        <div class="exad-scroll">
+          <table class="adm-table exs-narrow">
+            <thead><tr><th>Тип задания</th><th>Заданий в билете</th><th>Вес, %</th></tr></thead>
+            <tbody>
+              <tr><td>Одиночный выбор</td>
+                <td><input type="number" min="0" max="200" step="1" class="adm-input exs-num" data-block="single" data-f="count" aria-label="Заданий одиночного выбора"></td>
+                <td><input type="number" min="0" max="100" step="any" class="adm-input exs-num" data-block="single" data-f="weight" aria-label="Вес одиночного выбора"></td></tr>
+              <tr><td>Множественный выбор</td>
+                <td><input type="number" min="0" max="200" step="1" class="adm-input exs-num" data-block="multi" data-f="count" aria-label="Заданий множественного выбора"></td>
+                <td><input type="number" min="0" max="100" step="any" class="adm-input exs-num" data-block="multi" data-f="weight" aria-label="Вес множественного выбора"></td></tr>
+              <tr><td>Кейс</td>
+                <td><input type="number" class="adm-input exs-num" data-block="case" data-f="count" data-written disabled aria-label="Заданий-кейсов"></td>
+                <td><input type="number" class="adm-input exs-num" data-block="case" data-f="weight" data-written disabled aria-label="Вес кейсов"></td></tr>
+              <tr><td>Контрольный вопрос</td>
+                <td><input type="number" class="adm-input exs-num" data-block="control" data-f="count" data-written disabled aria-label="Контрольных вопросов"></td>
+                <td><input type="number" class="adm-input exs-num" data-block="control" data-f="weight" data-written disabled aria-label="Вес контрольных вопросов"></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="exad-muted" style="margin:8px 0 0;">Веса задают долю блока в итоговом проценте; учитываются только блоки, в которых есть задания. Письменные задания станут доступны, когда подключим оценку письменных ответов (сейчас такие попытки не получат оценку).</p>
+
+        <div class="exs-sub-title">Уровни сложности, %</div>
+        <div class="exad-grid">
+          <div class="exad-field"><label for="exsDBasic">Базовый</label><input id="exsDBasic" type="number" min="0" max="100" step="any" class="adm-input" data-p="difficulty.basic"></div>
+          <div class="exad-field"><label for="exsDMedium">Средний</label><input id="exsDMedium" type="number" min="0" max="100" step="any" class="adm-input" data-p="difficulty.medium"></div>
+          <div class="exad-field"><label for="exsDAdv">Продвинутый</label><input id="exsDAdv" type="number" min="0" max="100" step="any" class="adm-input" data-p="difficulty.advanced"></div>
+        </div>
+        <p class="exad-muted" style="margin:6px 0 0;">Доли внутри каждого блока. Сумма не обязана быть 100 — считается пропорция.</p>
+
+        <div class="exs-sub-title">Оценка и попытки</div>
+        <div class="exad-grid">
+          <div class="exad-field">
+            <label for="exsPass">Проходной балл, %</label>
+            <input id="exsPass" type="number" min="0" max="100" step="any" class="adm-input" data-p="passPercent">
+          </div>
+          <div class="exad-field">
+            <label for="exsMulti">Как считать множественный выбор</label>
+            <select id="exsMulti" class="adm-input" data-p="multiMode">
+              <option value="penalty">Штраф за лишний вариант (рекомендуется)</option>
+              <option value="allOrNothing">Всё или ничего</option>
+              <option value="perOption">По каждому варианту</option>
+            </select>
+          </div>
+          <div class="exad-field">
+            <label for="exsRule">Какая попытка идёт в итог</label>
+            <select id="exsRule" class="adm-input" data-p="attemptRule">
+              <option value="best">Лучшая</option>
+              <option value="last">Последняя</option>
+            </select>
+          </div>
+          <div class="exad-field">
+            <label for="exsAttempts">Попыток всего</label>
+            <input id="exsAttempts" type="number" min="1" max="20" step="1" class="adm-input" data-p="maxAttempts">
+          </div>
+          <div class="exad-field">
+            <label for="exsInterval">Пауза перед пересдачей, дней</label>
+            <input id="exsInterval" type="number" min="0" max="365" step="1" class="adm-input" data-p="minIntervalDays">
+          </div>
+          <div class="exad-field">
+            <label for="exsMinutes">Время на билет, минут</label>
+            <input id="exsMinutes" type="number" min="1" max="600" step="1" class="adm-input" data-p="ticketMinutes">
+          </div>
+          <div class="exad-field">
+            <label for="exsBank">Запас банка (bankFactor)</label>
+            <input id="exsBank" type="number" min="1" max="10" step="1" class="adm-input" data-p="bankFactor">
+            <span class="exad-hint">В банке нужно вопросов = заданий в ячейке × (попыток + 1) × запас.</span>
+          </div>
+          <div class="exad-field">
+            <label for="exsExpo">Показов в разборе до вывода вопроса</label>
+            <input id="exsExpo" type="number" min="1" max="1000" step="1" class="adm-input" data-p="maxExposures">
+            <span class="exad-hint">Вопрос, который столько раз показали в разборе, выводится из банка.</span>
+          </div>
+          <div class="exad-field">
+            <label for="exsReveal">Что участник видит в разборе</label>
+            <select id="exsReveal" class="adm-input" data-p="revealMode">
+              <option value="full">Полный разбор с верными ответами</option>
+              <option value="correctnessOnly">Только верно/неверно</option>
+            </select>
+          </div>
+          <div class="exad-field">
+            <label for="exsNeutral">Нейтрализованный вопрос</label>
+            <select id="exsNeutral" class="adm-input" data-p="neutralizeRule">
+              <option value="exclude">Исключить из подсчёта</option>
+              <option value="creditAll">Засчитать всем</option>
+            </select>
+          </div>
+          <div class="exad-field">
+            <label for="exsAppeal">Окно апелляции, часов</label>
+            <input id="exsAppeal" type="number" min="0" max="720" step="1" class="adm-input" data-p="appealWindowHours">
+            <span class="exad-hint">Пересдача открывается только после окончания этого окна.</span>
+          </div>
+          <div class="exad-field" style="justify-content:center;">
+            <label class="exad-check"><input type="checkbox" data-p="requireConsent"> Требовать согласие</label>
+            <span class="exad-hint">Нужны текст и версия согласия в разделе «Основное».</span>
+          </div>
+        </div>
+
+        <div class="exs-sub-title">Версии промптов оценки</div>
+        <div class="exad-grid" id="exsPrompts"></div>
+        <p class="exad-muted" style="margin:6px 0 0;">В списке только утверждённые версии. Публикация проверяет, что все пять есть и утверждены.</p>
+
+        <details class="exs-more">
+          <summary>Дополнительно (только просмотр)</summary>
+          <div id="exsAdvanced"></div>
+        </details>
+
+        <div id="exsParamsErr" style="margin-top:12px;"></div>
+        <div class="exad-actions exad-actions--end" style="margin-top:12px;">
+          <button type="button" class="adm-btn adm-btn--primary" id="exsSaveParams" data-act="save-params">Сохранить параметры</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Уроки -->
+    <section class="adm-card exad-section" id="exsLessonsCard">
+      <div class="adm-cardhead">
+        <div class="adm-cardhead-title">Уроки</div>
+        <div class="exs-head-actions">
+          <button type="button" class="adm-btn adm-btn--ghost" data-act="upload" id="exsUploadBtn"><i class="bi bi-file-earmark-text" aria-hidden="true"></i> Загрузить текст курса</button>
+          <button type="button" class="adm-btn adm-btn--primary" data-act="add-lesson"><i class="bi bi-plus-lg" aria-hidden="true"></i> Добавить урок</button>
+          <input type="file" id="exsFile" accept=".docx,.txt,.vtt" hidden>
+        </div>
+      </div>
+      <div class="exad-card-body">
+        <div class="exad-note exad-note--info">Вопросы создаются из текста озвучки урока. У <b>каждого</b> урока экзамена должен быть текст — иначе публикация не пройдёт. Удалить урок нельзя, поэтому лишние уроки не добавляйте.</div>
+        <div id="exsLessons"></div>
+        <details class="exs-more">
+          <summary>Как получить текст, если урок только озвучен</summary>
+          <p class="exad-small" style="margin:8px 0 0;">Если урок озвучен, а текста нет:</p>
+          <ol class="exad-small" style="margin:4px 0 0;padding-left:18px;">
+            <li>загрузить видео урока в SharePoint;</li>
+            <li>открыть его в Stream и включить расшифровку;</li>
+            <li>скачать файл VTT или DOCX;</li>
+            <li>загрузить этот файл сюда (кнопка «Загрузить текст курса»).</li>
+          </ol>
+          <p class="exad-small" style="margin:8px 0 0;">Файл всего курса (DOCX) страница сама разобьёт на уроки по начальным фразам уроков и покажет разбивку — её нужно проверить перед сохранением.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- 4. Раскладка билета -->
+    <section class="adm-card exad-section" id="exsLayoutCard">
+      <div class="adm-cardhead"><div class="adm-cardhead-title">Раскладка билета</div></div>
+      <div class="exad-card-body">
+        <p class="exad-muted" style="margin:0 0 10px;">Сколько заданий каждого урока, типа и уровня попадёт в билет, и хватает ли для этого одобренных вопросов. В ячейке: <b>заданий в билете → одобрено в банке / нужно</b>. Пересчитывается сразу при изменении параметров и весов уроков.</p>
+        <div id="exsLayout"></div>
+      </div>
+    </section>
+
+    <!-- 5. Создание вопросов ИИ -->
+    <section class="adm-card exad-section" id="exsJobsCard">
+      <div class="adm-cardhead">
+        <div class="adm-cardhead-title">Создание вопросов ИИ</div>
+        <div class="exs-head-actions">
+          <button type="button" class="adm-btn adm-btn--ghost" data-act="refresh-jobs"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Обновить</button>
+          <button type="button" class="adm-btn adm-btn--primary" data-act="create-missing"><i class="bi bi-stars" aria-hidden="true"></i> Создать недостающее</button>
+        </div>
+      </div>
+      <div class="exad-card-body">
+        <p class="exad-muted" style="margin:0 0 10px;">ИИ пишет вопросы по тексту урока, другой промпт их проверяет; в банк попадают только одобренные. Задание нельзя отменить или изменить со страницы — при неудаче создаётся новое.</p>
+        <div id="exsJobsNote"></div>
+        <div id="exsJobs"></div>
+      </div>
+    </section>
+
+    <!-- 6. Публикация -->
+    <section class="adm-card exad-section" id="exsPublishCard">
+      <div class="adm-cardhead"><div class="adm-cardhead-title">Публикация</div></div>
+      <div class="exad-card-body">
+        <div id="exsPublish"></div>
+        <div id="exsPublishState"></div>
+        <div class="exad-actions exad-actions--end">
+          <button type="button" class="adm-btn adm-btn--primary" id="exsPublishBtn" data-act="publish" disabled><i class="bi bi-send" aria-hidden="true"></i> Опубликовать</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var A = window.ExamAdm;
+  var root = document.getElementById('exsRoot');
+  if (!A || !root) { return; }
+  var V = A.V, esc = A.esc;
+
+  /* ── Константы ─────────────────────────────────────────────────────────────────────── */
+  var PROMPT_LABEL = {
+    TRIAGE: 'Первичная проверка ответа',
+    GRADE_CASE: 'Оценка кейса',
+    GRADE_CONTROL: 'Оценка контрольного вопроса',
+    APPEAL: 'Пересмотр по апелляции',
+    ARBITER: 'Арбитр при расхождении оценок'
+  };
+  var MODEL_LABEL = { grader: 'Оценка письменных ответов', appeal: 'Апелляция', arbiter: 'Арбитр', triage: 'Первичная проверка', substitute: 'Подбор замены' };
+  var EFFORT_LABEL = { low: 'низкая', medium: 'средняя', high: 'высокая' };
+  var WRITTEN = ['case', 'control'];          // письменные блоки: оценка ещё не подключена
+  var MIN_CHARS = 300;                        // меньше — поток создания вопросов откажется работать
+  var CHARS_PER_Q = 400;                      // поток ограничивает задание ≈1 вопросом на 400 знаков
+  var STUCK_MIN = 60;                         // сторожа у заданий нет — после часа честно предупреждаем
+  var JOB_POLL_MS = 10000;
+  var MAX_MEMO = 10000;                       // правила и согласие: столбцы вмещают 10 000 знаков
+  var MAX_PARAMS = 50000;                     // столбец параметров вмещает 50 000 знаков
+  var EV_PUB = "'EXAM_PUBLISHED'", EV_FAIL = "'EXAM_PUBLISH_FAILED'";
+  /* Поля «Оценка и попытки»: ключ, целое?, минимум, максимум, подпись для ошибки */
+  var PFIELDS = [
+    ['passPercent', false, 0, 100, 'Проходной балл'],
+    ['maxAttempts', true, 1, 20, 'Попыток всего'],
+    ['minIntervalDays', true, 0, 365, 'Пауза перед пересдачей'],
+    ['ticketMinutes', true, 1, 600, 'Время на билет'],
+    ['bankFactor', true, 1, 10, 'Запас банка'],
+    ['maxExposures', true, 1, 1000, 'Показов в разборе до вывода вопроса'],
+    ['appealWindowHours', true, 0, 720, 'Окно апелляции']
+  ];
+  var PSELECTS = ['multiMode', 'attemptRule', 'revealMode', 'neutralizeRule'];
+
+  var S = {
+    id: String(root.getAttribute('data-exam') || '').toLowerCase(),
+    hasSnap: root.getAttribute('data-has-snapshot') === '1',
+    errText: (document.getElementById('exsErr') || {}).value || '',
+    exam: null, storedRaw: '', base: null, current: null,
+    lessons: [], lessonById: {}, courses: [], coursesFailed: false, prompts: [],
+    approvedCell: {}, approvedByModule: {},
+    jobs: [], progress: {}, polling: false, pollStopped: false,
+    otherPublished: [], pubLog: null, locked: true, publishing: false,
+    weightDraft: {}, lessonSaving: false
+  };
+
+  /* ── Мелочи ────────────────────────────────────────────────────────────────────────── */
+  function $(id) { return document.getElementById(id); }
+  function q(sel) { return root.querySelector(sel); }
+  function qa(sel) { return Array.prototype.slice.call(root.querySelectorAll(sel)); }
+  function lower(g) { return String(g || '').toLowerCase(); }
+  function noop() { /* ошибка второстепенного запроса не должна ломать страницу */ }
+  /* Материал урока — как у потока создания вопросов: сначала озвучка, потом текст слайдов */
+  function material(m) { return String(m.new_narration || m.new_text || ''); }
+  /* Публикация проверяет озвучку ИЛИ текст слайдов у каждого урока */
+  function hasText(m) { return !!(String(m.new_narration || '').trim() || String(m.new_text || '').trim()); }
+  function charsOf(m) { return m.new_textchars != null ? m.new_textchars : material(m).length; }
+  function weightOf(m) { return m.new_weight == null ? 1 : Number(m.new_weight); }
+  /* Для раскладки: набранный, но ещё не сохранённый вес (раскладка пересчитывается при вводе) */
+  function layoutWeight(m) { return Object.prototype.hasOwnProperty.call(S.weightDraft, m.new_exammoduleid) ? S.weightDraft[m.new_exammoduleid] : weightOf(m); }
+  function capOf(m) { return Math.max(1, Math.floor(material(m).length / CHARS_PER_Q)); }
+  function isRunning(j) { return j.new_status === V.JOB_CREATED || j.new_status === V.JOB_RUNNING; }
+  function isStuck(j) { return isRunning(j) && (A.now() - new Date(j.createdon).getTime()) > STUCK_MIN * 60000; }
+  function lessonName(id) { var m = S.lessonById[lower(id)]; return m ? (m.new_name || 'Без названия') : '—'; }
+  function note(kind, html) { return '<div class="exad-note exad-note--' + kind + '">' + html + '</div>'; }
+  function isDraftFree() { return S.exam && S.exam.new_status === V.EXAM_DRAFT && !S.hasSnap; }
+  function elapsed(fromIso) {
+    var ms = A.now() - new Date(fromIso).getTime();
+    if (isNaN(ms) || ms < 0) { return '—'; }
+    var min = Math.floor(ms / 60000);
+    if (min < 60) { return min + ' мин'; }
+    return Math.floor(min / 60) + ' ч ' + ('0' + (min % 60)).slice(-2) + ' мин';
+  }
+  function sumCounts(spec) {
+    var c = spec && spec.counts, n = 0;
+    if (!c || typeof c !== 'object') { return 0; }
+    Object.keys(c).forEach(function (t) {
+      var row = c[t] || {};
+      Object.keys(row).forEach(function (d) { n += parseInt(row[d], 10) || 0; });
+    });
+    return n;
+  }
+  /* Тексты потока публикации: id урока → название, коды типа и уровня → по-русски */
+  function humanize(text) {
+    return String(text || '')
+      .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, function (g) {
+        var m = S.lessonById[g.toLowerCase()];
+        return m ? '«' + (m.new_name || 'Без названия') + '»' : g;
+      })
+      .replace(/тип (single|multi|case|control)\b/g, function (s, t) { return 'тип «' + A.LABEL.type[t] + '»'; })
+      .replace(/сложность (basic|medium|advanced)\b/g, function (s, d) { return 'сложность «' + A.LABEL.difficulty[d] + '»'; });
+  }
+  /* Действия по очереди, а не залпом: и портал, и потоки плохо переносят пачку одновременных записей */
+  function runSeq(items, fn) {
+    var ok = 0, errors = [];
+    return items.reduce(function (pr, it) {
+      return pr.then(function () {
+        return Promise.resolve().then(function () { return fn(it); })
+          .then(function () { ok++; }, function (e) { errors.push(e); });
+      });
+    }, Promise.resolve()).then(function () { return { ok: ok, errors: errors }; });
+  }
+  function byOrder(a, b) {
+    var x = a.new_order == null ? 1e9 : a.new_order, y = b.new_order == null ? 1e9 : b.new_order;
+    return x - y || String(a.new_name || '').localeCompare(String(b.new_name || ''), 'ru');
+  }
+
+  /* ── Загрузка данных ───────────────────────────────────────────────────────────────── */
+  /* Уроки, вопросы и промпты — только активные (statecode 0): поток публикации неактивные
+     не видит, иначе проверка на странице расходилась бы с проверкой на сервере */
+  function loadLessons() {
+    return A.apiAll('/_api/new_exammodules?$select=new_exammoduleid,new_name,new_order,new_section,new_weight,new_sourcekind,' +
+      'new_narrationsource,new_textchars,new_extractedon,new_status,new_narration,new_text' +
+      '&$filter=_new_exam_value eq ' + S.id + ' and statecode eq 0&$orderby=new_order asc&$top=500', 1000).then(function (rows) {
+      rows.forEach(function (m) { m.new_exammoduleid = lower(m.new_exammoduleid); });
+      rows.sort(byOrder);
+      S.lessons = rows;
+      S.lessonById = {};
+      rows.forEach(function (m) { S.lessonById[m.new_exammoduleid] = m; });
+    });
+  }
+  /* Одобренные вопросы по ячейкам «урок × тип × уровень» — по фактическому уровню вопроса */
+  function loadBank() {
+    return A.apiAll('/_api/new_examquestions?$select=_new_module_value,new_type,new_difficulty,new_status' +
+      '&$filter=_new_exam_value eq ' + S.id + ' and statecode eq 0&$top=5000', 20000).then(function (rows) {
+      var cell = {}, byMod = {};
+      rows.forEach(function (r) {
+        if (r.new_status !== V.Q_APPROVED) { return; }
+        var t = A.CODE.type[r.new_type], d = A.CODE.difficulty[r.new_difficulty], m = lower(r._new_module_value);
+        if (m) { byMod[m] = (byMod[m] || 0) + 1; }
+        if (!t || !d || !m) { return; }
+        var k = A.cellKey(t, m, d);
+        cell[k] = (cell[k] || 0) + 1;
+      });
+      S.approvedCell = cell;
+      S.approvedByModule = byMod;
+    });
+  }
+  function loadPrompts() {
+    return A.api('/_api/new_aiprompts?$select=new_code,new_version,new_status,new_model&$filter=new_status eq ' + V.PROMPT_APPROVED + ' and statecode eq 0&$top=500')
+      .then(function (j) { S.prompts = j.value || []; });
+  }
+  function loadCourses() {
+    return A.api('/_api/msdynce_courses?$select=msdynce_courseid,msdynce_coursename&$filter=statecode eq 0&$orderby=msdynce_coursename asc&$top=500')
+      .then(function (j) { S.courses = j.value || []; });
+  }
+  function loadJobs() {
+    return A.api('/_api/new_aijobs?$select=new_aijobid,new_name,_new_module_value,new_status,new_specjson,new_created,new_approved,new_rejected,' +
+      'new_inputtokens,new_outputtokens,new_costusd,new_errortext,createdon' +
+      '&$filter=_new_exam_value eq ' + S.id + '&$orderby=createdon desc&$top=200')
+      .then(function (j) { S.jobs = j.value || []; S.jobs.forEach(function (x) { x.new_aijobid = lower(x.new_aijobid); }); });
+  }
+  /* Страница аттестации участника показывает только последний опубликованный экзамен */
+  function loadOthers() {
+    return A.api('/_api/new_exams?$select=new_examid,new_name,new_publishedon&$filter=new_status eq ' + V.EXAM_PUBLISHED + '&$top=20')
+      .then(function (j) { S.otherPublished = (j.value || []).filter(function (e) { return lower(e.new_examid) !== S.id; }); });
+  }
+  function loadPubLog() {
+    return A.api('/_api/new_examlogs?$select=new_event,new_payload,createdon&$filter=_new_exam_value eq ' + S.id + ' and new_event eq ' + EV_PUB + '&$orderby=createdon desc&$top=1')
+      .then(function (j) { S.pubLog = (j.value || [])[0] || null; });
+  }
+  function loadProgress(job) {
+    return A.api('/_api/new_examquestions?$select=new_status,_new_job_value&$filter=_new_job_value eq ' + job.new_aijobid + '&$top=500').then(function (j) {
+      var pr = { total: 0, approved: 0, rejected: 0, review: 0 };
+      (j.value || []).forEach(function (x) {
+        pr.total++;
+        if (x.new_status === V.Q_APPROVED) { pr.approved++; } else if (x.new_status === V.Q_REJECTED) { pr.rejected++; } else if (x.new_status === V.Q_REVIEW) { pr.review++; }
+      });
+      S.progress[job.new_aijobid] = pr;
+    }).catch(noop);
+  }
+
+  function init() {
+    if (!S.id) { return; }
+    A.loadExam(S.id).then(function (exam) {
+      S.exam = exam;
+      S.storedRaw = exam.new_paramsjson || '';
+      S.locked = !isDraftFree();
+      renderHeader();
+      return Promise.all([
+        loadLessons(), loadBank(), loadPrompts(), loadJobs(),
+        loadCourses().catch(function () { S.coursesFailed = true; }),
+        loadOthers().catch(noop),
+        exam.new_publishedon ? loadPubLog().catch(noop) : null
+      ]);
+    }).then(function () {
+      $('exsLoading').hidden = true;
+      $('exsMain').hidden = false;
+      renderErrorBox();
+      renderBasics();
+      renderParams();
+      renderLessons();
+      recompute();
+      renderJobs();
+      if (S.jobs.some(isRunning)) { startJobPolling(); }
+    }).catch(function (e) {
+      $('exsLoading').className = '';
+      $('exsLoading').innerHTML = note('danger', 'Не удалось загрузить экзамен. ' + esc(e.message) +
+        ' <a class="exad-link" href="/admin/exams">К списку экзаменов</a>');
+    });
+  }
+
+  /* ── Шапка и ошибка последней публикации ───────────────────────────────────────────── */
+  function renderHeader() {
+    var e = S.exam;
+    var sub = 'Окно проведения: ' + A.dt(e.new_opens) + ' — ' + A.dt(e.new_closes);
+    if (e.new_publishedon) { sub += ' · опубликован ' + A.dt(e.new_publishedon); }
+    A.examHeader($('exsHead'), e, 'setup', esc(sub));
+  }
+  function renderErrorBox() {
+    var box = $('exsErrBox'), t = String(S.errText || '').trim();
+    if (!t || S.exam.new_status !== V.EXAM_DRAFT) { box.innerHTML = ''; return; }
+    var lines = t.split(/\r?\n/).filter(function (l) { return l.trim(); });
+    box.innerHTML = note('danger', '<b>Последняя попытка публикации не прошла.</b> Причины:<ul>' +
+      lines.map(function (l) { return '<li>' + esc(humanize(l)) + '</li>'; }).join('') + '</ul>' +
+      '<div class="exad-small" style="margin-top:6px;">Исправьте это и опубликуйте снова. Что ещё не готово — видно в разделе «Публикация» внизу страницы.</div>');
+  }
+
+  /* ── 1. Основное ───────────────────────────────────────────────────────────────────── */
+  function renderBasics() {
+    var e = S.exam;
+    $('exsName').value = e.new_name || '';
+    $('exsOpens').value = A.toInput(e.new_opens);
+    $('exsCloses').value = A.toInput(e.new_closes);
+    $('exsCertMonths').value = e.new_certvalidmonths == null ? '' : e.new_certvalidmonths;
+    $('exsConsentVer').value = e.new_consentversion || '';
+    $('exsRules').value = e.new_rules_ru || '';
+    $('exsConsent').value = e.new_consenttext || '';
+    var cur = lower(e._new_course_value), found = false, html = '<option value="">— не выбран —</option>';
+    S.courses.forEach(function (c) {
+      var id = lower(c.msdynce_courseid);
+      if (id === cur) { found = true; }
+      html += '<option value="' + esc(id) + '">' + esc(c.msdynce_coursename || 'Без названия') + '</option>';
+    });
+    if (cur && !found) { html += '<option value="' + esc(cur) + '">Текущий курс (нет в списке)</option>'; }
+    $('exsCourse').innerHTML = html;
+    $('exsCourse').value = cur;
+    if (S.coursesFailed) { $('exsCourseHint').textContent = 'Список курсов не загрузился — курс можно оставить как есть.'; }
+    var st = e.new_status;
+    $('exsBasicsNote').innerHTML = st === V.EXAM_DRAFT ? '' : note('info',
+      'Экзамен ' + (st === V.EXAM_PUBLISHED ? 'опубликован' : 'закрыт') + '. Эти поля можно менять и сейчас — они действуют сразу. ' +
+      'Но осторожно: новая версия согласия потребует нового согласия во всех следующих попытках, а изменение времени меняет, кто может начать экзамен.' +
+      (st === V.EXAM_CLOSED ? ' Закрытый экзамен продление окна заново не откроет.' : ''));
+  }
+  function basicsDirty() {
+    var e = S.exam;
+    if (!e) { return false; }
+    return $('exsName').value.trim() !== (e.new_name || '') ||
+      $('exsOpens').value !== A.toInput(e.new_opens) ||
+      $('exsCloses').value !== A.toInput(e.new_closes) ||
+      String($('exsCertMonths').value) !== (e.new_certvalidmonths == null ? '' : String(e.new_certvalidmonths)) ||
+      $('exsConsentVer').value.trim() !== (e.new_consentversion || '') ||
+      $('exsRules').value !== (e.new_rules_ru || '') ||
+      $('exsConsent').value !== (e.new_consenttext || '') ||
+      $('exsCourse').value !== lower(e._new_course_value);
+  }
+  function saveBasics(btn) {
+    var e = S.exam, errors = [];
+    var name = $('exsName').value.trim();
+    var opensV = $('exsOpens').value, closesV = $('exsCloses').value;
+    var opens = A.fromInput(opensV), closes = A.fromInput(closesV);
+    var monthsV = String($('exsCertMonths').value).trim();
+    var ver = $('exsConsentVer').value.trim();
+    var course = $('exsCourse').value, curCourse = lower(e._new_course_value);
+    if (!name) { errors.push('Укажите название.'); }
+    if (opensV && !opens) { errors.push('Начало: неверная дата.'); }
+    if (closesV && !closes) { errors.push('Окончание: неверная дата.'); }
+    if (opens && closes && new Date(opens).getTime() >= new Date(closes).getTime()) { errors.push('Начало должно быть раньше окончания.'); }
+    var months = null;
+    if (monthsV !== '') {
+      if (!/^\d+$/.test(monthsV) || parseInt(monthsV, 10) < 1 || parseInt(monthsV, 10) > 120) { errors.push('Срок действия сертификата — целое число месяцев от 1 до 120.'); }
+      else { months = parseInt(monthsV, 10); }
+    }
+    if (ver.length > 20) { errors.push('Версия согласия — не длиннее 20 знаков.'); }
+    if ($('exsRules').value.length > MAX_MEMO) { errors.push('Правила экзамена — не длиннее ' + A.fmtInt(MAX_MEMO) + ' знаков.'); }
+    if ($('exsConsent').value.length > MAX_MEMO) { errors.push('Текст согласия — не длиннее ' + A.fmtInt(MAX_MEMO) + ' знаков.'); }
+    /* Отвязать курс через этот вызов нельзя — только заменить другим */
+    if (!course && curCourse) { errors.push('Убрать курс здесь нельзя — можно только выбрать другой.'); }
+    if (errors.length) { A.toast(errors.join(' '), 'err'); return; }
+
+    var body = {
+      new_name: name,
+      new_opens: opens,
+      new_closes: closes,
+      new_certvalidmonths: months,
+      new_rules_ru: $('exsRules').value,
+      new_consenttext: $('exsConsent').value,
+      new_consentversion: ver
+    };
+    if (course && course !== curCourse) { body['new_course@odata.bind'] = '/msdynce_courses(' + course + ')'; }
+
+    var warn = [];
+    if (e.new_status !== V.EXAM_DRAFT) {
+      if (ver !== (e.new_consentversion || '')) { warn.push('Новая версия согласия: во всех следующих попытках участникам нужно будет дать согласие заново; уже начатые попытки это не затронет.'); }
+      if (opensV !== A.toInput(e.new_opens) || closesV !== A.toInput(e.new_closes)) { warn.push('Изменится время проведения: это сразу меняет, кто может начать экзамен, и ограничивает время уже идущих попыток окончанием окна.'); }
+      if (e.new_status === V.EXAM_CLOSED && (opensV !== A.toInput(e.new_opens) || closesV !== A.toInput(e.new_closes))) { warn.push('Экзамен уже закрыт — новое окно его заново не откроет.'); }
+    }
+    var ask = warn.length ? A.confirmBox('Сохранить изменения?', '<p>Экзамен уже ' + (e.new_status === V.EXAM_PUBLISHED ? 'опубликован' : 'закрыт') + ', изменения подействуют сразу.</p><ul>' +
+      warn.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>', 'Сохранить') : Promise.resolve(true);
+    ask.then(function (ok) {
+      if (!ok) { return; }
+      A.busy(btn, true, 'Сохраняем…');
+      return A.patch('new_exams', S.id, body).then(function () {
+        e.new_name = name; e.new_opens = opens; e.new_closes = closes; e.new_certvalidmonths = months;
+        e.new_rules_ru = body.new_rules_ru; e.new_consenttext = body.new_consenttext; e.new_consentversion = ver;
+        if (course) { e._new_course_value = course; }
+        renderHeader();
+        renderPublish();
+        A.toast('Основные данные сохранены.', 'ok');
+      }, function (er) { A.toast('Не сохранилось. ' + er.message, 'err'); })
+        .then(function () { A.busy(btn, false); });
+    });
+  }
+
+  /* ── 2. Билет и правила ────────────────────────────────────────────────────────────── */
+  function approvedVersions(code) {
+    var seen = {}, out = [];
+    S.prompts.forEach(function (p) {
+      if (p.new_code === code && p.new_status === V.PROMPT_APPROVED && p.new_version != null && !seen[p.new_version]) {
+        seen[p.new_version] = 1; out.push(p);
+      }
+    });
+    return out.sort(function (a, b) { return b.new_version - a.new_version; });
+  }
+  function newestApproved(code) { return approvedVersions(code)[0] || null; }
+  function renderPromptSelects() {
+    $('exsPrompts').innerHTML = A.PROMPT_CODES.map(function (code) {
+      var list = approvedVersions(code), stored = S.base.prompts[code], has = false;
+      var opts = list.map(function (p) {
+        if (p.new_version === stored) { has = true; }
+        return '<option value="' + esc(p.new_version) + '">Версия ' + esc(p.new_version) + (p.new_model ? ' (' + esc(p.new_model) + ')' : '') + '</option>';
+      }).join('');
+      if (!list.length) { opts = '<option value="">Нет утверждённых версий</option>'; }
+      /* Сохранённая версия, если она утверждена; иначе — самая новая утверждённая */
+      var val = has ? stored : (list.length ? list[0].new_version : '');
+      return '<div class="exad-field"><label for="exsPr' + code + '">' + esc(PROMPT_LABEL[code]) + ' <span class="exad-muted">(' + code + ')</span></label>' +
+        '<select id="exsPr' + code + '" class="adm-input" data-prompt="' + code + '" data-val="' + esc(val) + '">' + opts + '</select></div>';
+    }).join('');
+    qa('[data-prompt]').forEach(function (sel) { sel.value = sel.getAttribute('data-val'); });
+  }
+  function renderAdvanced() {
+    var b = S.base, rows = [];
+    Object.keys(b.models).forEach(function (k) { rows.push(['Модель: ' + (MODEL_LABEL[k] || k), b.models[k]]); });
+    Object.keys(b.effort).forEach(function (k) { rows.push(['Глубина рассуждений: ' + (MODEL_LABEL[k] || k), EFFORT_LABEL[b.effort[k]] || b.effort[k]]); });
+    rows.push(['Минимум по кейсам, %', b.casePassMinPercent]);
+    rows.push(['Порог расхождения оценок при апелляции, %', b.appealThresholdPct]);
+    rows.push(['Апелляция может понизить балл', b.appealCanLower ? 'да' : 'нет']);
+    rows.push(['Срок проверки письменных ответов, часов', b.gradingSlaHours]);
+    rows.push(['Лимит ответа: кейс / контрольный, знаков', b.answerLimitChars['case'] + ' / ' + b.answerLimitChars.control]);
+    $('exsAdvanced').innerHTML = '<p class="exad-muted" style="margin:8px 0 0;">Эти значения сохраняются без изменений. Они понадобятся, когда подключим оценку письменных ответов.</p>' +
+      '<dl class="exs-kv">' + rows.map(function (r) { return '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd>'; }).join('') + '</dl>';
+  }
+  function renderParams() {
+    S.base = A.normalizeParams(A.parseJson(S.storedRaw, {}));
+    var b = S.base;
+    b.blocks.forEach(function (bl) {
+      q('[data-block="' + bl.type + '"][data-f="count"]').value = WRITTEN.indexOf(bl.type) >= 0 ? 0 : bl.count;
+      q('[data-block="' + bl.type + '"][data-f="weight"]').value = bl.weight;
+    });
+    A.DIFFS.forEach(function (d) { q('[data-p="difficulty.' + d + '"]').value = b.difficulty[d]; });
+    PFIELDS.forEach(function (f) { q('[data-p="' + f[0] + '"]').value = b[f[0]]; });
+    PSELECTS.forEach(function (k) { q('[data-p="' + k + '"]').value = b[k]; });
+    q('[data-p="requireConsent"]').checked = !!b.requireConsent;
+    renderPromptSelects();
+    renderAdvanced();
+    var info = [];
+    if (!S.storedRaw) {
+      info.push(S.locked ? 'Сохранённых параметров нет — на странице значения по умолчанию. Экзамен работает по снимку, сделанному при публикации.' :
+        'Параметры ещё ни разу не сохранялись — на странице показаны значения по умолчанию.');
+    }
+    if (b.blocks.some(function (bl) { return WRITTEN.indexOf(bl.type) >= 0 && bl.count > 0; }) && !S.locked) {
+      info.push('В сохранённых параметрах были письменные задания. На странице их число сброшено до 0 — сохраните параметры.');
+    }
+    $('exsParamsInfo').innerHTML = info.length ? note('info', info.map(esc).join('<br>')) : '';
+    applyLock();
+  }
+  function applyLock() {
+    var lock = S.locked || S.publishing;
+    qa('#exsParams input, #exsParams select').forEach(function (el) { el.disabled = lock || el.hasAttribute('data-written'); });
+    $('exsSaveParams').disabled = lock;
+    qa('[data-weight]').forEach(function (el) { el.disabled = lock; });
+    var msg = '';
+    if (S.publishing) { msg = 'Идёт публикация — изменения временно недоступны.'; }
+    else if (S.exam.new_status !== V.EXAM_DRAFT) {
+      msg = '<b>Параметры билета заморожены.</b> После публикации экзамен работает по снимку, который сделан в момент публикации, — изменения на этой странице ни на что бы не повлияли, поэтому редактирование выключено.';
+    } else if (S.hasSnap) {
+      msg = '<b>Параметры билета заморожены.</b> Экзамен уже публиковался: снимок правил сохранён, и повторная публикация молча возьмёт старый снимок, не глядя на новые настройки. Страница не может очистить снимок — для нового набора правил создайте новый экзамен или обратитесь в поддержку' +
+        (A.cfg.support ? ' (' + esc(A.cfg.support) + ')' : '') + '.';
+    }
+    $('exsParamsLock').innerHTML = msg ? note('warn', msg) : '';
+  }
+  function readNum(el, isInt, min, max, label, errors, fallback) {
+    var s = String(el ? el.value : '').trim().replace(',', '.');
+    var ok = isInt ? /^\d+$/.test(s) : /^\d+(\.\d+)?$/.test(s);
+    if (!ok) { errors.push(label + ': ' + (s === '' ? 'заполните поле' : (isInt ? 'нужно целое число' : 'нужно число')) + '.'); return fallback; }
+    var n = isInt ? parseInt(s, 10) : parseFloat(s);
+    if (n < min || n > max) { errors.push(label + ': допустимо от ' + min + ' до ' + max + '.'); return fallback; }
+    return n;
+  }
+  /*
+    Параметры из формы в том виде, который читают потоки: все ключи явно, блоки по порядку,
+    письменные блоки с 0 заданий, уроки с весом > 0 в порядке new_order, раскладка — из них.
+  */
+  function readParams() {
+    var errors = [], raw = A.clone(S.base);
+    raw.blocks = S.base.blocks.map(function (bl) {
+      var label = A.LABEL.type[bl.type];
+      if (WRITTEN.indexOf(bl.type) >= 0) { return { type: bl.type, count: 0, weight: bl.weight }; }
+      return {
+        type: bl.type,
+        count: readNum(q('[data-block="' + bl.type + '"][data-f="count"]'), true, 0, 200, 'Заданий в билете (' + label + ')', errors, bl.count),
+        weight: readNum(q('[data-block="' + bl.type + '"][data-f="weight"]'), false, 0, 100, 'Вес (' + label + ')', errors, bl.weight)
+      };
+    });
+    raw.difficulty = {};
+    A.DIFFS.forEach(function (d) {
+      raw.difficulty[d] = readNum(q('[data-p="difficulty.' + d + '"]'), false, 0, 100, 'Уровень «' + A.LABEL.difficulty[d] + '»', errors, S.base.difficulty[d]);
+    });
+    PFIELDS.forEach(function (f) { raw[f[0]] = readNum(q('[data-p="' + f[0] + '"]'), f[1], f[2], f[3], f[4], errors, S.base[f[0]]); });
+    PSELECTS.forEach(function (k) { raw[k] = q('[data-p="' + k + '"]').value; });
+    raw.requireConsent = q('[data-p="requireConsent"]').checked;
+    raw.prompts = {};
+    A.PROMPT_CODES.forEach(function (c) {
+      var el = q('[data-prompt="' + c + '"]'), v = el ? parseInt(el.value, 10) : NaN;
+      raw.prompts[c] = isNaN(v) ? S.base.prompts[c] : v;
+    });
+    var p = A.normalizeParams(raw);
+    var diffSum = A.DIFFS.reduce(function (s, d) { return s + p.difficulty[d]; }, 0);
+    var counted = p.blocks.filter(function (b) { return b.count > 0; });
+    var wsum = counted.reduce(function (s, b) { return s + b.weight; }, 0);
+    if (diffSum <= 0) { errors.push('Уровни сложности: хотя бы у одного доля должна быть больше 0.'); }
+    if (counted.length && wsum <= 0) { errors.push('Вес: у блоков с заданиями сумма весов должна быть больше 0.'); }
+    /* Параметры заморожены — показываем сохранённую раскладку: экзамен работает по ней,
+       а не по сегодняшним урокам и весам */
+    if (S.locked && S.base.blueprint.length) {
+      p.modules = A.clone(S.base.modules);
+      p.blueprint = A.clone(S.base.blueprint);
+      return { p: p, errors: errors };
+    }
+    p.modules = S.lessons.filter(function (m) { return layoutWeight(m) > 0; })
+      .map(function (m) { return { id: m.new_exammoduleid, weight: layoutWeight(m) }; });
+    p.blueprint = [];
+    if (p.modules.length && counted.length && diffSum > 0) {
+      try { p.blueprint = A.buildBlueprint(p); } catch (e) { errors.push(e.message); }
+    }
+    return { p: p, errors: errors };
+  }
+  function tooBigParams(json) {
+    return 'Параметры не помещаются в хранилище (' + A.fmtInt(json.length) + ' из ' + A.fmtInt(MAX_PARAMS) + ' знаков) — слишком много уроков в раскладке. Обратитесь в поддержку.';
+  }
+  /* Совпадает ли форма с сохранённым текстом параметров (сравниваем ровно то, что будет записано) */
+  function paramsDirty() {
+    var stored = A.parseJson(S.storedRaw, null);
+    return !stored || JSON.stringify(S.current.p) !== JSON.stringify(stored);
+  }
+  function renderParamsState() {
+    var er = S.current.errors;
+    $('exsParamsErr').innerHTML = er.length ? note('danger', '<b>Исправьте поля:</b><ul>' + er.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>') : '';
+    $('exsParamsState').textContent = S.locked ? 'Заморожены' : (paramsDirty() ? 'Есть несохранённые изменения' : 'Сохранено');
+  }
+  function saveParams(btn) {
+    if (S.locked) { return; }
+    var cur = readParams();
+    if (cur.errors.length) { A.toast('Параметры не сохранены: исправьте поля, отмеченные в разделе.', 'err'); return; }
+    var json = JSON.stringify(cur.p);
+    if (json.length > MAX_PARAMS) { A.toast(tooBigParams(json), 'err'); return; }
+    A.busy(btn, true, 'Сохраняем…');
+    A.patch('new_exams', S.id, { new_paramsjson: json }).then(function () {
+      S.storedRaw = json;
+      S.exam.new_paramsjson = json;
+      recompute();
+      A.toast(cur.p.blueprint.length ? 'Параметры и раскладка билета сохранены.' : 'Параметры сохранены. Раскладка пустая — добавьте уроки с весом больше 0 и сохраните ещё раз.', 'ok');
+    }, function (e) { A.toast('Не сохранилось. ' + e.message, 'err'); })
+      .then(function () { A.busy(btn, false); applyLock(); });
+  }
+
+  /* ── 3. Уроки ──────────────────────────────────────────────────────────────────────── */
+  function textSourceLabel(m) {
+    if (String(m.new_narration || '').trim()) { return A.label('narrationSource', m.new_narrationsource); }
+    if (String(m.new_text || '').trim()) { return A.label('sourceKind', m.new_sourcekind); }
+    return '—';
+  }
+  function renderLessons() {
+    var box = $('exsLessons');
+    if (!S.lessons.length) {
+      box.innerHTML = '<div class="exad-empty">Уроков пока нет. Нажмите «Добавить урок». Текст курса можно загрузить, когда уроки уже есть.</div>';
+      return;
+    }
+    var lock = S.locked || S.publishing;
+    var h = '<div class="exad-scroll"><table class="adm-table"><thead><tr>' +
+      '<th class="adm-r">№</th><th>Урок</th><th>Раздел</th><th>Вес</th><th class="adm-r">Текст, знаков</th>' +
+      '<th>Источник текста</th><th>Статус</th><th class="adm-r">Одобрено вопросов</th><th></th></tr></thead><tbody>';
+    S.lessons.forEach(function (m) {
+      var id = m.new_exammoduleid, chars = charsOf(m);
+      var textCell = !hasText(m) ? '<span class="adm-pill adm-pill--danger">нет текста</span>' :
+        A.fmtInt(chars) + (material(m).length < MIN_CHARS ? '<div class="exad-muted">мало для вопросов</div>' : '');
+      h += '<tr>' +
+        '<td class="adm-r adm-num">' + esc(m.new_order == null ? '—' : m.new_order) + '</td>' +
+        '<td class="exs-lname">' + esc(m.new_name || 'Без названия') + '</td>' +
+        '<td>' + esc(m.new_section || '—') + '</td>' +
+        '<td><input type="number" min="0" step="0.01" class="adm-input exs-num" style="max-width:90px;" data-weight="' + esc(id) + '" value="' + esc(weightOf(m)) + '"' +
+          (lock ? ' disabled' : '') + ' aria-label="Вес урока ' + esc(m.new_name || '') + '"></td>' +
+        '<td class="adm-r adm-num">' + textCell + '</td>' +
+        '<td>' + esc(textSourceLabel(m)) + '</td>' +
+        '<td>' + (m.new_status == null ? '—' : A.pill('moduleStatus', m.new_status)) + '</td>' +
+        '<td class="adm-r adm-num">' + A.fmtInt(S.approvedByModule[id] || 0) + '</td>' +
+        '<td><button type="button" class="adm-btn adm-btn--ghost exs-sm" data-act="edit-lesson" data-id="' + esc(id) + '">Изменить</button></td>' +
+        '</tr>';
+    });
+    h += '</tbody></table></div>';
+    var noText = S.lessons.filter(function (m) { return !hasText(m); });
+    if (noText.length) {
+      h += note('warn', 'Без текста: ' + noText.map(function (m) { return '«' + esc(m.new_name || 'Без названия') + '»'; }).join(', ') +
+        '. Пока у этих уроков нет текста, экзамен не опубликуется.');
+    }
+    box.innerHTML = h;
+  }
+  function saveWeight(el) {
+    var id = el.getAttribute('data-weight'), m = S.lessonById[id];
+    if (!m || S.locked) { return; }
+    var s = String(el.value).trim().replace(',', '.');
+    if (!/^\d+(\.\d+)?$/.test(s)) { A.toast('Вес урока — число от 0 и больше.', 'err'); el.value = weightOf(m); delete S.weightDraft[id]; recompute(); return; }
+    var w = Math.round(parseFloat(s) * 100) / 100;
+    if (w === weightOf(m)) { delete S.weightDraft[id]; recompute(); return; }
+    el.disabled = true;
+    A.patch('new_exammodules', id, { new_weight: w }).then(function () {
+      m.new_weight = w;
+      delete S.weightDraft[id];
+      recompute();
+      A.toast('Вес урока сохранён. Раскладка пересчитана — сохраните параметры билета.', 'ok');
+    }, function (e) { el.value = weightOf(m); delete S.weightDraft[id]; recompute(); A.toast('Вес не сохранился. ' + e.message, 'err'); })
+      .then(function () { el.disabled = S.locked || S.publishing; });
+  }
+  function draftWeight(el) {
+    var id = el.getAttribute('data-weight'), s = String(el.value).trim().replace(',', '.');
+    if (/^\d+(\.\d+)?$/.test(s)) { S.weightDraft[id] = Math.round(parseFloat(s) * 100) / 100; } else { delete S.weightDraft[id]; }
+    recompute();
+  }
+  function lessonFormHtml(m) {
+    var lock = S.locked;
+    var nextOrder = S.lessons.reduce(function (mx, x) { return Math.max(mx, x.new_order == null ? 0 : x.new_order); }, 0) + 1;
+    var h = '<div class="exad-field"><label for="exsMName">Название урока</label>' +
+      '<input id="exsMName" class="adm-input" maxlength="200" value="' + esc(m ? (m.new_name || '') : '') + '"></div>' +
+      '<div class="exad-grid" style="margin-top:12px;">' +
+        '<div class="exad-field"><label for="exsMSection">Раздел курса</label><input id="exsMSection" class="adm-input" maxlength="100" placeholder="Например, Модуль 4" value="' + esc(m ? (m.new_section || '') : '') + '"></div>' +
+        '<div class="exad-field"><label for="exsMOrder">Порядок</label><input id="exsMOrder" type="number" step="1" class="adm-input" value="' + esc(m ? (m.new_order == null ? '' : m.new_order) : nextOrder) + '"></div>' +
+        '<div class="exad-field"><label for="exsMWeight">Вес</label><input id="exsMWeight" type="number" min="0" step="0.01" class="adm-input" value="' + esc(m ? weightOf(m) : 1) + '"' + (lock ? ' disabled' : '') + '>' +
+          '<span class="exad-hint">' + (lock ? 'Параметры билета заморожены — вес уже ни на что не влияет.' : 'Доля урока в билете. 0 — урок в билет не попадает.') + '</span></div>' +
+      '</div>' +
+      '<div class="exad-field" style="margin-top:12px;"><label for="exsMText">Текст озвучки урока</label>' +
+        '<textarea id="exsMText" class="adm-input" rows="10" placeholder="Вставьте сюда текст, который диктор читает в уроке">' + esc(m ? (m.new_narration || '') : '') + '</textarea>' +
+        '<span class="exad-hint" id="exsMCount"></span></div>';
+    if (m && !String(m.new_narration || '').trim() && String(m.new_text || '').trim()) {
+      h += note('info', 'У урока есть текст слайдов (' + A.fmtInt(String(m.new_text).length) + ' знаков) — он тоже засчитывается. Здесь редактируется только текст озвучки; если он есть, вопросы создаются по нему.');
+    }
+    if (m && m.new_status === V.MODULE_QUESTIONS) {
+      h += note('warn', 'По уроку уже созданы вопросы. Новый текст их не изменит — следующие задания ИИ будут писать вопросы по новому тексту.');
+    }
+    return h;
+  }
+  function readLessonForm(body) {
+    return {
+      name: body.querySelector('#exsMName').value.trim(),
+      section: body.querySelector('#exsMSection').value.trim(),
+      order: String(body.querySelector('#exsMOrder').value).trim(),
+      weight: String(body.querySelector('#exsMWeight').value).trim().replace(',', '.'),
+      text: body.querySelector('#exsMText').value.trim()
+    };
+  }
+  function validateLessonForm(body) {
+    var v = readLessonForm(body);
+    if (!v.name) { return 'Укажите название урока.'; }
+    if (!/^-?\d+$/.test(v.order)) { return 'Порядок — целое число.'; }
+    if (!/^\d+(\.\d+)?$/.test(v.weight)) { return 'Вес — число от 0 и больше.'; }
+    if (v.text.length > 1000000) { return 'Текст слишком длинный (больше миллиона знаков).'; }
+    return '';
+  }
+  function countOnOpen(body) {
+    var ta = body.querySelector('#exsMText'), out = body.querySelector('#exsMCount');
+    function upd() {
+      var n = ta.value.trim().length;
+      out.textContent = 'Знаков: ' + A.fmtInt(n) + (n && n < MIN_CHARS ? ' — мало: вопросы создаются из текста от ' + MIN_CHARS + ' знаков.' : (n ? ' — материала хватит примерно на ' + Math.floor(n / CHARS_PER_Q) + ' вопросов за одно задание.' : ''));
+    }
+    ta.addEventListener('input', upd);
+    upd();
+  }
+  /* Статус урока после правки текста: «Вопросы созданы» не откатываем — вопросы в банке остаются */
+  function statusAfterText(m, narration) {
+    var any = narration || String((m && m.new_text) || '').trim();
+    if (!any) { return V.MODULE_NOTEXT; }
+    if (m && m.new_status === V.MODULE_QUESTIONS) { return V.MODULE_QUESTIONS; }
+    return V.MODULE_TEXTREADY;
+  }
+  /* Вид источника («Текст озвучки») ставим, только если он пуст или уже такой: у уроков из PPTX,
+     PDF и H5P исходный вид не затираем, и при очистке озвучки тоже ничего не меняем */
+  function setNarrationKind(m, narration) {
+    if (!narration) { return false; }
+    return !m || m.new_sourcekind == null || m.new_sourcekind === V.KIND_NARRATION;
+  }
+  /* Пока идёт публикация или сохранение урока, уроки не трогаем: публикация проверяет их текст */
+  function lessonsBusy() {
+    if (S.publishing) { A.toast('Идёт публикация — уроки можно менять после её окончания.', 'err'); return true; }
+    if (S.lessonSaving) { A.toast('Подождите: предыдущее изменение уроков ещё сохраняется.', 'err'); return true; }
+    return false;
+  }
+  function afterLessonsChanged() {
+    renderLessons();
+    renderErrorBox();
+    recompute();
+  }
+  function editLesson(id) {
+    var m = S.lessonById[id];
+    if (!m) { return; }
+    A.modal({ title: 'Урок', html: lessonFormHtml(m), okText: 'Сохранить', wide: true, validate: validateLessonForm, onOpen: countOnOpen }).then(function (body) {
+      if (!body) { return; }
+      var v = readLessonForm(body);
+      var changed = v.text !== String(m.new_narration || '').trim();
+      var body2 = { new_name: v.name, new_section: v.section || null, new_order: parseInt(v.order, 10) };
+      if (!S.locked) { body2.new_weight = Math.round(parseFloat(v.weight) * 100) / 100; }
+      if (changed) {
+        body2.new_narration = v.text || null;
+        body2.new_textchars = (v.text || String(m.new_text || '')).length;
+        body2.new_extractedon = new Date(A.now()).toISOString();
+        body2.new_narrationsource = v.text ? V.NARR_DOC : V.NARR_NONE;
+        if (setNarrationKind(m, v.text)) { body2.new_sourcekind = V.KIND_NARRATION; }
+        body2.new_status = statusAfterText(m, v.text);
+      }
+      if (S.publishing || S.lessonSaving) { A.toast('Урок не сохранён: сейчас идёт публикация или другое сохранение. Попробуйте ещё раз.', 'err'); return; }
+      S.lessonSaving = true;
+      renderPublish();
+      A.toast('Сохраняем урок…');
+      return A.patch('new_exammodules', id, body2).then(function () {
+        /* Пока окно было открыто, фоновое обновление могло перечитать уроки — пишем в текущий объект */
+        var cur = S.lessonById[id] || m;
+        Object.keys(body2).forEach(function (k) { cur[k] = body2[k]; });
+        S.lessons.sort(byOrder);
+        A.toast('Урок сохранён.', 'ok');
+      }, function (e) { A.toast('Урок не сохранился. ' + e.message, 'err'); })
+        .then(function () { S.lessonSaving = false; afterLessonsChanged(); });
+    });
+  }
+  function addLesson(btn) {
+    A.modal({ title: 'Новый урок', html: lessonFormHtml(null), okText: 'Добавить', wide: true, validate: validateLessonForm, onOpen: countOnOpen }).then(function (body) {
+      if (!body) { return; }
+      var v = readLessonForm(body);
+      var hasTxt = !!v.text;
+      var examRef = '/new_exams(' + S.id + ')';
+      var weight = S.locked ? 1 : Math.round(parseFloat(v.weight) * 100) / 100;
+      var status = hasTxt ? V.MODULE_TEXTREADY : V.MODULE_NOTEXT;
+      var narrSrc = hasTxt ? V.NARR_DOC : V.NARR_NONE;
+      var extracted = hasTxt ? new Date(A.now()).toISOString() : null;
+      if (S.publishing || S.lessonSaving) { A.toast('Урок не добавлен: сейчас идёт публикация или другое сохранение. Попробуйте ещё раз.', 'err'); return; }
+      S.lessonSaving = true;
+      renderPublish();
+      A.busy(btn, true, 'Добавляем…');
+      return A.post('new_exammodules', {
+        new_name: v.name,
+        'new_exam@odata.bind': examRef,
+        new_order: parseInt(v.order, 10),
+        new_section: v.section || null,
+        new_weight: weight,
+        new_status: status,
+        new_sourcekind: V.KIND_NARRATION,
+        new_narrationsource: narrSrc,
+        new_narration: v.text || null,
+        new_textchars: v.text.length,
+        new_extractedon: extracted
+      }).then(function () {
+        return loadLessons().then(function () {
+          afterLessonsChanged();
+          A.toast('Урок добавлен.' + (hasTxt ? '' : ' Не забудьте добавить ему текст — без него экзамен не опубликуется.'), 'ok');
+        });
+      }, function (e) { A.toast('Урок не добавлен. ' + e.message, 'err'); })
+        .then(function () { S.lessonSaving = false; A.busy(btn, false); renderPublish(); });
+    });
+  }
+
+  /* ── 3а. Загрузка текста курса (DOCX, TXT, VTT) ────────────────────────────────────── */
+  var W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  function readAs(file, kind, enc) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () { resolve(r.result); };
+      r.onerror = function () { reject(new Error('Не удалось прочитать файл.')); };
+      if (kind === 'buf') { r.readAsArrayBuffer(file); } else { r.readAsText(file, enc || 'utf-8'); }
+    });
+  }
+  /* Текстовый файл: сначала UTF-8. Блокнот и старый Word сохраняют русский текст в Windows-1251 —
+     в UTF-8 он превращается в знаки-заменители (U+FFFD), и в урок ушёл бы мусор. Тогда перечитываем как 1251 */
+  function readTextFile(file) {
+    var BAD = '�';
+    return readAs(file, 'text').then(function (t) {
+      if (String(t).indexOf(BAD) < 0) { return t; }
+      return readAs(file, 'text', 'windows-1251').then(function (t2) {
+        if (String(t2).indexOf(BAD) < 0) { return t2; }
+        throw new Error('Не удалось распознать кодировку файла. Сохраните его в кодировке UTF-8 (в Блокноте: «Сохранить как» → «Кодировка: UTF-8») и загрузите снова.');
+      });
+    });
+  }
+  /* Библиотека чтения ZIP лежит в файлах сайта: внешние CDN закрыты политикой безопасности */
+  function loadJsZip() {
+    if (window.JSZip) { return Promise.resolve(window.JSZip); }
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = '/jszip.min.js';
+      s.onload = function () { if (window.JSZip) { resolve(window.JSZip); } else { reject(new Error('Библиотека чтения DOCX не загрузилась.')); } };
+      s.onerror = function () { reject(new Error('Не удалось загрузить библиотеку чтения DOCX.')); };
+      document.head.appendChild(s);
+    });
+  }
+  /* Надпись в Word хранится дважды: современная разметка и запасная копия (mc:Fallback) — копию пропускаем */
+  function inFallback(el) {
+    for (var n = el.parentNode; n && n.nodeType === 1; n = n.parentNode) { if (n.localName === 'Fallback') { return true; } }
+    return false;
+  }
+  function nearestPara(el) {
+    var n = el.parentNode;
+    while (n && !(n.localName === 'p' && n.namespaceURI === W_NS)) { n = n.parentNode; }
+    return n;
+  }
+  /* DOCX: каждый абзац <w:p> — строка; внутри склеиваем <w:t>, табуляции и переносы внутри фрагментов текста */
+  function docxToText(file) {
+    return Promise.all([loadJsZip(), readAs(file, 'buf')]).then(function (r) {
+      return r[0].loadAsync(r[1]);
+    }).then(function (zip) {
+      var f = zip.file('word/document.xml');
+      if (!f) { throw new Error('Это не похоже на документ Word (DOCX).'); }
+      return f.async('string');
+    }).then(function (xml) {
+      var doc = new DOMParser().parseFromString(xml, 'application/xml');
+      if (doc.getElementsByTagName('parsererror').length) { throw new Error('Документ повреждён — не удалось прочитать текст.'); }
+      var body = doc.getElementsByTagNameNS(W_NS, 'body')[0] || doc.documentElement;
+      var ps = body.getElementsByTagNameNS(W_NS, 'p'), out = [];
+      for (var i = 0; i < ps.length; i++) {
+        var p = ps[i], parts = [], els = p.getElementsByTagNameNS(W_NS, '*');
+        if (inFallback(p)) { continue; }
+        for (var j = 0; j < els.length; j++) {
+          var e = els[j];
+          if (nearestPara(e) !== p) { continue; }        // вложенные абзацы (надписи) — своим ходом
+          var n = e.localName, inRun = e.parentNode && e.parentNode.localName === 'r';
+          if (n === 't') { parts.push(e.textContent); }
+          else if (n === 'tab' && inRun) { parts.push('\t'); }   // <w:tab> в настройках абзаца — это позиции табуляции, не текст
+          else if ((n === 'br' || n === 'cr') && inRun) { parts.push('\n'); }
+        }
+        out.push(parts.join(''));
+      }
+      return out.join('\n');
+    });
+  }
+  /* VTT (расшифровка из Stream) — без служебных строк и тегов */
+  /* Stream и Teams ставят перед временем реплики её идентификатор (например, «3f2a…-9c1d/12-0») —
+     любая строка прямо перед строкой времени служебная, иначе она попала бы в текст урока */
+  function vttToText(vtt) {
+    var lines = String(vtt).split(/\r?\n/);
+    return lines
+      .filter(function (l, i) {
+        var t = l.trim(), next = String(lines[i + 1] || '');
+        if (!t || /^(WEBVTT|NOTE\b|\d+$|\d{2}:\d{2}.*-->)/.test(t)) { return false; }
+        if (next.indexOf('-->') >= 0) { return false; }
+        return !/^[0-9a-f]{8}-[0-9a-f-]{27,}(\/\d+-\d+)?$/i.test(t);
+      })
+      .map(function (l) { return l.replace(/<[^>]+>/g, ''); })
+      .join(' ').replace(/\s+/g, ' ').trim();
+  }
+  /*
+    Границы — фразы, с которых начинается каждый урок в сценарии курса (методичка 7.10).
+    «Привет! Сегодня нужно…» внутри урока SMART границей не считается. Разбивку администратор
+    подтверждает вручную. Если границ нет — весь текст одна часть (файл одного урока).
+  */
+  function splitNarration(text) {
+    var re = /Привет! (?:Это|Мы начинаем|Я твой)|Это (?:второй|третий|четв[её]ртый) урок/g;
+    var starts = [], m;
+    while ((m = re.exec(text)) !== null) { starts.push(m.index); }
+    if (!starts.length) { starts = [0]; }
+    var preamble = starts[0] > 0 ? text.slice(0, starts[0]).trim() : '';
+    var parts = starts.map(function (s, i) { return text.slice(s, i + 1 < starts.length ? starts[i + 1] : text.length).trim(); })
+      .filter(function (p) { return p; });
+    var seen = {};
+    function key(p) { return p.slice(0, 300).replace(/\s+/g, ' '); }
+    var out = parts.map(function (p, i) {
+      var k = key(p), dupOf = Object.prototype.hasOwnProperty.call(seen, k) ? seen[k] : null;
+      if (dupOf === null) { seen[k] = i + 1; }
+      return { n: i + 1, text: p, chars: p.length, dupOf: dupOf, head: p.slice(0, 120) };
+    });
+    return { parts: out, preamble: preamble };
+  }
+  function onFile(input) {
+    var file = input.files && input.files[0], btn = $('exsUploadBtn');
+    if (!file) { return; }
+    function done() { A.busy(btn, false); input.value = ''; }
+    if (!S.lessons.length) { A.toast('Сначала добавьте уроки — текст раскладывается по уже созданным урокам.', 'err'); input.value = ''; return; }
+    var nm = file.name.toLowerCase();
+    var kind = /\.docx$/.test(nm) ? 'docx' : (/\.vtt$/.test(nm) ? 'vtt' : (/\.txt$/.test(nm) ? 'txt' : ''));
+    if (!kind) { A.toast('Подходят файлы DOCX, TXT или VTT.', 'err'); input.value = ''; return; }
+    if (file.size > 20 * 1024 * 1024) { A.toast('Файл больше 20 МБ — для текста урока это слишком много.', 'err'); input.value = ''; return; }
+    A.busy(btn, true, 'Читаем файл…');
+    var pr = kind === 'docx' ? docxToText(file) : readTextFile(file).then(function (t) { return kind === 'vtt' ? vttToText(t) : String(t); });
+    pr.then(function (text) {
+      text = String(text || '').replace(/^﻿/, '').replace(/\r\n?/g, '\n');
+      if (!text.trim()) { throw new Error('В файле не нашлось текста.'); }
+      done();
+      return previewSplit(text, kind === 'vtt' ? V.NARR_VTT : V.NARR_DOC, file.name);
+    }).catch(function (e) { A.toast(e.message, 'err'); done(); });
+  }
+  function previewSplit(text, source, fileName) {
+    var sp = splitNarration(text), parts = sp.parts, k = 0;
+    parts.forEach(function (p) { p.target = p.dupOf === null && k < S.lessons.length ? S.lessons[k++].new_exammoduleid : ''; });
+    /* Файл одного урока: урок выбирает администратор, чтобы случайно не затереть текст первого урока */
+    if (parts.length === 1 && S.lessons.length > 1) { parts[0].target = ''; }
+    var opts = function (sel) {
+      return '<option value="">Не сохранять</option>' + S.lessons.map(function (m) {
+        var id = m.new_exammoduleid;
+        return '<option value="' + esc(id) + '"' + (id === sel ? ' selected' : '') + '>В урок: ' + esc((m.new_order == null ? '' : m.new_order + '. ') + (m.new_name || 'Без названия')) +
+          (String(m.new_narration || '').trim() ? ' (заменит текущий текст)' : '') + '</option>';
+      }).join('');
+    };
+    var h = note('info', 'Файл «' + esc(fileName) + '»: частей — ' + parts.length + ', всего ' + A.fmtInt(text.length) + ' знаков. ' +
+      'Проверьте, в какой урок пойдёт каждая часть. Дубли по умолчанию не сохраняются. Текст уроков, для которых выбрана часть, будет заменён.');
+    if (sp.preamble) {
+      h += note('warn', 'Текст до начала первого урока (' + A.fmtInt(sp.preamble.length) + ' знаков) не вошёл ни в одну часть: «' + esc(sp.preamble.slice(0, 120)) + '…»');
+    }
+    if (parts.length === 1 && S.lessons.length > 1) {
+      h += note('info', 'Текст не разделился на несколько уроков — похоже, это текст одного урока. Выберите, в какой урок его сохранить.');
+    }
+    h += '<div class="exad-scroll"><table class="adm-table"><thead><tr><th class="adm-r">Часть</th><th>Начало текста</th><th class="adm-r">Знаков</th><th>Куда сохранить</th></tr></thead><tbody>';
+    parts.forEach(function (p, i) {
+      h += '<tr><td class="adm-r adm-num">' + p.n + '</td>' +
+        '<td class="exs-head-cell">' + esc(p.head) + '…' + (p.dupOf !== null ? '<div><span class="adm-pill adm-pill--warn">дубль части ' + p.dupOf + '</span></div>' : '') + '</td>' +
+        '<td class="adm-r adm-num">' + A.fmtInt(p.chars) + (p.chars < MIN_CHARS ? '<div class="exad-muted">мало</div>' : '') + '</td>' +
+        '<td style="min-width:220px;"><select class="adm-input" data-part="' + i + '">' + opts(p.target) + '</select></td></tr>';
+    });
+    h += '</tbody></table></div>';
+    return A.modal({
+      title: 'Разбивка текста по урокам', html: h, okText: 'Сохранить текст в уроки', wide: true,
+      validate: function (body) {
+        var used = {}, any = false, dup = '';
+        Array.prototype.forEach.call(body.querySelectorAll('[data-part]'), function (s) {
+          if (!s.value) { return; }
+          any = true;
+          if (used[s.value]) { dup = lessonName(s.value); }
+          used[s.value] = 1;
+        });
+        if (!any) { return 'Не выбран ни один урок.'; }
+        if (dup) { return 'В урок «' + dup + '» выбрано несколько частей — оставьте одну.'; }
+        return '';
+      }
+    }).then(function (body) {
+      if (!body) { return; }
+      var plan = [];
+      Array.prototype.forEach.call(body.querySelectorAll('[data-part]'), function (s) {
+        if (s.value && S.lessonById[s.value]) { plan.push({ m: S.lessonById[s.value], text: parts[parseInt(s.getAttribute('data-part'), 10)].text }); }
+      });
+      return saveParts(plan, source);
+    });
+  }
+  function saveParts(plan, source) {
+    var btn = $('exsUploadBtn');
+    if (S.publishing || S.lessonSaving) { A.toast('Текст не сохранён: сейчас идёт публикация или другое сохранение. Попробуйте ещё раз.', 'err'); return Promise.resolve(); }
+    S.lessonSaving = true;
+    renderPublish();
+    A.busy(btn, true, 'Сохраняем текст…');
+    var nowIso = new Date(A.now()).toISOString();
+    return runSeq(plan, function (it) {
+      var id = it.m.new_exammoduleid;
+      var body = {
+        new_narration: it.text,
+        new_textchars: it.text.length,
+        new_extractedon: nowIso,
+        new_narrationsource: source,
+        new_status: statusAfterText(it.m, it.text)
+      };
+      if (setNarrationKind(it.m, it.text)) { body.new_sourcekind = V.KIND_NARRATION; }
+      return A.patch('new_exammodules', id, body).then(function () {
+        /* Уроки могли перечитаться, пока шло сохранение, — пишем в текущий объект */
+        var cur = S.lessonById[id] || it.m;
+        Object.keys(body).forEach(function (k) { cur[k] = body[k]; });
+      });
+    }).then(function (res) {
+      S.lessonSaving = false;
+      A.busy(btn, false);
+      afterLessonsChanged();
+      if (res.errors.length) {
+        A.toast('Текст сохранён в уроков: ' + res.ok + '. Не сохранилось: ' + res.errors.length + ' (' + res.errors[0].message + ').', 'err');
+      } else {
+        A.toast('Текст сохранён в уроков: ' + res.ok + '.', 'ok');
+      }
+    });
+  }
+
+  /* ── 4. Раскладка билета ───────────────────────────────────────────────────────────── */
+  function layoutStats(p) {
+    var st = { cells: 0, short: 0, missing: 0, bp: {} };
+    p.blueprint.forEach(function (c) {
+      var k = A.cellKey(c.type, c.module, c.difficulty), have = S.approvedCell[k] || 0, need = A.requiredFor(c.count, p);
+      st.bp[k] = { count: c.count, have: have, need: need };
+      st.cells++;
+      if (have < need) { st.short++; st.missing += need - have; }
+    });
+    return st;
+  }
+  function savedLayout() { return S.locked && S.base.blueprint.length > 0; }
+  function inLayout(p, m) {
+    if (!savedLayout()) { return layoutWeight(m) > 0; }
+    return p.modules.some(function (x) { return x.id === m.new_exammoduleid; });
+  }
+  function renderLayout() {
+    var p = S.current.p, box = $('exsLayout');
+    var blocks = p.blocks.filter(function (b) { return b.count > 0; });
+    if (!S.lessons.length) { box.innerHTML = '<div class="exad-empty">Уроков пока нет — добавьте их в разделе «Уроки».</div>'; return; }
+    if (!blocks.length) { box.innerHTML = '<div class="exad-empty">В билете нет заданий — укажите их число в разделе «Билет и правила».</div>'; return; }
+    if (!p.blueprint.length) {
+      box.innerHTML = '<div class="exad-empty">Раскладку не посчитать: ' + (p.modules.length ? 'исправьте ошибки в разделе «Билет и правила».' : 'нет ни одного урока с весом больше 0.') + '</div>';
+      return;
+    }
+    var st = layoutStats(p);
+    var h = '<div class="exad-scroll"><table class="adm-table exs-layout"><thead><tr><th rowspan="2">Урок</th>';
+    blocks.forEach(function (b) { h += '<th colspan="3" class="exs-c">' + esc(A.LABEL.type[b.type]) + '</th>'; });
+    h += '</tr><tr>';
+    blocks.forEach(function () { A.DIFFS.forEach(function (d) { h += '<th class="exs-c">' + esc(A.LABEL.difficultyShort[d]) + '</th>'; }); });
+    h += '</tr></thead><tbody>';
+    S.lessons.forEach(function (m) {
+      h += '<tr><td><div class="exs-lname">' + esc(m.new_name || 'Без названия') + '</div>' +
+        (inLayout(p, m) ? '' : '<div class="exad-muted">' + (savedLayout() ? 'не входит в сохранённую раскладку' : 'вес 0 — в билет не попадает') + '</div>') + '</td>';
+      blocks.forEach(function (b) {
+        A.DIFFS.forEach(function (d) {
+          var c = st.bp[A.cellKey(b.type, m.new_exammoduleid, d)];
+          if (!c) { h += '<td class="exs-c exad-muted">—</td>'; return; }
+          h += '<td class="exs-c adm-num ' + (c.have < c.need ? 'exad-cell-short' : 'exad-cell-ok') + '" title="Заданий в билете: ' + c.count +
+            '; одобрено в банке: ' + c.have + '; нужно: ' + c.need + '">' + c.count + ' → ' + c.have + ' / ' + c.need + '</td>';
+        });
+      });
+      h += '</tr>';
+    });
+    h += '<tr class="exs-total"><td><b>Итого в билете</b></td>';
+    blocks.forEach(function (b) {
+      var sum = p.blueprint.filter(function (c) { return c.type === b.type; }).reduce(function (s, c) { return s + c.count; }, 0);
+      h += '<td colspan="3" class="exs-c"><b>' + sum + '</b> из ' + b.count + '</td>';
+    });
+    h += '</tr></tbody></table></div>';
+    h += st.short ?
+      note('danger', 'Не хватает вопросов в ячейках: <b>' + st.short + '</b> из ' + st.cells + ', всего недостаёт <b>' + A.fmtInt(st.missing) + '</b> одобренных вопросов. Их можно заказать кнопкой «Создать недостающее» ниже.') :
+      note('success', 'Вопросов хватает во всех ' + st.cells + ' ячейках.');
+    box.innerHTML = h;
+  }
+
+  /* ── 5. Создание вопросов ИИ ───────────────────────────────────────────────────────── */
+  function renderJobs() {
+    var box = $('exsJobs'), nb = $('exsJobsNote');
+    var running = S.jobs.filter(isRunning);
+    var notes = [];
+    if (S.polling && running.length) { notes.push(note('info', '<span class="exad-spin"></span> Идут задания: ' + running.length + '. Страница обновляется сама каждые 10 секунд — её можно не перезагружать.')); }
+    if (S.pollStopped && running.length) { notes.push(note('warn', 'Автообновление остановлено. Нажмите «Обновить», чтобы увидеть текущее состояние.')); }
+    nb.innerHTML = notes.join('');
+    if (!S.jobs.length) { box.innerHTML = '<div class="exad-empty">Заданий ещё не было. Кнопка «Создать недостающее» закажет вопросы для ячеек, где их не хватает.</div>'; return; }
+    var tot = { cost: 0, created: 0, approved: 0, rejected: 0 };
+    var h = '<div class="exad-scroll"><table class="adm-table"><thead><tr>' +
+      '<th>Задание</th><th>Урок</th><th>Статус</th><th class="adm-r">Заказано</th><th class="adm-r">Создано вопросов</th>' +
+      '<th class="adm-r">Одобрено</th><th class="adm-r">Отклонено</th><th class="adm-r" title="Одобрено ÷ (одобрено + отклонено). Цель — от 90%">С первого раза</th>' +
+      '<th class="adm-r">Стоимость</th><th>Запущено</th><th></th></tr></thead><tbody>';
+    S.jobs.forEach(function (j) {
+      var spec = A.parseJson(j.new_specjson, null), ordered = sumCounts(spec), run = isRunning(j);
+      var ap = j.new_approved || 0, rj = j.new_rejected || 0;
+      tot.cost += Number(j.new_costusd) || 0; tot.created += j.new_created || 0; tot.approved += ap; tot.rejected += rj;
+      h += '<tr>' +
+        '<td class="adm-mono">' + esc(j.new_name || '—') + '</td>' +
+        '<td>' + esc(lessonName(j._new_module_value)) + '</td>' +
+        '<td>' + A.pill('jobStatus', j.new_status) + (isStuck(j) ? ' <span class="adm-pill adm-pill--warn">возможно, зависло</span>' : '') + '</td>' +
+        '<td class="adm-r adm-num">' + A.fmtInt(ordered) + '</td>' +
+        '<td class="adm-r adm-num">' + (run ? '…' : A.fmtInt(j.new_created)) + '</td>' +
+        '<td class="adm-r adm-num">' + (run ? '…' : A.fmtInt(ap)) + '</td>' +
+        '<td class="adm-r adm-num">' + (run ? '…' : A.fmtInt(rj)) + '</td>' +
+        '<td class="adm-r adm-num">' + (run ? '…' : A.pct(ap, ap + rj)) + '</td>' +
+        '<td class="adm-r adm-num">' + (run ? '…' : A.money(j.new_costusd)) + '</td>' +
+        '<td>' + esc(A.dt(j.createdon)) + '</td>' +
+        '<td>' + (j.new_errortext ? '<button type="button" class="adm-btn adm-btn--ghost exs-sm" data-act="job-notes" data-id="' + esc(j.new_aijobid) + '" aria-expanded="false">Заметки</button>' : '') + '</td>' +
+        '</tr>';
+      if (run) {
+        var pr = S.progress[j.new_aijobid], m = S.lessonById[lower(j._new_module_value)];
+        var expect = m ? Math.min(ordered, capOf(m)) : ordered;
+        h += '<tr class="exs-sub"><td colspan="11">' +
+          (j.new_status === V.JOB_CREATED ? 'Ждёт запуска' : 'Идёт') + ' уже ' + esc(elapsed(j.createdon)) + '. ' +
+          (pr ? 'Создано вопросов: <b>' + pr.total + '</b> (одобрено ' + pr.approved + ', отклонено ' + pr.rejected + ', на проверке у рецензента ' + pr.review + '). ' : '') +
+          'Ожидается до ' + A.fmtInt(expect) + ' вопросов. Счётчики и стоимость появятся, когда задание закончится.' +
+          (isStuck(j) ? '<div style="margin-top:4px;"><b>Задание идёт дольше ' + STUCK_MIN + ' минут — возможно, оно зависло.</b> Отменить его со страницы нельзя. Сообщите в поддержку' +
+            (A.cfg.support ? ' (' + esc(A.cfg.support) + ')' : '') + '. Новое задание по этому уроку можно заказать, отметив урок вручную в окне «Создать недостающее».</div>' : '') +
+          '</td></tr>';
+      }
+      if (j.new_errortext) {
+        h += '<tr class="exs-sub" id="exsJN-' + esc(j.new_aijobid) + '" hidden><td colspan="11"><pre class="exad-pre">' + esc(humanize(j.new_errortext)) + '</pre></td></tr>';
+      }
+    });
+    h += '<tr class="exs-total"><td colspan="4"><b>Итого</b></td>' +
+      '<td class="adm-r adm-num">' + A.fmtInt(tot.created) + '</td><td class="adm-r adm-num">' + A.fmtInt(tot.approved) + '</td>' +
+      '<td class="adm-r adm-num">' + A.fmtInt(tot.rejected) + '</td><td class="adm-r adm-num">' + A.pct(tot.approved, tot.approved + tot.rejected) + '</td>' +
+      '<td class="adm-r adm-num"><b>' + A.money(tot.cost) + '</b></td><td colspan="2"></td></tr>';
+    h += '</tbody></table></div>';
+    if (S.jobs.length >= 200) { h += '<p class="exad-muted">Показаны последние 200 заданий.</p>'; }
+    box.innerHTML = h;
+  }
+  function refreshJobs() {
+    var before = {};
+    S.jobs.forEach(function (j) { before[j.new_aijobid] = isRunning(j); });
+    return loadJobs().then(function () {
+      var running = S.jobs.filter(isRunning);
+      var finished = S.jobs.some(function (j) { return before[j.new_aijobid] && !isRunning(j); });
+      return Promise.all(running.map(loadProgress)).then(function () {
+        /* Задание закончилось — обновляем банк и статусы уроков: от них зависят раскладка и публикация */
+        if (finished) {
+          return Promise.all([loadBank(), loadLessons()]).then(function () { renderLessons(); recompute(); });
+        }
+      });
+    }).then(function () { renderJobs(); });
+  }
+  function startJobPolling() {
+    if (S.polling) { return; }
+    S.polling = true;
+    S.pollStopped = false;
+    Promise.all(S.jobs.filter(isRunning).map(loadProgress)).then(renderJobs);
+    /* Не дольше 90 минут: сторожа у заданий нет, а бесконечный опрос держал бы вкладку занятой */
+    A.poll(function () {
+      return refreshJobs().then(function () { return !S.jobs.some(isRunning); });
+    }, { interval: JOB_POLL_MS, maxTries: 540 }).then(function (done) {
+      S.polling = false;
+      if (done) { A.toast('Задания ИИ завершены — банк и раскладка обновлены.', 'ok'); } else { S.pollStopped = true; }
+      renderJobs();
+    });
+  }
+  function manualRefresh(btn) {
+    A.busy(btn, true, 'Обновляем…');
+    Promise.all([refreshJobs(), loadBank()]).then(function () {
+      renderLessons();
+      recompute();
+      if (S.jobs.some(isRunning)) { startJobPolling(); }
+    }, function (e) { A.toast('Не удалось обновить. ' + e.message, 'err'); })
+      .then(function () { A.busy(btn, false); });
+  }
+  function toggleNotes(btn) {
+    var row = $('exsJN-' + btn.getAttribute('data-id'));
+    if (!row) { return; }
+    row.hidden = !row.hidden;
+    btn.setAttribute('aria-expanded', row.hidden ? 'false' : 'true');
+  }
+  function countsText(counts) {
+    return Object.keys(counts).map(function (t) {
+      return A.LABEL.typeShort[t] + ': ' + A.DIFFS.filter(function (d) { return counts[t][d]; })
+        .map(function (d) { return counts[t][d] + ' ' + A.LABEL.difficultyShort[d].toLowerCase(); }).join(', ');
+    }).join('; ');
+  }
+  /* План «Создать недостающее»: по каждому уроку — сколько не хватает в его ячейках раскладки */
+  function missingPlan(p) {
+    return S.lessons.map(function (m) {
+      var id = m.new_exammoduleid, counts = {}, total = 0;
+      p.blueprint.filter(function (c) { return c.module === id; }).forEach(function (c) {
+        var n = A.needForCell(c, p, S.approvedCell);
+        if (n > 0) {
+          if (!counts[c.type]) { counts[c.type] = {}; }
+          counts[c.type][c.difficulty] = (counts[c.type][c.difficulty] || 0) + n;
+          total += n;
+        }
+      });
+      var chars = material(m).length;
+      var busyJob = S.jobs.filter(function (j) { return isRunning(j) && lower(j._new_module_value) === id; });
+      var reason = '', stuck = false;
+      if (!total) { reason = 'вопросов хватает'; }
+      else if (chars < MIN_CHARS) { reason = 'мало текста (' + chars + ' знаков, нужно от ' + MIN_CHARS + ')'; }
+      /* Второе задание по уроку параллельно даёт дубли */
+      else if (busyJob.some(function (j) { return !isStuck(j); })) { reason = 'по уроку уже идёт задание'; }
+      /* Все идущие задания старше часа: по умолчанию не заказываем (медленное задание ещё может дописать),
+         но даём заказать осознанно — отдельной неотмеченной галочкой */
+      else if (busyJob.length) { stuck = true; }
+      return { m: m, counts: counts, total: total, chars: chars, cap: capOf(m), reason: reason, stuck: stuck };
+    });
+  }
+  function createMissing(btn) {
+    var cur = S.current;
+    if (cur.errors.length) { A.toast('Сначала исправьте поля в разделе «Билет и правила».', 'err'); return; }
+    if (!cur.p.blueprint.length) { A.toast('Раскладка пустая — нечего заказывать. Добавьте уроки и задания в билете.', 'err'); return; }
+    var plan = missingPlan(cur.p), eligible = plan.filter(function (x) { return !x.reason; });
+    if (plan.every(function (x) { return !x.total; })) { A.toast('Вопросов хватает во всех ячейках — заказывать нечего.', 'ok'); return; }
+    /* Если заказать нечего по другим причинам — всё равно показываем окно: в нём видно, почему */
+    var warns = [];
+    warns.push('Каждый вопрос стоит денег: его пишет одна модель и проверяет другая. Баланс счёта Anthropic ограничен — заказывайте только то, что нужно. Ориентир из методички — около 1 $ за урок.');
+    var rv = newestApproved('REVIEW'), gen = newestApproved('GEN_SINGLE');
+    if (rv && gen && rv.new_model && rv.new_model === gen.new_model) {
+      warns.push('Вопросы сейчас пишет и проверяет одна и та же модель (' + rv.new_model + '). Проверка другой моделью надёжнее ловит ошибки — лучше утвердить версию промпта рецензента на другой модели.');
+    }
+    if (!S.locked && paramsDirty()) { warns.push('Заказ считается по параметрам на странице, а они не сохранены. Сохраните параметры, чтобы раскладка совпадала с заказом.'); }
+    if (S.exam.new_status !== V.EXAM_DRAFT || S.hasSnap) { warns.push('Экзамен уже публиковался: новые вопросы не попадут в его билеты — билеты собираются из снимка, сделанного при публикации.'); }
+    var h = warns.map(function (w) { return note('warn', esc(w)); }).join('');
+    h += '<div class="exad-scroll"><table class="adm-table"><thead><tr><th></th><th>Урок</th><th>Заказать</th><th class="adm-r">Всего</th><th>Материал</th></tr></thead><tbody>';
+    plan.forEach(function (x) {
+      var id = x.m.new_exammoduleid;
+      h += '<tr><td>' + (x.reason ? '' : '<input type="checkbox" data-job-lesson="' + esc(id) + '"' + (x.stuck ? '' : ' checked') + ' aria-label="Заказать для урока ' + esc(x.m.new_name || '') + '">') + '</td>' +
+        '<td class="exs-lname">' + esc(x.m.new_name || 'Без названия') + '</td>' +
+        '<td>' + (x.reason ? '<span class="exad-muted">' + esc(x.reason) + '</span>' : esc(countsText(x.counts))) +
+          (x.stuck ? '<div style="color:#7C4A03;">Предыдущее задание по уроку идёт больше ' + STUCK_MIN + ' минут и, возможно, зависло. Отметьте урок, только если хотите заказать всё равно: если старое задание ещё допишет вопросы, появятся дубли.</div>' : '') + '</td>' +
+        '<td class="adm-r adm-num">' + (x.total ? A.fmtInt(x.total) : '—') + '</td>' +
+        '<td class="exad-small">' + A.fmtInt(x.chars) + ' знаков — хватит примерно на ' + Math.floor(x.chars / CHARS_PER_Q) + ' вопросов' +
+          (!x.reason && x.total > x.cap ? '<div style="color:#7C4A03;">ИИ остановится примерно на ' + x.cap + ' вопросах. Остальное — следующим заданием; или добавьте текст озвучки, или снизьте запас банка.</div>' : '') + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+    A.modal({
+      title: 'Создать недостающие вопросы', html: h, okText: 'Заказать', wide: true,
+      validate: function (body) { return body.querySelectorAll('[data-job-lesson]:checked').length ? '' : 'Не выбран ни один урок.'; }
+    }).then(function (body) {
+      if (!body) { return; }
+      var chosen = {};
+      Array.prototype.forEach.call(body.querySelectorAll('[data-job-lesson]:checked'), function (c) { chosen[c.getAttribute('data-job-lesson')] = 1; });
+      var todo = eligible.filter(function (x) { return chosen[x.m.new_exammoduleid]; });
+      var made = [];
+      A.busy(btn, true, 'Создаём задания…');
+      return runSeq(todo, function (x) { return postJob(x).then(function (job) { made.push(job); }); }).then(function (res) {
+        if (res.errors.length) { A.toast('Заданий создано: ' + res.ok + '. Не создано: ' + res.errors.length + ' (' + res.errors[0].message + ').', 'err'); }
+        else { A.toast('Заданий создано: ' + res.ok + '. Вопросы появятся в течение нескольких минут.', 'ok'); }
+        /* Кнопку отпускаем только после обновления списка: иначе второй клик
+           посчитал бы план по старому списку и заказал бы те же платные задания ещё раз.
+           Список не обновился — вписываем созданные задания сами, чтобы уроки считались занятыми */
+        return refreshJobs().catch(function () {
+          var known = {};
+          S.jobs.forEach(function (j) { known[j.new_aijobid] = 1; });
+          made.forEach(function (j) { if (!known[j.new_aijobid]) { S.jobs.unshift(j); } });
+          renderJobs();
+          A.toast('Список заданий не обновился. Созданные задания учтены — по этим урокам повторно заказать нельзя. Нажмите «Обновить», чтобы увидеть их состояние.', 'err');
+        }).then(function () { A.busy(btn, false); startJobPolling(); });
+      });
+    });
+  }
+  /* Задание для потока создания вопросов: статус «Создано» обязателен, иначе поток молча выйдет.
+     Возвращает строку для списка заданий — на случай, если список потом не перечитается */
+  function postJob(x) {
+    var moduleId = lower(x.m.new_exammoduleid);
+    var spec = JSON.stringify({ module: moduleId, counts: x.counts });
+    var examRef = '/new_exams(' + S.id + ')';
+    var moduleRef = '/new_exammodules(' + moduleId + ')';
+    var key = A.uuid();
+    return A.post('new_aijobs', {
+      'new_exam@odata.bind': examRef,
+      'new_module@odata.bind': moduleRef,
+      new_status: V.JOB_CREATED,
+      new_specjson: spec,
+      new_idempotencykey: key
+    }).then(function (r) {
+      return {
+        new_aijobid: lower((r && r.id) || key), new_name: '', _new_module_value: moduleId,
+        new_status: V.JOB_CREATED, new_specjson: spec, createdon: new Date(A.now()).toISOString()
+      };
+    });
+  }
+
+  /* ── 6. Публикация ─────────────────────────────────────────────────────────────────── */
+  function publishChecks() {
+    var e = S.exam, p = S.current.p, errs = S.current.errors, list = [];
+    function add(ok, text, detail, soft) { list.push({ ok: ok, text: text, detail: detail || '', soft: !!soft }); }
+    add(e.new_status === V.EXAM_DRAFT, 'Экзамен в статусе «Черновик»');
+    add(!S.hasSnap, 'Экзамен ещё не публиковался', S.hasSnap ?
+      'Снимок правил уже сохранён. Повторная публикация молча возьмёт старый снимок и не проверит новые настройки, поэтому снова опубликовать этот экзамен со страницы нельзя. Создайте новый экзамен или обратитесь в поддержку.' : '');
+    var noText = S.lessons.filter(function (m) { return !hasText(m); });
+    add(S.lessons.length > 0 && !noText.length, 'У каждого урока есть текст',
+      !S.lessons.length ? 'Уроков нет.' : (noText.length ? 'Без текста: ' + noText.map(function (m) { return '«' + (m.new_name || 'Без названия') + '»'; }).join(', ') + '.' : ''));
+    var counted = p.blocks.filter(function (b) { return b.count > 0; });
+    var written = p.blocks.filter(function (b) { return WRITTEN.indexOf(b.type) >= 0 && b.count > 0; });
+    add(counted.length > 0 && !written.length && !errs.length, 'Билет задан и параметры без ошибок',
+      errs.length ? 'Исправьте поля в разделе «Билет и правила».' : (!counted.length ? 'В билете нет заданий.' : (written.length ? 'Письменные задания пока нельзя: их оценка не подключена.' : '')));
+    var badPrompts = A.PROMPT_CODES.filter(function (c) { return !approvedVersions(c).some(function (x) { return x.new_version === p.prompts[c]; }); });
+    add(!badPrompts.length, 'Все пять промптов оценки утверждены', badPrompts.length ? 'Нет утверждённой версии: ' +
+      badPrompts.map(function (c) { return PROMPT_LABEL[c] + ' (' + c + ')'; }).join(', ') + '. Проверка публикации требует их даже для экзамена только с выбором ответа.' : '');
+    var st = layoutStats(p);
+    add(p.blueprint.length > 0 && !st.short, 'В банке хватает одобренных вопросов', !p.blueprint.length ? 'Раскладка пустая.' :
+      (st.short ? 'Не хватает в ячейках: ' + st.short + ', всего недостаёт ' + A.fmtInt(st.missing) + ' вопросов — см. «Раскладка билета» и «Создать недостающее».' : ''));
+    var o = e.new_opens ? new Date(e.new_opens).getTime() : NaN, c = e.new_closes ? new Date(e.new_closes).getTime() : NaN;
+    var winOk = !isNaN(o) && !isNaN(c) && o < c && c > A.now();
+    add(winOk, 'Время проведения задано и ещё не прошло', winOk ? '' :
+      (isNaN(o) || isNaN(c) ? 'Укажите начало и окончание в разделе «Основное» и сохраните.' : (o >= c ? 'Начало должно быть раньше окончания.' : 'Окончание уже прошло.')));
+    if (p.requireConsent) {
+      var consOk = !!String(e.new_consenttext || '').trim() && !!String(e.new_consentversion || '').trim();
+      add(consOk, 'Текст и версия согласия заполнены', consOk ? '' : 'Включено «Требовать согласие» — заполните текст и версию согласия в разделе «Основное» и сохраните.');
+    }
+    /* Мягкие пункты: не блокируют кнопку */
+    add(!paramsDirty(), 'Параметры билета сохранены', paramsDirty() ? 'Параметры на странице отличаются от сохранённых — они сохранятся вместе с публикацией.' : '', true);
+    if (basicsDirty()) { add(false, 'В разделе «Основное» есть несохранённые изменения', 'Проверка идёт по сохранённым данным. Сохраните раздел, если изменения нужны.', true); }
+    if (S.otherPublished.length) {
+      add(false, 'Уже опубликован другой экзамен', S.otherPublished.map(function (x) { return '«' + (x.new_name || 'Без названия') + '»'; }).join(', ') +
+        '. Участники на странице аттестации видят только один — опубликованный последним.', true);
+    }
+    if (S.jobs.some(isRunning)) { add(false, 'Идут задания ИИ', 'В снимок попадут только вопросы, одобренные к моменту публикации.', true); }
+    return list;
+  }
+  function renderPublish() {
+    var box = $('exsPublish'), btn = $('exsPublishBtn'), e = S.exam;
+    if (!S.current || !e) { return; }
+    if (e.new_status === V.EXAM_PUBLISHED || e.new_status === V.EXAM_CLOSED) {
+      btn.hidden = true;
+      if (S.publishing) { return; }
+      var pub = e.new_status === V.EXAM_PUBLISHED;
+      if (pub && !e.new_publishedon) {
+        box.innerHTML = note('warn', '<b>Экзамен в статусе «Опубликован», но проверка публикации ещё не закончилась.</b> Обновите страницу через пару минут. Если так и останется — обратитесь в поддержку' +
+          (A.cfg.support ? ' (' + esc(A.cfg.support) + ')' : '') + ': без снимка участники не смогут начать экзамен.');
+        return;
+      }
+      box.innerHTML = note(pub ? 'success' : 'info', '<b>' + (pub ? 'Опубликован ' : 'Закрыт. Был опубликован ') + esc(A.dt(e.new_publishedon)) + '.</b>' +
+        (S.pubLog && S.pubLog.new_payload ? ' ' + esc(S.pubLog.new_payload) + '.' : '') +
+        '<div style="margin-top:4px;">Правила билета и набор вопросов заморожены в снимке. Новые и выведенные вопросы на билеты этого экзамена не влияют.</div>');
+      return;
+    }
+    btn.hidden = false;
+    var list = publishChecks();
+    var blocking = list.filter(function (x) { return !x.soft && !x.ok; });
+    box.innerHTML = '<ul class="exs-check">' + list.map(function (x) {
+      var cls = x.ok ? 'ok' : (x.soft ? 'warn' : 'bad'), sym = x.ok ? '✓' : (x.soft ? '!' : '✗');
+      return '<li><span class="exs-mark exs-mark--' + cls + '" aria-hidden="true">' + sym + '</span><div>' + esc(x.text) +
+        (x.detail ? '<span class="exs-detail">' + esc(x.detail) + '</span>' : '') + '</div></li>';
+    }).join('') + '</ul>' +
+      (blocking.length ? note('warn', 'Кнопка станет доступна, когда будут выполнены все пункты с ✗.') : '');
+    btn.disabled = S.publishing || S.lessonSaving || blocking.length > 0;
+  }
+  function doPublish(btn) {
+    var list = publishChecks();
+    if (S.publishing || S.lessonSaving || list.some(function (x) { return !x.soft && !x.ok; })) { return; }
+    var p = S.current.p, e = S.exam, dirty = paramsDirty();
+    var html = '<p>После публикации:</p><ul>' +
+      '<li>участники увидят экзамен на странице аттестации и смогут сдавать его с ' + esc(A.dt(e.new_opens)) + ' по ' + esc(A.dt(e.new_closes)) + ';</li>' +
+      '<li>правила билета и набор вопросов заморозятся — изменить их потом будет нельзя, даже если вернуть экзамен в черновик;</li>' +
+      '<li>время, правила и согласие в разделе «Основное» останутся доступны для правки.</li></ul>' +
+      (dirty ? note('info', 'Параметры билета на странице не сохранены — они сохранятся вместе с публикацией.') : '') +
+      (S.otherPublished.length ? note('warn', 'Уже опубликован другой экзамен. Участники увидят только тот, что опубликован последним, — то есть этот.') : '') +
+      '<p class="exad-muted">Проверка на сервере занимает до пары минут. Не закрывайте страницу.</p>';
+    A.confirmBox('Опубликовать экзамен?', html, 'Опубликовать').then(function (ok) {
+      if (!ok) { return; }
+      var json = JSON.stringify(p);
+      if (json.length > MAX_PARAMS) { A.toast(tooBigParams(json), 'err'); return; }
+      var since = 0;
+      var t0 = A.now(), stateBox = $('exsPublishState');
+      S.publishing = true;
+      applyLock();
+      A.busy(btn, true, 'Публикуем…');
+      function progress() { stateBox.innerHTML = note('info', '<span class="exad-spin"></span> Сервер проверяет экзамен и записывает снимок… прошло ' + Math.round((A.now() - t0) / 1000) + ' с.'); }
+      function finish() { S.publishing = false; A.busy(btn, false); applyLock(); renderLessons(); renderPublish(); }
+      progress();
+      /* Время последней записи о неудачной публикации — до PATCH: иначе причины прошлой неудачи
+         показались бы как текущие (поток пишет журнал не во всех ветках). Время берём с сервера,
+         а не с часов компьютера. Не прочиталось — берём «сейчас минус 5 секунд». */
+      lastFailAt().then(function (t) { since = t; }, function () { since = A.now() - 5000; }).then(function () {
+        /* Одна запись: параметры и статус вместе — поток публикации срабатывает на смену статуса и читает параметры */
+        return A.patch('new_exams', S.id, { new_paramsjson: json, new_status: V.EXAM_PUBLISHED });
+      }).then(function () {
+        S.storedRaw = json;
+        S.exam.new_paramsjson = json;
+        var outcome = '';
+        return A.poll(function () {
+          progress();
+          return A.api('/_api/new_exams(' + S.id + ')?$select=new_status,new_publishedon').then(function (x) {
+            if (x.new_status === V.EXAM_PUBLISHED && x.new_publishedon) { outcome = 'ok'; S.exam.new_publishedon = x.new_publishedon; return true; }
+            if (x.new_status === V.EXAM_DRAFT) { outcome = 'fail'; return true; }
+            return false;
+          });
+        }, { interval: 3000, maxTries: 60 }).then(function (done) {
+          if (done && outcome === 'ok') {
+            stateBox.innerHTML = note('success', 'Экзамен опубликован. Обновляем страницу…');
+            A.toast('Экзамен опубликован.', 'ok');
+            setTimeout(function () { location.reload(); }, 1500);
+            return;
+          }
+          if (done && outcome === 'fail') {
+            S.exam.new_status = V.EXAM_DRAFT;
+            return showPublishFailure(since).then(finish);
+          }
+          S.exam.new_status = V.EXAM_PUBLISHED;
+          S.locked = true;
+          stateBox.innerHTML = note('warn', '<b>Сервер не ответил за 3 минуты.</b> Экзамен сейчас в статусе «Опубликован», но проверка ещё не закончилась — она могла задержаться. ' +
+            'Обновите страницу через несколько минут. Если статус так и не изменится — обратитесь в поддержку' + (A.cfg.support ? ' (' + esc(A.cfg.support) + ')' : '') + '.' +
+            '<div class="exad-actions" style="margin-top:8px;"><button type="button" class="adm-btn adm-btn--ghost exs-sm" data-act="reload">Обновить страницу</button></div>');
+          S.publishing = false;
+          A.busy(btn, false);
+          applyLock();
+          renderLessons();
+          renderHeader();
+          renderPublish();
+        });
+      }, function (er) {
+        stateBox.innerHTML = '';
+        A.toast('Не удалось опубликовать. ' + er.message, 'err');
+        finish();
+      });
+    });
+  }
+  /* Время (мс) самой свежей записи «публикация не прошла»; 0 — таких записей ещё не было */
+  function lastFailAt() {
+    return A.api('/_api/new_examlogs?$select=createdon&$filter=_new_exam_value eq ' + S.id + ' and new_event eq ' + EV_FAIL + '&$orderby=createdon desc&$top=1')
+      .then(function (j) {
+        var r = (j.value || [])[0], t = r && r.createdon ? new Date(r.createdon).getTime() : 0;
+        return isNaN(t) ? 0 : t;
+      });
+  }
+  /* since — время в мс: подходят только записи строго новее него */
+  function showPublishFailure(since) {
+    var stateBox = $('exsPublishState');
+    var row = null;
+    renderHeader();
+    /* Старые причины из экзамена устарели: свежие показываем ниже, в разделе «Публикация» */
+    S.errText = '';
+    renderErrorBox();
+    stateBox.innerHTML = note('info', '<span class="exad-spin"></span> Публикация не прошла. Получаем причины…');
+    /* Поток сначала возвращает статус «Черновик» и только потом пишет журнал — запись ждём несколько раз */
+    return A.poll(function () {
+      return A.api('/_api/new_examlogs?$select=new_event,new_payload,createdon&$filter=_new_exam_value eq ' + S.id + ' and new_event eq ' + EV_FAIL + '&$orderby=createdon desc&$top=5')
+        .then(function (j) {
+          row = (j.value || []).filter(function (x) { return x.createdon && new Date(x.createdon).getTime() > since; })[0] || null;
+          return !!row;
+        });
+    }, { interval: 2000, maxTries: 6, immediate: true })
+      .then(function () {
+        if (!row) { throw new Error('нет записи'); }
+        var lines = String(row.new_payload || '').split(/\r?\n/).filter(function (l) { return l.trim(); });
+        stateBox.innerHTML = note('danger', '<b>Публикация не прошла проверку.</b> Экзамен остался черновиком. Причины:<ul>' +
+          lines.map(function (l) { return '<li>' + esc(humanize(l)) + '</li>'; }).join('') + '</ul>');
+      })
+      .catch(function () {
+        /* Не все ветки потока пишут подробности в журнал — тогда текст есть только в самом экзамене */
+        stateBox.innerHTML = note('danger', '<b>Публикация не прошла.</b> Экзамен остался черновиком. Подробная причина появится вверху страницы после обновления.' +
+          '<div class="exad-actions" style="margin-top:8px;"><button type="button" class="adm-btn adm-btn--ghost exs-sm" data-act="reload">Обновить страницу</button></div>');
+      })
+      .then(function () { A.toast('Публикация не прошла — см. причины в разделе «Публикация».', 'err'); });
+  }
+
+  /* ── Пересчёт и события ────────────────────────────────────────────────────────────── */
+  function recompute() {
+    S.current = readParams();
+    renderParamsState();
+    renderLayout();
+    renderPublish();
+  }
+
+  root.addEventListener('click', function (ev) {
+    var t = ev.target && ev.target.closest ? ev.target.closest('[data-act]') : null;
+    if (!t || !root.contains(t) || t.disabled) { return; }
+    var act = t.getAttribute('data-act');
+    if (act === 'save-basics') { saveBasics(t); }
+    else if (act === 'save-params') { saveParams(t); }
+    else if ((act === 'add-lesson' || act === 'edit-lesson' || act === 'upload') && lessonsBusy()) { return; }
+    else if (act === 'add-lesson') { addLesson(t); }
+    else if (act === 'edit-lesson') { editLesson(t.getAttribute('data-id')); }
+    else if (act === 'upload') { $('exsFile').click(); }
+    else if (act === 'refresh-jobs') { manualRefresh(t); }
+    else if (act === 'create-missing') { createMissing(t); }
+    else if (act === 'job-notes') { toggleNotes(t); }
+    else if (act === 'publish') { doPublish(t); }
+    else if (act === 'reload') { location.reload(); }
+  });
+  root.addEventListener('input', function (ev) {
+    var t = ev.target;
+    if (!S.current) { return; }
+    if (t.hasAttribute('data-weight')) { draftWeight(t); return; }
+    if (t.closest('#exsParams')) { recompute(); }
+    else if (t.closest('#exsBasics')) { renderPublish(); }
+  });
+  root.addEventListener('change', function (ev) {
+    var t = ev.target;
+    if (t.id === 'exsFile') { onFile(t); return; }
+    if (t.hasAttribute('data-weight')) { saveWeight(t); return; }
+    if (S.current && t.closest('#exsParams')) { recompute(); }
+    else if (S.current && t.closest('#exsBasics')) { renderPublish(); }
+  });
+
+  init();
+})();
+</script>
+
+{% else %}
+<div class="container adm-scope exad">
+  <div class="exad-head">
+    <a class="exad-back" href="/admin/exams"><i class="bi bi-arrow-left" aria-hidden="true"></i> Все экзамены</a>
+    <h1>Настройка экзамена</h1>
+  </div>
+  <div class="exad-note exad-note--warn">
+    Экзамен не найден: в адресе страницы нет номера экзамена или он неверный.
+    <a class="exad-link" href="/admin/exams">Перейдите к списку экзаменов</a> и откройте настройку оттуда.
+  </div>
+</div>
+{% endif %}
+{% endunless %}
