@@ -1,0 +1,522 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": { "connectionReferenceLogicalName": "new_sharedcommondataserviceforapps_73c39" },
+        "api": { "name": "shared_commondataserviceforapps" }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": { "defaultValue": {}, "type": "Object" },
+        "$authentication": { "defaultValue": {}, "type": "SecureObject" }
+      },
+      "triggers": {
+        "Когда_создано_задание": {
+          "type": "OpenApiConnectionWebhook",
+          "inputs": {
+            "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "SubscribeWebhookTrigger", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+            "parameters": { "subscriptionRequest/message": 1, "subscriptionRequest/entityname": "new_aijob", "subscriptionRequest/scope": 4 },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      },
+      "actions": {
+        "Константы": {
+          "type": "Compose",
+          "runAfter": {},
+          "inputs": {
+            "jobСоздано": 100000000,
+            "jobВыполняется": 100000001,
+            "jobГотово": 100000002,
+            "jobЧастично": 100000003,
+            "jobОшибка": 100000004,
+            "moduleВопросыСозданы": 100000003,
+            "qНаПроверке": 100000000,
+            "sourceИИ": 100000000,
+            "type": { "single": 100000000, "multi": 100000001, "case": 100000002, "control": 100000003 },
+            "difficulty": { "basic": 100000000, "medium": 100000001, "advanced": 100000002 },
+            "effortName": { "100000000": "low", "100000001": "medium", "100000002": "high" },
+            "points": { "single": 1, "multi": 1, "case": 10, "control": 5 },
+            "prompt": { "single": "GEN_SINGLE", "multi": "GEN_MULTI", "case": "GEN_CASE", "control": "GEN_CONTROL" },
+            "criteria": { "case": "K1:25|K2:25|K3:20|K4:15|K5:15", "control": "K1:60|K2:40" },
+            "_о_ячейках": "За один вызов — до 5 вопросов на выбор, 1 кейс или 2 контрольных: так вызов укладывается в 120 секунд синхронного действия.",
+            "cells": [
+              { "type": "single",  "difficulty": "basic",    "chunk": 5 },
+              { "type": "single",  "difficulty": "medium",   "chunk": 5 },
+              { "type": "single",  "difficulty": "advanced", "chunk": 5 },
+              { "type": "multi",   "difficulty": "basic",    "chunk": 5 },
+              { "type": "multi",   "difficulty": "medium",   "chunk": 5 },
+              { "type": "multi",   "difficulty": "advanced", "chunk": 5 },
+              { "type": "case",    "difficulty": "basic",    "chunk": 1 },
+              { "type": "case",    "difficulty": "medium",   "chunk": 1 },
+              { "type": "case",    "difficulty": "advanced", "chunk": 1 },
+              { "type": "control", "difficulty": "basic",    "chunk": 2 },
+              { "type": "control", "difficulty": "medium",   "chunk": 2 },
+              { "type": "control", "difficulty": "advanced", "chunk": 2 }
+            ]
+          }
+        },
+        "Вызовы": { "type": "InitializeVariable", "runAfter": { "Константы": [ "Succeeded" ] }, "inputs": { "variables": [ { "name": "Вызовы", "type": "array", "value": [] } ] } },
+        "Создано": { "type": "InitializeVariable", "runAfter": { "Вызовы": [ "Succeeded" ] }, "inputs": { "variables": [ { "name": "Создано", "type": "integer", "value": 0 } ] } },
+        "Одобрено": { "type": "InitializeVariable", "runAfter": { "Создано": [ "Succeeded" ] }, "inputs": { "variables": [ { "name": "Одобрено", "type": "integer", "value": 0 } ] } },
+        "Отклонено": { "type": "InitializeVariable", "runAfter": { "Одобрено": [ "Succeeded" ] }, "inputs": { "variables": [ { "name": "Отклонено", "type": "integer", "value": 0 } ] } },
+        "ТокеныВход": { "type": "InitializeVariable", "runAfter": { "Отклонено": [ "Succeeded" ] }, "inputs": { "variables": [ { "name": "ТокеныВход", "type": "integer", "value": 0 } ] } },
+        "ТокеныВыход": { "type": "InitializeVariable", "runAfter": { "ТокеныВход": [ "Succeeded" ] }, "inputs": { "variables": [ { "name": "ТокеныВыход", "type": "integer", "value": 0 } ] } },
+        "Стоимость": { "type": "InitializeVariable", "runAfter": { "ТокеныВыход": [ "Succeeded" ] }, "inputs": { "variables": [ { "name": "Стоимость", "type": "float", "value": 0 } ] } },
+        "Заметки": { "type": "InitializeVariable", "runAfter": { "Стоимость": [ "Succeeded" ] }, "inputs": { "variables": [ { "name": "Заметки", "type": "array", "value": [] } ] } },
+        "Try": {
+          "type": "Scope",
+          "runAfter": { "Заметки": [ "Succeeded" ] },
+          "actions": {
+            "Не_новое_задание": {
+              "type": "If",
+              "runAfter": {},
+              "expression": { "not": { "equals": [ "@triggerOutputs()?['body/new_status']", "@outputs('Константы')['jobСоздано']" ] } },
+              "actions": { "Выход_не_новое": { "type": "Terminate", "runAfter": {}, "inputs": { "runStatus": "Succeeded" } } },
+              "else": { "actions": {} }
+            },
+            "Выполняется": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Не_новое_задание": [ "Succeeded" ] },
+              "inputs": {
+                "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "UpdateOnlyRecord", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                "parameters": { "entityName": "new_aijobs", "recordId": "@triggerOutputs()?['body/new_aijobid']", "item/new_status": "@outputs('Константы')['jobВыполняется']" },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Заказ": {
+              "type": "Compose",
+              "runAfter": { "Выполняется": [ "Succeeded" ] },
+              "inputs": "@json(coalesce(triggerOutputs()?['body/new_specjson'], '{}'))"
+            },
+            "Урок": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Заказ": [ "Succeeded" ] },
+              "inputs": {
+                "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "GetItem", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                "parameters": { "entityName": "new_exammodules", "recordId": "@{coalesce(outputs('Заказ')?['module'], triggerOutputs()?['body/_new_module_value'])}" },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Материал": {
+              "type": "Compose",
+              "runAfter": { "Урок": [ "Succeeded" ] },
+              "inputs": "@{coalesce(outputs('Урок')?['body/new_narration'], outputs('Урок')?['body/new_text'], '')}"
+            },
+            "Без_материала": {
+              "type": "If",
+              "runAfter": { "Материал": [ "Succeeded" ] },
+              "expression": { "less": [ "@length(outputs('Материал'))", 300 ] },
+              "actions": {
+                "Ошибка_материала": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "UpdateOnlyRecord", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                    "parameters": {
+                      "entityName": "new_aijobs",
+                      "recordId": "@triggerOutputs()?['body/new_aijobid']",
+                      "item/new_status": "@outputs('Константы')['jobОшибка']",
+                      "item/new_errortext": "У урока нет текста озвучки или он слишком короткий — вопросы создавать не из чего."
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Выход_без_материала": { "type": "Terminate", "runAfter": { "Ошибка_материала": [ "Succeeded" ] }, "inputs": { "runStatus": "Succeeded" } }
+              },
+              "else": { "actions": {} }
+            },
+            "Цикл_ячеек": {
+              "type": "Foreach",
+              "runAfter": { "Без_материала": [ "Succeeded" ] },
+              "foreach": "@outputs('Константы')['cells']",
+              "runtimeConfiguration": { "concurrency": { "repetitions": 1 } },
+              "actions": {
+                "Заказано_в_ячейке": {
+                  "type": "Compose",
+                  "runAfter": {},
+                  "inputs": "@int(coalesce(outputs('Заказ')?['counts']?[items('Цикл_ячеек')?['type']]?[items('Цикл_ячеек')?['difficulty']], 0))"
+                },
+                "Вызовы_ячейки": {
+                  "type": "Select",
+                  "runAfter": { "Заказано_в_ячейке": [ "Succeeded" ] },
+                  "inputs": {
+                    "from": "@range(0, div(add(outputs('Заказано_в_ячейке'), sub(items('Цикл_ячеек')?['chunk'], 1)), items('Цикл_ячеек')?['chunk']))",
+                    "select": {
+                      "type": "@items('Цикл_ячеек')?['type']",
+                      "difficulty": "@items('Цикл_ячеек')?['difficulty']",
+                      "count": "@min(items('Цикл_ячеек')?['chunk'], sub(outputs('Заказано_в_ячейке'), mul(item(), items('Цикл_ячеек')?['chunk'])))"
+                    }
+                  }
+                },
+                "Все_вызовы_с_ячейкой": {
+                  "type": "Compose",
+                  "runAfter": { "Вызовы_ячейки": [ "Succeeded" ] },
+                  "inputs": "@union(variables('Вызовы'), body('Вызовы_ячейки'))"
+                },
+                "Запомнить_вызовы": {
+                  "type": "SetVariable",
+                  "runAfter": { "Все_вызовы_с_ячейкой": [ "Succeeded" ] },
+                  "inputs": { "name": "Вызовы", "value": "@outputs('Все_вызовы_с_ячейкой')" }
+                }
+              }
+            },
+            "Предел_материала": {
+              "type": "Compose",
+              "runAfter": { "Цикл_ячеек": [ "Succeeded" ] },
+              "inputs": "@max(1, div(length(outputs('Материал')), 400))"
+            },
+            "Цикл_вызовов": {
+              "type": "Foreach",
+              "runAfter": { "Предел_материала": [ "Succeeded" ] },
+              "foreach": "@variables('Вызовы')",
+              "runtimeConfiguration": { "concurrency": { "repetitions": 1 } },
+              "actions": {
+                "Хватит_ли_материала": {
+                  "type": "If",
+                  "runAfter": {},
+                  "expression": { "greaterOrEquals": [ "@variables('Создано')", "@outputs('Предел_материала')" ] },
+                  "actions": {
+                    "Заметка_о_материале": {
+                      "type": "AppendToArrayVariable",
+                      "runAfter": {},
+                      "inputs": { "name": "Заметки", "value": "@{concat('Материала мало: на урок около ', string(outputs('Предел_материала')), ' вопросов (≈1 на 400 знаков озвучки). Остаток заказа пропущен.')}" }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Промпт": {
+                        "type": "OpenApiConnection",
+                        "runAfter": {},
+                        "inputs": {
+                          "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                          "parameters": {
+                            "entityName": "new_aiprompts",
+                            "$filter": "statecode eq 0 and new_status eq 100000001 and new_code eq '@{outputs('Константы')['prompt'][items('Цикл_вызовов')?['type']]}'",
+                            "$select": "new_code,new_version,new_systemtext,new_schemajson,new_model,new_effort,new_maxtokens",
+                            "$orderby": "new_version desc",
+                            "$top": 1
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      },
+                      "П": { "type": "Compose", "runAfter": { "Промпт": [ "Succeeded" ] }, "inputs": "@first(outputs('Промпт')?['body/value'])" },
+                      "Уже_в_банке": {
+                        "type": "OpenApiConnection",
+                        "runAfter": { "П": [ "Succeeded" ] },
+                        "inputs": {
+                          "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                          "parameters": {
+                            "entityName": "new_examquestions",
+                            "$filter": "statecode eq 0 and _new_module_value eq '@{outputs('Урок')?['body/new_exammoduleid']}' and new_status ne 100000002",
+                            "$select": "new_stem,new_contenthash",
+                            "$top": 500
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      },
+                      "Начала_формулировок": {
+                        "type": "Select",
+                        "runAfter": { "Уже_в_банке": [ "Succeeded" ] },
+                        "inputs": {
+                          "from": "@outputs('Уже_в_банке')?['body/value']",
+                          "select": "@{concat('- ', substring(coalesce(item()?['new_stem'], ''), 0, min(100, length(coalesce(item()?['new_stem'], '')))))}"
+                        }
+                      },
+                      "Хеши_банка": {
+                        "type": "Select",
+                        "runAfter": { "Начала_формулировок": [ "Succeeded" ] },
+                        "inputs": { "from": "@outputs('Уже_в_банке')?['body/value']", "select": "@coalesce(item()?['new_contenthash'], '')" }
+                      },
+                      "Содержимое": {
+                        "type": "Compose",
+                        "runAfter": { "Хеши_банка": [ "Succeeded" ] },
+                        "inputs": [
+                          { "type": "text", "text": "@{concat('<narration>', outputs('Материал'), '</narration>')}", "cache_control": { "type": "ephemeral" } },
+                          { "type": "text", "text": "@{concat('<task>Урок: ', coalesce(outputs('Урок')?['body/new_name'], ''), '. Тип: ', items('Цикл_вызовов')?['type'], '. Сложность: ', items('Цикл_вызовов')?['difficulty'], '. Количество: ', string(items('Цикл_вызовов')?['count']), '.</task><existing>', join(body('Начала_формулировок'), decodeUriComponent('%0A')), '</existing>')}" }
+                        ]
+                      },
+                      "Вызов_генератора": {
+                        "type": "Workflow",
+                        "runAfter": { "Содержимое": [ "Succeeded" ] },
+                        "inputs": {
+                          "host": { "workflowReferenceName": "b1c40009-e5c9-4d7a-9a61-2026092200c4" },
+                          "body": {
+                            "text": "@{outputs('П')?['new_code']}",
+                            "text_1": "@{outputs('П')?['new_model']}",
+                            "text_2": "@{outputs('Константы')['effortName'][string(coalesce(outputs('П')?['new_effort'], 100000001))]}",
+                            "text_3": "@{coalesce(outputs('П')?['new_maxtokens'], 8000)}",
+                            "text_4": "@{outputs('П')?['new_systemtext']}",
+                            "text_5": "@{string(outputs('Содержимое'))}",
+                            "text_6": "@{outputs('П')?['new_schemajson']}",
+                            "text_7": "создание вопросов",
+                            "text_8": "@{concat(triggerOutputs()?['body/new_aijobid'], ':', items('Цикл_вызовов')?['type'], ':', items('Цикл_вызовов')?['difficulty'])}"
+                          }
+                        }
+                      },
+                      "Плюс_токены_вход": {
+                        "type": "IncrementVariable", "runAfter": { "Вызов_генератора": [ "Succeeded" ] },
+                        "inputs": { "name": "ТокеныВход", "value": "@int(coalesce(body('Вызов_генератора')?['inputTokens'], 0))" }
+                      },
+                      "Плюс_токены_выход": {
+                        "type": "IncrementVariable", "runAfter": { "Плюс_токены_вход": [ "Succeeded" ] },
+                        "inputs": { "name": "ТокеныВыход", "value": "@int(coalesce(body('Вызов_генератора')?['outputTokens'], 0))" }
+                      },
+                      "Плюс_стоимость": {
+                        "type": "IncrementVariable", "runAfter": { "Плюс_токены_выход": [ "Succeeded" ] },
+                        "inputs": { "name": "Стоимость", "value": "@float(coalesce(body('Вызов_генератора')?['costUsd'], 0))" }
+                      },
+                      "Генератор_ответил": {
+                        "type": "If",
+                        "runAfter": { "Плюс_стоимость": [ "Succeeded" ] },
+                        "expression": { "equals": [ "@body('Вызов_генератора')?['ok']", true ] },
+                        "actions": {
+                          "Ответ_генератора": { "type": "Compose", "runAfter": {}, "inputs": "@json(body('Вызов_генератора')?['outputText'])" },
+                          "Цикл_вопросов": {
+                            "type": "Foreach",
+                            "runAfter": { "Ответ_генератора": [ "Succeeded" ] },
+                            "foreach": "@coalesce(outputs('Ответ_генератора')?['questions'], json('[]'))",
+                            "runtimeConfiguration": { "concurrency": { "repetitions": 1 } },
+                            "actions": {
+                              "В": { "type": "Compose", "runAfter": {}, "inputs": "@items('Цикл_вопросов')" },
+                              "Это_выбор": {
+                                "type": "Compose", "runAfter": { "В": [ "Succeeded" ] },
+                                "inputs": "@or(equals(items('Цикл_вызовов')?['type'], 'single'), equals(items('Цикл_вызовов')?['type'], 'multi'))"
+                              },
+                              "Варианты_с_ид": {
+                                "type": "Select",
+                                "runAfter": { "Это_выбор": [ "Succeeded" ] },
+                                "inputs": {
+                                  "from": "@range(0, length(coalesce(outputs('В')?['options'], json('[]'))))",
+                                  "select": {
+                                    "id": "@substring('abcdefg', item(), 1)",
+                                    "text": "@outputs('В')?['options']?[item()]?['text']",
+                                    "correct": "@outputs('В')?['options']?[item()]?['correct']",
+                                    "misconception": "@outputs('В')?['options']?[item()]?['misconception']"
+                                  }
+                                }
+                              },
+                              "Верных": {
+                                "type": "Query",
+                                "runAfter": { "Варианты_с_ид": [ "Succeeded" ] },
+                                "inputs": { "from": "@body('Варианты_с_ид')", "where": "@equals(item()?['correct'], true)" }
+                              },
+                              "Коды_критериев": {
+                                "type": "Select",
+                                "runAfter": { "Верных": [ "Succeeded" ] },
+                                "inputs": { "from": "@coalesce(outputs('В')?['criteria'], json('[]'))", "select": "@concat(item()?['code'], ':', string(item()?['weight']))" }
+                              },
+                              "Формулировка": {
+                                "type": "Compose",
+                                "runAfter": { "Коды_критериев": [ "Succeeded" ] },
+                                "inputs": "@{if(equals(items('Цикл_вызовов')?['type'], 'case'), concat(coalesce(outputs('В')?['title'], ''), decodeUriComponent('%0A%0A'), coalesce(outputs('В')?['situation'], ''), decodeUriComponent('%0A%0A'), 'Задание: ', coalesce(outputs('В')?['task'], '')), coalesce(outputs('В')?['stem'], ''))}"
+                              },
+                              "Хеш": {
+                                "type": "Compose",
+                                "runAfter": { "Формулировка": [ "Succeeded" ] },
+                                "inputs": "@{toLower(trim(substring(outputs('Формулировка'), 0, min(400, length(outputs('Формулировка'))))))}"
+                              },
+                              "Годен": {
+                                "type": "Compose",
+                                "runAfter": { "Хеш": [ "Succeeded" ] },
+                                "inputs": "@and(greaterOrEquals(length(coalesce(outputs('В')?['source_quote'], '')), 10), contains(outputs('Материал'), coalesce(outputs('В')?['source_quote'], '~~нет цитаты~~')), not(contains(body('Хеши_банка'), outputs('Хеш'))), if(equals(items('Цикл_вызовов')?['type'], 'single'), and(greaterOrEquals(length(body('Варианты_с_ид')), 4), lessOrEquals(length(body('Варианты_с_ид')), 5), equals(length(body('Верных')), 1)), if(equals(items('Цикл_вызовов')?['type'], 'multi'), and(greaterOrEquals(length(body('Варианты_с_ид')), 5), lessOrEquals(length(body('Варианты_с_ид')), 7), greaterOrEquals(length(body('Верных')), 2), lessOrEquals(length(body('Верных')), 4)), equals(join(body('Коды_критериев'), '|'), outputs('Константы')['criteria'][items('Цикл_вызовов')?['type']]))))"
+                              },
+                              "Если_годен": {
+                                "type": "If",
+                                "runAfter": { "Годен": [ "Succeeded" ] },
+                                "expression": { "equals": [ "@outputs('Годен')", true ] },
+                                "actions": {
+                                  "Создать_вопрос": {
+                                    "type": "OpenApiConnection",
+                                    "runAfter": {},
+                                    "inputs": {
+                                      "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "CreateRecord", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                                      "parameters": {
+                                        "entityName": "new_examquestions",
+                                        "item/new_type": "@outputs('Константы')['type'][items('Цикл_вызовов')?['type']]",
+                                        "item/new_difficulty": "@outputs('Константы')['difficulty'][coalesce(outputs('В')?['difficulty'], items('Цикл_вызовов')?['difficulty'])]",
+                                        "item/new_stem": "@{outputs('Формулировка')}",
+                                        "item/new_optionsjson": "@{if(outputs('Это_выбор'), string(body('Варианты_с_ид')), '')}",
+                                        "item/new_explanation": "@{coalesce(outputs('В')?['explanation'], '')}",
+                                        "item/new_reference": "@{coalesce(outputs('В')?['reference_solution'], outputs('В')?['reference_answer'], '')}",
+                                        "item/new_rubricjson": "@{if(outputs('Это_выбор'), '', string(json(concat('{\"criteria\":', string(coalesce(outputs('В')?['criteria'], json('[]'))), ',\"key_elements\":', string(coalesce(outputs('В')?['key_elements'], json('[]'))), '}'))))}",
+                                        "item/new_points": "@outputs('Константы')['points'][items('Цикл_вызовов')?['type']]",
+                                        "item/new_slides": "",
+                                        "item/new_sourcequote": "@{coalesce(outputs('В')?['source_quote'], '')}",
+                                        "item/new_status": "@outputs('Константы')['qНаПроверке']",
+                                        "item/new_source": "@outputs('Константы')['sourceИИ']",
+                                        "item/new_contenthash": "@{outputs('Хеш')}",
+                                        "item/new_exposures": 0,
+                                        "item/new_version": 1,
+                                        "item/new_exam@odata.bind": "/new_exams(@{triggerOutputs()?['body/_new_exam_value']})",
+                                        "item/new_module@odata.bind": "/new_exammodules(@{outputs('Урок')?['body/new_exammoduleid']})",
+                                        "item/new_job@odata.bind": "/new_aijobs(@{triggerOutputs()?['body/new_aijobid']})"
+                                      },
+                                      "authentication": "@parameters('$authentication')"
+                                    }
+                                  },
+                                  "Плюс_создано": { "type": "IncrementVariable", "runAfter": { "Создать_вопрос": [ "Succeeded" ] }, "inputs": { "name": "Создано", "value": 1 } },
+                                  "Проверить_вопрос": {
+                                    "type": "Workflow",
+                                    "runAfter": { "Плюс_создано": [ "Succeeded" ] },
+                                    "inputs": {
+                                      "host": { "workflowReferenceName": "b1b40010-e5c9-4d7a-9a61-2026092200b4" },
+                                      "body": { "text": "@{outputs('Создать_вопрос')?['body/new_examquestionid']}" }
+                                    }
+                                  },
+                                  "Плюс_стоимость_рецензии": {
+                                    "type": "IncrementVariable", "runAfter": { "Проверить_вопрос": [ "Succeeded" ] },
+                                    "inputs": { "name": "Стоимость", "value": "@float(coalesce(body('Проверить_вопрос')?['costUsd'], 0))" }
+                                  },
+                                  "Итог_рецензии": {
+                                    "type": "If",
+                                    "runAfter": { "Плюс_стоимость_рецензии": [ "Succeeded" ] },
+                                    "expression": { "equals": [ "@body('Проверить_вопрос')?['approved']", true ] },
+                                    "actions": { "Плюс_одобрено": { "type": "IncrementVariable", "runAfter": {}, "inputs": { "name": "Одобрено", "value": 1 } } },
+                                    "else": { "actions": { "Плюс_отклонено_рецензентом": { "type": "IncrementVariable", "runAfter": {}, "inputs": { "name": "Отклонено", "value": 1 } } } }
+                                  }
+                                },
+                                "else": {
+                                  "actions": {
+                                    "Плюс_отклонено_проверкой": { "type": "IncrementVariable", "runAfter": {}, "inputs": { "name": "Отклонено", "value": 1 } },
+                                    "Заметка_о_браке": {
+                                      "type": "AppendToArrayVariable",
+                                      "runAfter": { "Плюс_отклонено_проверкой": [ "Succeeded" ] },
+                                      "inputs": {
+                                        "name": "Заметки",
+                                        "value": "@{concat('Отклонён автоматической проверкой (', items('Цикл_вызовов')?['type'], '): ', substring(outputs('Формулировка'), 0, min(80, length(outputs('Формулировка')))), '…')}"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "else": {
+                          "actions": {
+                            "Заметка_о_сбое": {
+                              "type": "AppendToArrayVariable",
+                              "runAfter": {},
+                              "inputs": {
+                                "name": "Заметки",
+                                "value": "@{concat('Генератор не ответил (', items('Цикл_вызовов')?['type'], ' / ', items('Цикл_вызовов')?['difficulty'], '): ', coalesce(body('Вызов_генератора')?['errorCode'], ''), ' ', coalesce(body('Вызов_генератора')?['errorText'], ''))}"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "Заказано_всего": {
+              "type": "Compose",
+              "runAfter": { "Цикл_вызовов": [ "Succeeded" ] },
+              "inputs": "@length(variables('Вызовы'))"
+            },
+            "Итог_задания": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Заказано_всего": [ "Succeeded" ] },
+              "inputs": {
+                "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "UpdateOnlyRecord", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                "parameters": {
+                  "entityName": "new_aijobs",
+                  "recordId": "@triggerOutputs()?['body/new_aijobid']",
+                  "item/new_status": "@if(and(greater(variables('Одобрено'), 0), equals(length(variables('Заметки')), 0), equals(variables('Отклонено'), 0)), outputs('Константы')['jobГотово'], if(greater(variables('Одобрено'), 0), outputs('Константы')['jobЧастично'], outputs('Константы')['jobОшибка']))",
+                  "item/new_created": "@variables('Создано')",
+                  "item/new_approved": "@variables('Одобрено')",
+                  "item/new_rejected": "@variables('Отклонено')",
+                  "item/new_inputtokens": "@variables('ТокеныВход')",
+                  "item/new_outputtokens": "@variables('ТокеныВыход')",
+                  "item/new_costusd": "@float(formatNumber(variables('Стоимость'), '0.00', 'en-US'))",
+                  "item/new_errortext": "@{join(variables('Заметки'), decodeUriComponent('%0A'))}"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Урок_с_вопросами": {
+              "type": "If",
+              "runAfter": { "Итог_задания": [ "Succeeded" ] },
+              "expression": { "greater": [ "@variables('Одобрено')", 0 ] },
+              "actions": {
+                "Отметить_урок": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "UpdateOnlyRecord", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                    "parameters": { "entityName": "new_exammodules", "recordId": "@outputs('Урок')?['body/new_exammoduleid']", "item/new_status": "@outputs('Константы')['moduleВопросыСозданы']" },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                }
+              },
+              "else": { "actions": {} }
+            },
+            "Журнал_задания": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Урок_с_вопросами": [ "Succeeded" ] },
+              "inputs": {
+                "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "CreateRecord", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                "parameters": {
+                  "entityName": "new_examlogs",
+                  "item/new_event": "AI_JOB_DONE",
+                  "item/new_actor": "F-B3 Создание вопросов",
+                  "item/new_subjectid": "@triggerOutputs()?['body/new_aijobid']",
+                  "item/new_payload": "@{concat('{\"вызовов\":', string(outputs('Заказано_всего')), ',\"создано\":', string(variables('Создано')), ',\"одобрено\":', string(variables('Одобрено')), ',\"отклонено\":', string(variables('Отклонено')), ',\"стоимость\":', string(variables('Стоимость')), '}')}",
+                  "item/new_exam@odata.bind": "/new_exams(@{triggerOutputs()?['body/_new_exam_value']})"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          }
+        },
+        "Catch": {
+          "type": "Scope",
+          "runAfter": { "Try": [ "Failed", "TimedOut" ] },
+          "actions": {
+            "Журнал_сбоя": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "CreateRecord", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                "parameters": {
+                  "entityName": "new_examlogs",
+                  "item/new_event": "FLOW_ERROR",
+                  "item/new_actor": "F-B3 Создание вопросов",
+                  "item/new_subjectid": "@{workflow()?['run']?['name']}",
+                  "item/new_payload": "@{string(result('Try'))}"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Задание_с_ошибкой": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Журнал_сбоя": [ "Succeeded" ] },
+              "inputs": {
+                "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "UpdateOnlyRecord", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                "parameters": {
+                  "entityName": "new_aijobs",
+                  "recordId": "@triggerOutputs()?['body/new_aijobid']",
+                  "item/new_status": "@outputs('Константы')['jobОшибка']",
+                  "item/new_created": "@variables('Создано')",
+                  "item/new_approved": "@variables('Одобрено')",
+                  "item/new_rejected": "@variables('Отклонено')",
+                  "item/new_errortext": "Задание прервалось из-за сбоя потока. Подробности — в журнале экзамена."
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}

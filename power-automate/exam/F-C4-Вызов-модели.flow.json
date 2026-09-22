@@ -116,7 +116,7 @@
           "type": "Compose",
           "runAfter": {},
           "inputs": {
-            "_о_ценах": "Долларов за миллион токенов. Цель — контроль бюджета, не бухгалтерия: кешированные токены считаются как обычные.",
+            "_о_ценах": "Долларов за миллион токенов. Запись в кеш — 1,25 базовой цены входа, чтение из кеша — 0,1: цель — контроль бюджета, не бухгалтерия.",
             "opus_in": 5,
             "opus_out": 25,
             "sonnet_in": 2,
@@ -236,7 +236,7 @@
                 "stopReason": "@{coalesce(body('Вызов_модели')?['stop_reason'], '')}",
                 "modelUsed": "@{coalesce(body('Вызов_модели')?['model'], triggerBody()?['text_1'])}",
                 "outputText": "@{if(greater(length(body('Текстовые_блоки')), 0), coalesce(first(body('Текстовые_блоки'))?['text'], ''), '')}",
-                "inputTokens": "@int(coalesce(body('Вызов_модели')?['usage']?['input_tokens'], 0))",
+                "inputTokens": "@add(add(int(coalesce(body('Вызов_модели')?['usage']?['input_tokens'], 0)), int(coalesce(body('Вызов_модели')?['usage']?['cache_creation_input_tokens'], 0))), int(coalesce(body('Вызов_модели')?['usage']?['cache_read_input_tokens'], 0)))",
                 "outputTokens": "@int(coalesce(body('Вызов_модели')?['usage']?['output_tokens'], 0))",
                 "errorCode": "",
                 "errorText": ""
@@ -256,7 +256,7 @@
                   "Succeeded"
                 ]
               },
-              "inputs": "@if(contains(toLower(outputs('Итог_успеха')?['modelUsed']), 'opus'), div(add(mul(float(outputs('Итог_успеха')?['inputTokens']), outputs('Цены')['opus_in']), mul(float(outputs('Итог_успеха')?['outputTokens']), outputs('Цены')['opus_out'])), 1000000), div(add(mul(float(outputs('Итог_успеха')?['inputTokens']), outputs('Цены')['sonnet_in']), mul(float(outputs('Итог_успеха')?['outputTokens']), outputs('Цены')['sonnet_out'])), 1000000))"
+              "inputs": "@div(add(add(add(mul(float(coalesce(body('Вызов_модели')?['usage']?['input_tokens'], 0)), if(contains(toLower(outputs('Итог_успеха')?['modelUsed']), 'opus'), outputs('Цены')['opus_in'], outputs('Цены')['sonnet_in'])), mul(float(coalesce(body('Вызов_модели')?['usage']?['cache_creation_input_tokens'], 0)), mul(if(contains(toLower(outputs('Итог_успеха')?['modelUsed']), 'opus'), outputs('Цены')['opus_in'], outputs('Цены')['sonnet_in']), 1.25))), mul(float(coalesce(body('Вызов_модели')?['usage']?['cache_read_input_tokens'], 0)), mul(if(contains(toLower(outputs('Итог_успеха')?['modelUsed']), 'opus'), outputs('Цены')['opus_in'], outputs('Цены')['sonnet_in']), 0.1))), mul(float(outputs('Итог_успеха')?['outputTokens']), if(contains(toLower(outputs('Итог_успеха')?['modelUsed']), 'opus'), outputs('Цены')['opus_out'], outputs('Цены')['sonnet_out']))), 1000000)"
             },
             "Задержка": {
               "type": "Compose",

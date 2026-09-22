@@ -1,0 +1,315 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": { "connectionReferenceLogicalName": "new_sharedcommondataserviceforapps_73c39" },
+        "api": { "name": "shared_commondataserviceforapps" }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": { "defaultValue": {}, "type": "Object" },
+        "$authentication": { "defaultValue": {}, "type": "SecureObject" }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "Button",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "text": { "title": "questionId", "type": "string", "x-ms-dynamically-added": true, "description": "Идентификатор вопроса банка" }
+              },
+              "required": [ "text" ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Константы": {
+          "type": "Compose",
+          "runAfter": {},
+          "inputs": {
+            "typeSingle": 100000000,
+            "typeMulti": 100000001,
+            "typeCase": 100000002,
+            "typeControl": 100000003,
+            "qОдобрен": 100000001,
+            "qОтклонён": 100000002,
+            "promptУтверждён": 100000001,
+            "difficultyName": { "100000000": "basic", "100000001": "medium", "100000002": "advanced" },
+            "typeName": { "100000000": "single", "100000001": "multi", "100000002": "case", "100000003": "control" },
+            "effortName": { "100000000": "low", "100000001": "medium", "100000002": "high" }
+          }
+        },
+        "Try": {
+          "type": "Scope",
+          "runAfter": { "Константы": [ "Succeeded" ] },
+          "actions": {
+            "Вопрос": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "GetItem", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                "parameters": { "entityName": "new_examquestions", "recordId": "@triggerBody()?['text']" },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Урок": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Вопрос": [ "Succeeded" ] },
+              "inputs": {
+                "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "GetItem", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                "parameters": { "entityName": "new_exammodules", "recordId": "@outputs('Вопрос')?['body/_new_module_value']" },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Промпт_рецензента": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Урок": [ "Succeeded" ] },
+              "inputs": {
+                "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                "parameters": {
+                  "entityName": "new_aiprompts",
+                  "$filter": "statecode eq 0 and new_code eq 'REVIEW' and new_status eq 100000001",
+                  "$select": "new_code,new_version,new_systemtext,new_schemajson,new_model,new_effort,new_maxtokens",
+                  "$orderby": "new_version desc",
+                  "$top": 1
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "П": {
+              "type": "Compose",
+              "runAfter": { "Промпт_рецензента": [ "Succeeded" ] },
+              "inputs": "@first(outputs('Промпт_рецензента')?['body/value'])"
+            },
+            "Это_выбор": {
+              "type": "Compose",
+              "runAfter": { "П": [ "Succeeded" ] },
+              "inputs": "@or(equals(outputs('Вопрос')?['body/new_type'], outputs('Константы')['typeSingle']), equals(outputs('Вопрос')?['body/new_type'], outputs('Константы')['typeMulti']))"
+            },
+            "Варианты": {
+              "type": "Compose",
+              "runAfter": { "Это_выбор": [ "Succeeded" ] },
+              "inputs": "@if(outputs('Это_выбор'), json(coalesce(outputs('Вопрос')?['body/new_optionsjson'], '[]')), json('[]'))"
+            },
+            "Варианты_вслепую": {
+              "type": "Select",
+              "runAfter": { "Варианты": [ "Succeeded" ] },
+              "inputs": {
+                "from": "@outputs('Варианты')",
+                "select": { "id": "@item()?['id']", "text": "@item()?['text']" }
+              }
+            },
+            "Верные": {
+              "type": "Query",
+              "runAfter": { "Варианты_вслепую": [ "Succeeded" ] },
+              "inputs": { "from": "@outputs('Варианты')", "where": "@equals(coalesce(item()?['correct'], false), true)" }
+            },
+            "Верные_ид": {
+              "type": "Select",
+              "runAfter": { "Верные": [ "Succeeded" ] },
+              "inputs": { "from": "@body('Верные')", "select": "@item()?['id']" }
+            },
+            "Часть_вопроса": {
+              "type": "Compose",
+              "runAfter": { "Верные_ид": [ "Succeeded" ] },
+              "inputs": "@if(outputs('Это_выбор'), concat('<source_quote>', coalesce(outputs('Вопрос')?['body/new_sourcequote'], ''), '</source_quote><question type=\"', outputs('Константы')['typeName'][string(outputs('Вопрос')?['body/new_type'])], '\" difficulty=\"', outputs('Константы')['difficultyName'][string(outputs('Вопрос')?['body/new_difficulty'])], '\">', coalesce(outputs('Вопрос')?['body/new_stem'], ''), '</question><options>', string(body('Варианты_вслепую')), '</options>'), concat('<source_quote>', coalesce(outputs('Вопрос')?['body/new_sourcequote'], ''), '</source_quote><question type=\"', outputs('Константы')['typeName'][string(outputs('Вопрос')?['body/new_type'])], '\" difficulty=\"', outputs('Константы')['difficultyName'][string(outputs('Вопрос')?['body/new_difficulty'])], '\">', coalesce(outputs('Вопрос')?['body/new_stem'], ''), '</question><reference>', coalesce(outputs('Вопрос')?['body/new_reference'], ''), '</reference><rubric>', coalesce(outputs('Вопрос')?['body/new_rubricjson'], ''), '</rubric>'))"
+            },
+            "Содержимое": {
+              "type": "Compose",
+              "runAfter": { "Часть_вопроса": [ "Succeeded" ] },
+              "inputs": [
+                { "type": "text", "text": "@{concat('<narration>', coalesce(outputs('Урок')?['body/new_narration'], outputs('Урок')?['body/new_text'], ''), '</narration>')}" },
+                { "type": "text", "text": "@{outputs('Часть_вопроса')}" }
+              ]
+            },
+            "Вызов_рецензента": {
+              "type": "Workflow",
+              "runAfter": { "Содержимое": [ "Succeeded" ] },
+              "inputs": {
+                "host": { "workflowReferenceName": "b1c40009-e5c9-4d7a-9a61-2026092200c4" },
+                "body": {
+                  "text": "REVIEW",
+                  "text_1": "@{outputs('П')?['new_model']}",
+                  "text_2": "@{outputs('Константы')['effortName'][string(coalesce(outputs('П')?['new_effort'], 100000001))]}",
+                  "text_3": "@{coalesce(outputs('П')?['new_maxtokens'], 6000)}",
+                  "text_4": "@{outputs('П')?['new_systemtext']}",
+                  "text_5": "@{string(outputs('Содержимое'))}",
+                  "text_6": "@{outputs('П')?['new_schemajson']}",
+                  "text_7": "проверка вопроса",
+                  "text_8": "@{concat('review:', triggerBody()?['text'])}"
+                }
+              }
+            },
+            "Вызов_удался": {
+              "type": "If",
+              "runAfter": { "Вызов_рецензента": [ "Succeeded" ] },
+              "expression": { "equals": [ "@body('Вызов_рецензента')?['ok']", true ] },
+              "actions": {
+                "Рецензия": {
+                  "type": "Compose",
+                  "runAfter": {},
+                  "inputs": "@json(body('Вызов_рецензента')?['outputText'])"
+                },
+                "Все_проверки": {
+                  "type": "Compose",
+                  "runAfter": { "Рецензия": [ "Succeeded" ] },
+                  "inputs": "@and(equals(outputs('Рецензия')?['checks']?['wording']?['pass'], true), equals(outputs('Рецензия')?['checks']?['unambiguous']?['pass'], true), equals(outputs('Рецензия')?['checks']?['matches_material']?['pass'], true), equals(outputs('Рецензия')?['checks']?['difficulty_matches']?['pass'], true), equals(outputs('Рецензия')?['checks']?['distractors_plausible']?['pass'], true), equals(outputs('Рецензия')?['checks']?['rubric_usable']?['pass'], true), equals(outputs('Рецензия')?['checks']?['no_bias']?['pass'], true))"
+                },
+                "Решил_так_же": {
+                  "type": "Compose",
+                  "runAfter": { "Все_проверки": [ "Succeeded" ] },
+                  "inputs": "@if(outputs('Это_выбор'), equals(join(sort(coalesce(outputs('Рецензия')?['answer_option_ids'], json('[]'))), '|'), join(sort(body('Верные_ид')), '|')), true)"
+                },
+                "Одобрить": {
+                  "type": "Compose",
+                  "runAfter": { "Решил_так_же": [ "Succeeded" ] },
+                  "inputs": "@and(equals(outputs('Рецензия')?['verdict'], 'accept'), outputs('Все_проверки'), outputs('Решил_так_же'))"
+                },
+                "Записать_решение": {
+                  "type": "OpenApiConnection",
+                  "runAfter": { "Одобрить": [ "Succeeded" ] },
+                  "inputs": {
+                    "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "UpdateOnlyRecord", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                    "parameters": {
+                      "entityName": "new_examquestions",
+                      "recordId": "@triggerBody()?['text']",
+                      "item/new_status": "@if(outputs('Одобрить'), outputs('Константы')['qОдобрен'], outputs('Константы')['qОтклонён'])",
+                      "item/new_reviewjson": "@{body('Вызов_рецензента')?['outputText']}",
+                      "item/new_reviewfirstpass": "@outputs('Одобрить')"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Журнал_решения": {
+                  "type": "OpenApiConnection",
+                  "runAfter": { "Записать_решение": [ "Succeeded" ] },
+                  "inputs": {
+                    "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "CreateRecord", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                    "parameters": {
+                      "entityName": "new_examlogs",
+                      "item/new_event": "@{if(outputs('Одобрить'), 'QUESTION_APPROVED', 'QUESTION_REJECTED')}",
+                      "item/new_actor": "F-B4 Проверка вопроса",
+                      "item/new_subjectid": "@triggerBody()?['text']",
+                      "item/new_payload": "@{concat('вердикт=', coalesce(outputs('Рецензия')?['verdict'], ''), '; проверки=', string(outputs('Все_проверки')), '; решил_так_же=', string(outputs('Решил_так_же')), '; ', coalesce(outputs('Рецензия')?['comment'], ''))}",
+                      "item/new_exam@odata.bind": "/new_exams(@{outputs('Вопрос')?['body/_new_exam_value']})"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Ответ": {
+                  "type": "Response",
+                  "kind": "Http",
+                  "runAfter": { "Журнал_решения": [ "Succeeded" ] },
+                  "inputs": {
+                    "statusCode": 200,
+                    "body": {
+                      "approved": "@outputs('Одобрить')",
+                      "inputTokens": "@body('Вызов_рецензента')?['inputTokens']",
+                      "outputTokens": "@body('Вызов_рецензента')?['outputTokens']",
+                      "costUsd": "@body('Вызов_рецензента')?['costUsd']"
+                    },
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "approved": { "type": "boolean" },
+                        "inputTokens": { "type": "integer" },
+                        "outputTokens": { "type": "integer" },
+                        "costUsd": { "type": "number" }
+                      }
+                    }
+                  }
+                }
+              },
+              "else": {
+                "actions": {
+                  "Отклонить_без_рецензии": {
+                    "type": "OpenApiConnection",
+                    "runAfter": {},
+                    "inputs": {
+                      "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "UpdateOnlyRecord", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                      "parameters": {
+                        "entityName": "new_examquestions",
+                        "recordId": "@triggerBody()?['text']",
+                        "item/new_status": "@outputs('Константы')['qОтклонён']",
+                        "item/new_reviewjson": "@{concat('{\"error\":\"рецензент не ответил\",\"code\":\"', body('Вызов_рецензента')?['errorCode'], '\"}')}",
+                        "item/new_reviewfirstpass": false
+                      },
+                      "authentication": "@parameters('$authentication')"
+                    }
+                  },
+                  "Ответ_без_рецензии": {
+                    "type": "Response",
+                    "kind": "Http",
+                    "runAfter": { "Отклонить_без_рецензии": [ "Succeeded" ] },
+                    "inputs": {
+                      "statusCode": 200,
+                      "body": { "approved": false, "inputTokens": 0, "outputTokens": 0, "costUsd": 0 },
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "approved": { "type": "boolean" },
+                          "inputTokens": { "type": "integer" },
+                          "outputTokens": { "type": "integer" },
+                          "costUsd": { "type": "number" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "Catch": {
+          "type": "Scope",
+          "runAfter": { "Try": [ "Failed", "TimedOut" ] },
+          "actions": {
+            "Журнал_сбоя": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "CreateRecord", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                "parameters": {
+                  "entityName": "new_examlogs",
+                  "item/new_event": "FLOW_ERROR",
+                  "item/new_actor": "F-B4 Проверка вопроса",
+                  "item/new_subjectid": "@{workflow()?['run']?['name']}",
+                  "item/new_payload": "@{string(result('Try'))}"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Ответ_сбоя": {
+              "type": "Response",
+              "kind": "Http",
+              "runAfter": { "Журнал_сбоя": [ "Succeeded" ] },
+              "inputs": {
+                "statusCode": 200,
+                "body": { "approved": false, "inputTokens": 0, "outputTokens": 0, "costUsd": 0 },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "approved": { "type": "boolean" },
+                    "inputTokens": { "type": "integer" },
+                    "outputTokens": { "type": "integer" },
+                    "costUsd": { "type": "number" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}
