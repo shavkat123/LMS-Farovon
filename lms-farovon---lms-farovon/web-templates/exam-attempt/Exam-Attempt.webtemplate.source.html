@@ -476,7 +476,10 @@
     state.attempt = a;
     document.getElementById('exaTitle').textContent = 'Экзамен · попытка ' + (a.new_name || '');
     if (a.new_status === STATUS.failed) { renderFailed(a); return; }
-    if (a.new_status === STATUS.prepare) { waitForTicket(); return; }
+    // У только что созданной попытки статуса ещё нет: у поля нет значения по умолчанию, а «Готовится»
+    // ставит поток сборки билета через несколько секунд. Без этой проверки участник, нажав «Начать»,
+    // сразу улетал на страницу результата.
+    if (a.new_status === STATUS.prepare || a.new_status == null) { waitForTicket(); return; }
     if (a.new_status === STATUS.running) { boot(); return; }
     window.location.href = '/exam-result?attempt=' + ATTEMPT_ID;
   }).catch(function (e) {
