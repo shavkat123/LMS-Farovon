@@ -10,6 +10,8 @@
   выборкам — по одному полю связи с экзаменом, до 5000 строк на таблицу.
 
   Удаления нет нигде: у роли нет права удалять экзамены. Один экзамен — один цикл аттестации.
+  Для нового цикла экзамен копируется: уроки с текстом, одобренные вопросы и правила переходят
+  в новый черновик, а попытки, результаты, сертификаты, задания ИИ и журнал остаются у прошлого.
   Новый экзамен всегда создаётся черновиком: поток публикации срабатывает только на смену статуса,
   и экзамен, созданный сразу опубликованным, остался бы без снимка вопросов.
 {% endcomment %}
@@ -42,6 +44,9 @@
   .exl-empty i { display: block; font-size: 36px; color: #CBD5E1; margin-bottom: 10px; }
   .exl-empty p { margin: 0 0 12px; }
   .exl-note-list { margin: 6px 0 0; padding-left: 18px; }
+  .exl-linkbtn { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+  .exl-linkbtn[disabled] { color: var(--adm-fg-3) !important; cursor: default; text-decoration: none; }
+  .exl-copy-what { margin: 6px 0 0; padding-left: 18px; }
   /* В общем стиле колонки формы не уже 320px — на экране 360px диалог уже, форма вылезала бы вбок */
   #exadModalBody .exad-grid--2 { grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); }
 </style>
@@ -82,6 +87,7 @@
     </div>
   </div>
 
+  <div id="exlCopy" aria-live="polite"></div>
   <div id="exlNotes" aria-live="polite"></div>
 
   <div class="adm-card exad-section">
@@ -90,7 +96,7 @@
       <div class="exad-empty"><span class="exad-spin"></span> Загружаем экзамены…</div>
     </div>
     <div class="exl-foot">
-      Один экзамен — один цикл аттестации. Для нового цикла создайте новый экзамен: у прошлых остаются свои результаты и сертификаты. Удалить экзамен нельзя.
+      Один экзамен — один цикл аттестации. Для нового цикла скопируйте прошлый экзамен («Копировать»): уроки, одобренные вопросы и правила перейдут в новый черновик, а попытки, результаты и сертификаты останутся у прошлого. Удалить экзамен нельзя.
     </div>
   </div>
 
@@ -111,18 +117,16 @@
   /* Потолок выборок для счётчиков: столько отдаёт Web API за один запрос без постраничности */
   var CAP = 5000;
   var creating = false;
+  var copying = false;
+  var copyState = null;            // ход последнего копирования — для «Продолжить», если оно прервалось
+  var lastExams = [], lastCounts = {};
+  var copyEl = document.getElementById('exlCopy');
 
   /*
-    Курсы нужны дважды: подпись в таблице и список в форме. Сбой не критичен — поле просто скрываем.
-    Удачный ответ запоминаем, а после сбоя спрашиваем снова: иначе «Повторить» и перезагрузка
-    списка так и оставили бы курсы пустыми до обновления страницы.
+    Поля «Курс» на страницах экзамена нет: состав экзамена задают его уроки. В LMS «Наставничество»
+    заведено семью курсами «модуль №1…№7», и выбор курса выглядел как выбор модуля, хотя экзамен
+    идёт по всем урокам, добавленным в него.
   */
-  var coursesCache = null;
-  function getCourses() {
-    if (coursesCache) { return Promise.resolve(coursesCache); }
-    return A.api('/_api/msdynce_courses?$select=msdynce_courseid,msdynce_coursename&$orderby=msdynce_coursename asc&$top=500')
-      .then(function (j) { coursesCache = j.value || []; return coursesCache; }, function () { return null; });
-  }
 
   /* ── Загрузка ──────────────────────────────────────────────────────────────────────── */
   /*
@@ -145,7 +149,7 @@
 
   function load() {
     bodyEl.innerHTML = '<div class="exad-empty"><span class="exad-spin"></span> Загружаем экзамены…</div>';
-    var examsP = A.api('/_api/new_exams?$select=new_examid,new_name,new_status,new_opens,new_closes,new_publishedon,_new_course_value&$orderby=new_name asc&$top=500')
+    var examsP = A.api('/_api/new_exams?$select=new_examid,new_name,new_status,new_opens,new_closes,new_publishedon&$orderby=new_name asc&$top=500')
       .then(function (j) { return j.value || []; });
     var modulesP = soft(A.apiAll('/_api/new_exammodules?$select=_new_exam_value&$top=5000', CAP)
       .then(function (rows) { return countBy(rows); }));
@@ -166,8 +170,8 @@
     var certsP = soft(A.apiAll('/_api/new_certifications?$select=_new_exam_value,new_status&$top=5000', CAP)
       .then(function (rows) { return countBy(rows, function (r) { return r.new_status === 100000000; }); }));
 
-    return Promise.all([examsP, modulesP, questionsP, attemptsP, certsP, getCourses()]).then(function (res) {
-      render(res[0], { modules: res[1], questions: res[2], attempts: res[3], certs: res[4] }, res[5]);
+    return Promise.all([examsP, modulesP, questionsP, attemptsP, certsP]).then(function (res) {
+      render(res[0], { modules: res[1], questions: res[2], attempts: res[3], certs: res[4] });
     }, function (e) {
       renderKpis(null);
       bodyEl.innerHTML =
@@ -267,8 +271,9 @@
     return o ? 'с ' + esc(A.dt(o)) : 'до ' + esc(A.dt(c));
   }
 
-  function render(exams, counts, courses) {
+  function render(exams, counts) {
     var sorted = sortExams(exams);
+    lastExams = exams; lastCounts = counts;
     renderKpis(sorted);
     renderNotes(sorted, counts);
 
@@ -282,20 +287,14 @@
       return;
     }
 
-    var courseName = {};
-    (courses || []).forEach(function (c) { courseName[String(c.msdynce_courseid).toLowerCase()] = c.msdynce_coursename || ''; });
-
     var rows = sorted.map(function (e) {
       var id = String(e.new_examid).toLowerCase();
       var q = '?id=' + encodeURIComponent(id);
-      var cid = String(e._new_course_value || '').toLowerCase();
-      var course = cid ? (courseName[cid] || '') : '';
       var passed = extraNum(counts.attempts, id);
       var failedAtt = counts.attempts ? (counts.attempts.other[id] || 0) : 0;
       var active = extraNum(counts.certs, id);
       return '<tr>' +
-        '<td><a class="exad-link exl-name" href="/admin/exam-setup' + q + '">' + esc(e.new_name || 'Без названия') + '</a>' +
-          (course ? '<span class="exl-course">Курс: ' + esc(course) + '</span>' : '') + '</td>' +
+        '<td><a class="exad-link exl-name" href="/admin/exam-setup' + q + '">' + esc(e.new_name || 'Без названия') + '</a></td>' +
         '<td>' + A.pill('examStatus', e.new_status) + '</td>' +
         '<td class="exl-window">' + windowCell(e) + '</td>' +
         '<td class="exl-window">' + esc(A.dt(e.new_publishedon)) + '</td>' +
@@ -309,7 +308,8 @@
         '<td><div class="exl-acts">' +
           '<a class="exad-link" href="/admin/exam-setup' + q + '">Настройка</a><span class="exl-dot" aria-hidden="true">·</span>' +
           '<a class="exad-link" href="/admin/exam-bank' + q + '">Банк</a><span class="exl-dot" aria-hidden="true">·</span>' +
-          '<a class="exad-link" href="/admin/exam-results' + q + '">Результаты</a>' +
+          '<a class="exad-link" href="/admin/exam-results' + q + '">Результаты</a><span class="exl-dot" aria-hidden="true">·</span>' +
+          '<button type="button" class="exad-link exl-linkbtn" data-exl-action="copy" data-id="' + esc(id) + '"' + (copying ? ' disabled' : '') + '>Копировать</button>' +
         '</div></td>' +
       '</tr>';
     }).join('');
@@ -329,31 +329,16 @@
   }
 
   /* ── Создание экзамена ─────────────────────────────────────────────────────────────── */
-  function formHtml(courses, v) {
+  function formHtml(v) {
     v = v || {};
-    var courseField = '';
-    if (courses) {
-      courseField =
-        '<div class="exad-field">' +
-          '<label for="exlfCourse">Курс</label>' +
-          '<select class="adm-input" id="exlfCourse">' +
-            '<option value="">Без курса</option>' +
-            courses.map(function (c) {
-              var cid = String(c.msdynce_courseid).toLowerCase();
-              return '<option value="' + esc(cid) + '"' + (cid === v.course ? ' selected' : '') + '>' + esc(c.msdynce_coursename || 'Без названия') + '</option>';
-            }).join('') +
-          '</select>' +
-          '<span class="exad-hint">Необязательно. Курс, по материалам которого проводится аттестация.</span>' +
-        '</div>';
-    }
     return '' +
-      '<div class="exad-note exad-note--info">Экзамен создаётся черновиком: участники его не увидят, пока вы не опубликуете его на странице настройки.</div>' +
+      '<div class="exad-note exad-note--info">Экзамен создаётся черновиком: участники его не увидят, пока вы не опубликуете его на странице настройки. ' +
+        'Какие уроки войдут в экзамен, задаётся потом, в разделе «Уроки»: вопросы билета берутся из всех добавленных уроков.</div>' +
       '<div class="exad-grid exad-grid--2">' +
         '<div class="exad-field" style="grid-column:1/-1;">' +
           '<label for="exlfName">Название <span aria-hidden="true">*</span></label>' +
           '<input type="text" class="adm-input" id="exlfName" maxlength="200" autocomplete="off" placeholder="Например: Наставничество — осень 2026" value="' + esc(v.name || '') + '">' +
         '</div>' +
-        (courseField ? '<div style="grid-column:1/-1;">' + courseField + '</div>' : '') +
         '<div class="exad-field">' +
           '<label for="exlfOpens">Начало</label>' +
           '<input type="datetime-local" class="adm-input" id="exlfOpens" value="' + esc(v.opensRaw || '') + '">' +
@@ -378,7 +363,6 @@
     var monthsRaw = val(body, 'exlfMonths').trim();
     return {
       name: val(body, 'exlfName').trim(),
-      course: val(body, 'exlfCourse'),
       opensRaw: val(body, 'exlfOpens'),
       closesRaw: val(body, 'exlfCloses'),
       monthsRaw: monthsRaw,
@@ -408,11 +392,11 @@
 
   function openCreate(prefill, errText) {
     if (creating) { return; }
-    getCourses().then(function (courses) {
+    Promise.resolve().then(function () {
       return A.modal({
         title: 'Новый экзамен',
         okText: 'Создать черновик',
-        html: formHtml(courses, prefill),
+        html: formHtml(prefill),
         validate: validateForm,
         onOpen: function () {
           if (errText) { var er = document.getElementById('exadModalErr'); if (er) { er.textContent = errText; } }
@@ -432,8 +416,6 @@
       с методичкой. Уроки и раскладка билета пустые — их задают на странице настройки.
     */
     var paramsText = JSON.stringify(A.normalizeParams({}));
-    /* Без курса ключ привязки остаётся undefined, и JSON.stringify его просто не отправит */
-    var courseBind = d.course && A.isGuid(d.course) ? '/msdynce_courses(' + d.course + ')' : undefined;
     /* Статус задаём явно: у столбцов выбора нет значения по умолчанию. Только «Черновик» (100000000) */
     A.post('new_exams', {
       new_name: d.name,
@@ -442,8 +424,7 @@
       new_certvalidmonths: d.months,
       new_consentversion: '1',
       new_opens: A.fromInput(d.opensRaw),
-      new_closes: A.fromInput(d.closesRaw),
-      'new_course@odata.bind': courseBind
+      new_closes: A.fromInput(d.closesRaw)
     }).then(function (r) {
       if (A.isGuid(r.id)) {
         A.toast('Черновик создан. Открываем настройку…', 'ok');
@@ -465,6 +446,276 @@
     });
   }
 
+  /* ── Копирование экзамена ──────────────────────────────────────────────────────────── */
+  /*
+    Новый цикл аттестации — новый экзамен, но уроки и банк вопросов у курса те же. Без копирования
+    их пришлось бы загружать и создавать через ИИ заново (деньги и время), хотя всё уже проверено.
+    Копируем: уроки с текстом озвучки, одобренные вопросы вместе с решением рецензента и правила
+    билета (раскладка переводится на новые уроки). Не копируем: попытки, результаты, сертификаты,
+    задания ИИ, журнал и снимок публикации — новый экзамен начинается черновиком с чистой историей.
+
+    Копии вопросов создаются сразу «Одобренными»: это те же тексты, что уже прошли проверку, а поток
+    рецензии берёт только вопросы «На проверке», так что повторной проверки (и расходов) не будет.
+
+    Всё идёт из браузера через Web API, поэтому копирование может прерваться (сеть, закрытая вкладка).
+    Ход хранится в памяти страницы, и «Продолжить» доделывает недостающее: уроки сверяются по порядку
+    и названию, вопросы — по уроку и ключу дублей, так что повтор ничего не задвоит.
+  */
+  function examOf(id) {
+    for (var i = 0; i < lastExams.length; i++) { if (String(lastExams[i].new_examid).toLowerCase() === id) { return lastExams[i]; } }
+    return null;
+  }
+  function copyFormHtml(src, v) {
+    var id = String(src.new_examid).toLowerCase();
+    var lessons = lastCounts.modules ? (lastCounts.modules.total[id] || 0) : null;
+    var qs = lastCounts.questions ? (lastCounts.questions.total[id] || 0) : null;
+    return '' +
+      '<div class="exad-note exad-note--info">Будет создан новый черновик по образцу «' + esc(src.new_name || 'Без названия') + '».' +
+        '<ul class="exl-copy-what">' +
+          '<li>Переносятся: уроки с текстом' + (lessons != null ? ' (' + A.fmtInt(lessons) + ')' : '') + ', правила билета, правила экзамена и текст согласия.</li>' +
+          '<li>Одобренные вопросы' + (qs != null ? ' (' + A.fmtInt(qs) + ')' : '') + ' переносятся уже одобренными — повторной проверки ИИ и расходов не будет.</li>' +
+          '<li>Не переносятся: попытки, результаты, сертификаты, задания ИИ и журнал.</li>' +
+        '</ul></div>' +
+      '<div class="exad-grid exad-grid--2">' +
+        '<div class="exad-field" style="grid-column:1/-1;">' +
+          '<label for="exlcName">Название нового экзамена <span aria-hidden="true">*</span></label>' +
+          '<input type="text" class="adm-input" id="exlcName" maxlength="200" autocomplete="off" value="' + esc(v.name) + '">' +
+        '</div>' +
+        '<div class="exad-field">' +
+          '<label for="exlcOpens">Начало</label>' +
+          '<input type="datetime-local" class="adm-input" id="exlcOpens" value="' + esc(v.opensRaw || '') + '">' +
+          '<span class="exad-hint">Время по Душанбе (UTC+5). Можно задать позже.</span>' +
+        '</div>' +
+        '<div class="exad-field">' +
+          '<label for="exlcCloses">Окончание</label>' +
+          '<input type="datetime-local" class="adm-input" id="exlcCloses" value="' + esc(v.closesRaw || '') + '">' +
+          '<span class="exad-hint">После окончания экзамен закроется сам.</span>' +
+        '</div>' +
+        '<div class="exad-field" style="grid-column:1/-1;">' +
+          '<label class="exad-check"><input type="checkbox" id="exlcQuestions"' + (v.withQuestions === false ? '' : ' checked') + '> Копировать одобренные вопросы</label>' +
+          '<span class="exad-hint">Без вопросов переносятся только уроки и правила — банк придётся наполнять заново.</span>' +
+        '</div>' +
+      '</div>';
+  }
+  function readCopyForm(body) {
+    var q = body.querySelector('#exlcQuestions');
+    return { name: val(body, 'exlcName').trim(), opensRaw: val(body, 'exlcOpens'), closesRaw: val(body, 'exlcCloses'), withQuestions: !!(q && q.checked) };
+  }
+  function validateCopyForm(body) {
+    var d = readCopyForm(body);
+    if (!d.name) { return 'Укажите название нового экзамена.'; }
+    if (d.name.length > 200) { return 'Название длиннее 200 знаков — сократите его.'; }
+    if (d.opensRaw && !A.fromInput(d.opensRaw)) { return 'Дата начала заполнена не полностью.'; }
+    if (d.closesRaw && !A.fromInput(d.closesRaw)) { return 'Дата окончания заполнена не полностью.'; }
+    if (d.opensRaw && d.closesRaw && new Date(A.fromInput(d.opensRaw)).getTime() >= new Date(A.fromInput(d.closesRaw)).getTime()) {
+      return 'Окончание должно быть позже начала.';
+    }
+    return '';
+  }
+  function openCopy(srcId) {
+    if (copying || creating) { A.toast('Дождитесь окончания текущей операции.', 'err'); return; }
+    var src = examOf(srcId);
+    if (!src) { A.toast('Экзамен не найден в списке — обновите страницу.', 'err'); return; }
+    A.modal({
+      title: 'Копировать экзамен', okText: 'Скопировать',
+      html: copyFormHtml(src, { name: (src.new_name || 'Экзамен') + ' — копия' }),
+      validate: validateCopyForm
+    }).then(function (body) {
+      if (!body) { return; }
+      var d = readCopyForm(body);
+      copyState = { srcId: srcId, srcName: src.new_name || 'Без названия', name: d.name, opens: A.fromInput(d.opensRaw), closes: A.fromInput(d.closesRaw),
+        withQuestions: d.withQuestions, newId: '', lessonMap: {}, qDone: {}, lessons: 0, lessonsDone: 0, qTotal: 0, qCopied: 0, qSkipped: 0, stage: 'start' };
+      runCopy(copyState);
+    });
+  }
+
+  function copyProgress(st, text) {
+    copyEl.innerHTML = '<div class="exad-note exad-note--info"><span class="exad-spin"></span> <b>Копируем «' + esc(st.srcName) + '» → «' + esc(st.name) + '».</b> ' +
+      esc(text) + '<div class="exad-muted" style="margin-top:4px;">Не закрывайте страницу, пока копирование не закончится.</div></div>';
+  }
+  function setCopying(on) {
+    copying = on;
+    Array.prototype.forEach.call(pageEl.querySelectorAll('[data-exl-action="copy"]'), function (b) { b.disabled = on; });
+  }
+  function warnLeave(ev) { if (copying) { ev.preventDefault(); ev.returnValue = ''; } }
+  window.addEventListener('beforeunload', warnLeave);
+
+  /* Параллельно, но не больше limit запросов сразу: и быстрее, и портал не захлёбывается */
+  function pool(items, limit, worker) {
+    return new Promise(function (resolve, reject) {
+      var next = 0, active = 0, done = 0, failed = false;
+      if (!items.length) { resolve(); return; }
+      function launch() {
+        while (!failed && active < limit && next < items.length) {
+          active++;
+          worker(items[next++]).then(function () {
+            active--; done++;
+            if (done === items.length) { resolve(); } else { launch(); }
+          }, function (e) { failed = true; reject(e); });
+        }
+      }
+      launch();
+    });
+  }
+
+  function lessonStatus(m, withQuestions) {
+    var hasText = !!((m.new_narration && String(m.new_narration).trim()) || (m.new_text && String(m.new_text).trim()));
+    if (!hasText) { return V.MODULE_NOTEXT; }
+    return withQuestions && m.new_status === V.MODULE_QUESTIONS ? V.MODULE_QUESTIONS : V.MODULE_TEXTREADY;
+  }
+  function lessonKey(order, name) { return String(order == null ? '' : order) + '|' + String(name || '').trim().toLowerCase(); }
+
+  function runCopy(st) {
+    setCopying(true);
+    copyProgress(st, 'Читаем исходный экзамен…');
+    var src = null, lessons = [], questions = [];
+    return A.loadExam(st.srcId).then(function (e) {
+      src = e;
+      return A.apiAll('/_api/new_exammodules?$select=new_exammoduleid,new_name,new_order,new_section,new_weight,new_sourcekind,new_narration,new_narrationsource,new_text,new_textchars,new_extractedon,new_status,_new_h5pcontent_value&$filter=_new_exam_value eq ' + st.srcId + ' and statecode eq 0&$orderby=new_order asc&$top=500', 500);
+    }).then(function (rows) {
+      lessons = rows; st.lessons = rows.length;
+      if (!st.withQuestions) { return []; }
+      return A.apiAll('/_api/new_examquestions?$select=new_examquestionid,_new_module_value,new_type,new_difficulty,new_stem,new_optionsjson,new_explanation,new_reference,new_rubricjson,new_points,new_slides,new_sourcequote,new_reviewjson,new_reviewfirstpass,new_source,new_contenthash,new_version&$filter=_new_exam_value eq ' + st.srcId + ' and new_status eq ' + V.Q_APPROVED + ' and statecode eq 0&$top=5000', 5000);
+    }).then(function (rows) {
+      questions = rows; st.qTotal = rows.length;
+      if (st.newId) { return st.newId; }
+      /* Черновик создаём с пустой раскладкой: если копирование прервётся, в нём не останется
+         ссылок на уроки исходного экзамена. Раскладку переводим на новые уроки в самом конце. */
+      var p = A.normalizeParams(A.parseJson(src.new_paramsjson, {}));
+      var draft = A.clone(p); draft.modules = []; draft.blueprint = [];
+      copyProgress(st, 'Создаём черновик…');
+      return A.post('new_exams', {
+        new_name: st.name,
+        new_status: V.EXAM_DRAFT,
+        new_paramsjson: JSON.stringify(draft),
+        new_rules_ru: src.new_rules_ru || null,
+        new_consenttext: src.new_consenttext || null,
+        new_consentversion: src.new_consentversion || '1',
+        new_certvalidmonths: src.new_certvalidmonths || 12,
+        new_opens: st.opens,
+        new_closes: st.closes
+      }).then(function (r) {
+        if (!A.isGuid(r.id)) { throw new Error('портал не вернул номер нового экзамена'); }
+        st.newId = r.id;
+        return r.id;
+      });
+    }).then(function () {
+      /* Что уже есть в новом экзамене (для «Продолжить» после сбоя): уроки по порядку и названию */
+      return A.apiAll('/_api/new_exammodules?$select=new_exammoduleid,new_name,new_order&$filter=_new_exam_value eq ' + st.newId + '&$top=500', 500);
+    }).then(function (existing) {
+      var byKey = {};
+      existing.forEach(function (m) { byKey[lessonKey(m.new_order, m.new_name)] = String(m.new_exammoduleid).toLowerCase(); });
+      lessons.forEach(function (m) {
+        var sid = String(m.new_exammoduleid).toLowerCase(), have = byKey[lessonKey(m.new_order, m.new_name)];
+        if (!st.lessonMap[sid] && have) { st.lessonMap[sid] = have; }
+      });
+      /* Уроки — по одному, в исходном порядке */
+      var chain = Promise.resolve();
+      lessons.forEach(function (m) {
+        chain = chain.then(function () {
+          var sid = String(m.new_exammoduleid).toLowerCase();
+          if (st.lessonMap[sid]) { return; }
+          copyProgress(st, 'Уроки: ' + Object.keys(st.lessonMap).length + ' из ' + st.lessons + '…');
+          return A.post('new_exammodules', {
+            new_name: m.new_name,
+            'new_exam@odata.bind': '/new_exams(' + st.newId + ')',
+            new_order: m.new_order,
+            new_section: m.new_section,
+            new_weight: m.new_weight,
+            new_sourcekind: m.new_sourcekind != null ? m.new_sourcekind : V.KIND_NARRATION,
+            new_narration: m.new_narration,
+            new_narrationsource: m.new_narrationsource != null ? m.new_narrationsource : V.NARR_NONE,
+            new_text: m.new_text,
+            new_textchars: m.new_textchars,
+            new_extractedon: m.new_extractedon,
+            new_status: lessonStatus(m, st.withQuestions),
+            'new_h5pcontent@odata.bind': m._new_h5pcontent_value ? '/new_h5pcontents(' + m._new_h5pcontent_value + ')' : undefined
+          }).then(function (r) {
+            if (!A.isGuid(r.id)) { throw new Error('портал не вернул номер нового урока'); }
+            st.lessonMap[sid] = r.id;
+          });
+        });
+      });
+      return chain;
+    }).then(function () {
+      st.lessonsDone = Object.keys(st.lessonMap).length;
+      if (!questions.length) { return; }
+      /* Что из вопросов уже скопировано (повтор после сбоя): урок + ключ дублей */
+      return A.apiAll('/_api/new_examquestions?$select=_new_module_value,new_contenthash&$filter=_new_exam_value eq ' + st.newId + '&$top=5000', 5000).then(function (existing) {
+        var have = {};
+        existing.forEach(function (q) { have[String(q._new_module_value || '').toLowerCase() + '|' + (q.new_contenthash || '')] = true; });
+        var todo = questions.filter(function (q) {
+          var qid = String(q.new_examquestionid).toLowerCase();
+          if (st.qDone[qid]) { return false; }
+          var target = st.lessonMap[String(q._new_module_value || '').toLowerCase()];
+          if (!target) { st.qDone[qid] = 'skip'; return false; }            // вопрос без урока или урок неактивен
+          if (q.new_contenthash && have[target + '|' + q.new_contenthash]) { st.qDone[qid] = true; return false; }
+          return true;
+        });
+        function progress() {
+          var n = 0; Object.keys(st.qDone).forEach(function (k) { if (st.qDone[k] === true) { n++; } });
+          copyProgress(st, 'Уроки: ' + st.lessonsDone + ' из ' + st.lessons + ' · вопросы: ' + n + ' из ' + st.qTotal + '…');
+        }
+        progress();
+        return pool(todo, 4, function (q) {
+          var target = st.lessonMap[String(q._new_module_value || '').toLowerCase()];
+          return A.post('new_examquestions', {
+            'new_exam@odata.bind': '/new_exams(' + st.newId + ')',
+            'new_module@odata.bind': '/new_exammodules(' + target + ')',
+            new_type: q.new_type,
+            new_difficulty: q.new_difficulty,
+            new_stem: q.new_stem,
+            new_optionsjson: q.new_optionsjson,
+            new_explanation: q.new_explanation,
+            new_reference: q.new_reference,
+            new_rubricjson: q.new_rubricjson,
+            new_points: q.new_points,
+            new_slides: q.new_slides,
+            new_sourcequote: q.new_sourcequote,
+            new_status: V.Q_APPROVED,
+            new_reviewjson: q.new_reviewjson,
+            new_reviewfirstpass: q.new_reviewfirstpass,
+            new_source: q.new_source != null ? q.new_source : V.SRC_AI,
+            new_contenthash: q.new_contenthash,
+            new_exposures: 0,
+            new_version: q.new_version || 1
+          }).then(function () { st.qDone[String(q.new_examquestionid).toLowerCase()] = true; progress(); });
+        });
+      });
+    }).then(function () {
+      /* Правила билета переводим на новые уроки: раскладка ссылается на уроки по их номерам */
+      copyProgress(st, 'Переносим раскладку билета на новые уроки…');
+      var p = A.normalizeParams(A.parseJson(src.new_paramsjson, {}));
+      var map = st.lessonMap;
+      p.modules = p.modules.filter(function (m) { return map[m.id]; }).map(function (m) { return { id: map[m.id], weight: m.weight }; });
+      p.blueprint = p.blueprint.filter(function (c) { return map[c.module]; })
+        .map(function (c) { return { type: c.type, module: map[c.module], difficulty: c.difficulty, count: c.count }; });
+      return A.patch('new_exams', st.newId, { new_paramsjson: JSON.stringify(p) });
+    }).then(function () {
+      setCopying(false);
+      var copied = 0, skipped = 0;
+      Object.keys(st.qDone).forEach(function (k) { if (st.qDone[k] === true) { copied++; } else if (st.qDone[k] === 'skip') { skipped++; } });
+      var q = '?id=' + encodeURIComponent(st.newId);
+      copyEl.innerHTML = '<div class="exad-note exad-note--success"><b>Готово: создан черновик «' + esc(st.name) + '».</b> ' +
+        'Уроков: ' + A.fmtInt(st.lessonsDone) + ', одобренных вопросов: ' + A.fmtInt(copied) +
+        (skipped ? ' (ещё ' + A.fmtInt(skipped) + ' без урока пропущено)' : '') + '. ' +
+        'Проверьте даты и правила на странице настройки и опубликуйте экзамен, когда будете готовы.' +
+        '<div class="exad-actions" style="margin-top:8px;">' +
+          '<a class="adm-btn adm-btn--primary" href="/admin/exam-setup' + q + '">Открыть настройку</a>' +
+          '<a class="adm-btn adm-btn--ghost" href="/admin/exam-bank' + q + '">Банк вопросов</a>' +
+        '</div></div>';
+      copyState = null;
+      A.toast('Экзамен скопирован', 'ok');
+      load();
+    }, function (err) {
+      setCopying(false);
+      copyEl.innerHTML = '<div class="exad-note exad-note--danger" role="alert"><b>Копирование прервалось.</b> ' + esc(err && err.message ? err.message : 'Неизвестная ошибка') +
+        (st.newId ? '<div style="margin-top:6px;">Черновик «' + esc(st.name) + '» уже создан. «Продолжить» доделает недостающее — уже скопированное не задвоится.</div>' : '') +
+        '<div class="exad-actions" style="margin-top:8px;"><button type="button" class="adm-btn adm-btn--primary" data-exl-action="copy-resume">Продолжить копирование</button></div></div>';
+      if (st.newId) { load(); }
+    });
+  }
+
   /* ── События (без inline-обработчиков: их блокирует политика безопасности портала) ─── */
   pageEl.addEventListener('click', function (ev) {
     var t = ev.target && ev.target.closest ? ev.target.closest('[data-exl-action]') : null;
@@ -472,6 +723,8 @@
     var action = t.getAttribute('data-exl-action');
     if (action === 'create') { ev.preventDefault(); openCreate(null, ''); }
     else if (action === 'reload') { ev.preventDefault(); load(); }
+    else if (action === 'copy') { ev.preventDefault(); openCopy(String(t.getAttribute('data-id') || '').toLowerCase()); }
+    else if (action === 'copy-resume') { ev.preventDefault(); if (copyState && !copying) { runCopy(copyState); } }
   });
 
   load();

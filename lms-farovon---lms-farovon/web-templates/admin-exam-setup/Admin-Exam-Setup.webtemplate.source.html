@@ -108,11 +108,6 @@
             <input id="exsName" class="adm-input" maxlength="200" autocomplete="off">
           </div>
           <div class="exad-field">
-            <label for="exsCourse">Курс</label>
-            <select id="exsCourse" class="adm-input"></select>
-            <span class="exad-hint" id="exsCourseHint">Необязательно. Курс, по материалам которого проводится экзамен.</span>
-          </div>
-          <div class="exad-field">
             <label for="exsOpens">Начало</label>
             <input id="exsOpens" type="datetime-local" class="adm-input">
             <span class="exad-hint">Время по Душанбе (UTC+5). До начала экзамен сдавать нельзя.</span>
@@ -382,7 +377,7 @@
     hasSnap: root.getAttribute('data-has-snapshot') === '1',
     errText: (document.getElementById('exsErr') || {}).value || '',
     exam: null, storedRaw: '', base: null, current: null,
-    lessons: [], lessonById: {}, courses: [], coursesFailed: false, prompts: [],
+    lessons: [], lessonById: {}, prompts: [],
     approvedCell: {}, approvedByModule: {},
     jobs: [], progress: {}, polling: false, pollStopped: false,
     otherPublished: [], pubLog: null, locked: true, publishing: false,
@@ -485,10 +480,6 @@
     return A.api('/_api/new_aiprompts?$select=new_code,new_version,new_status,new_model&$filter=new_status eq ' + V.PROMPT_APPROVED + ' and statecode eq 0&$top=500')
       .then(function (j) { S.prompts = j.value || []; });
   }
-  function loadCourses() {
-    return A.api('/_api/msdynce_courses?$select=msdynce_courseid,msdynce_coursename&$filter=statecode eq 0&$orderby=msdynce_coursename asc&$top=500')
-      .then(function (j) { S.courses = j.value || []; });
-  }
   function loadJobs() {
     return A.api('/_api/new_aijobs?$select=new_aijobid,new_name,_new_module_value,new_status,new_specjson,new_created,new_approved,new_rejected,' +
       'new_inputtokens,new_outputtokens,new_costusd,new_errortext,createdon' +
@@ -524,7 +515,6 @@
       renderHeader();
       return Promise.all([
         loadLessons(), loadBank(), loadPrompts(), loadJobs(),
-        loadCourses().catch(function () { S.coursesFailed = true; }),
         loadOthers().catch(noop),
         exam.new_publishedon ? loadPubLog().catch(noop) : null
       ]);
@@ -571,16 +561,6 @@
     $('exsConsentVer').value = e.new_consentversion || '';
     $('exsRules').value = e.new_rules_ru || '';
     $('exsConsent').value = e.new_consenttext || '';
-    var cur = lower(e._new_course_value), found = false, html = '<option value="">— не выбран —</option>';
-    S.courses.forEach(function (c) {
-      var id = lower(c.msdynce_courseid);
-      if (id === cur) { found = true; }
-      html += '<option value="' + esc(id) + '">' + esc(c.msdynce_coursename || 'Без названия') + '</option>';
-    });
-    if (cur && !found) { html += '<option value="' + esc(cur) + '">Текущий курс (нет в списке)</option>'; }
-    $('exsCourse').innerHTML = html;
-    $('exsCourse').value = cur;
-    if (S.coursesFailed) { $('exsCourseHint').textContent = 'Список курсов не загрузился — курс можно оставить как есть.'; }
     var st = e.new_status;
     $('exsBasicsNote').innerHTML = st === V.EXAM_DRAFT ? '' : note('info',
       'Экзамен ' + (st === V.EXAM_PUBLISHED ? 'опубликован' : 'закрыт') + '. Эти поля можно менять и сейчас — они действуют сразу. ' +
@@ -596,8 +576,7 @@
       String($('exsCertMonths').value) !== (e.new_certvalidmonths == null ? '' : String(e.new_certvalidmonths)) ||
       $('exsConsentVer').value.trim() !== (e.new_consentversion || '') ||
       $('exsRules').value !== (e.new_rules_ru || '') ||
-      $('exsConsent').value !== (e.new_consenttext || '') ||
-      $('exsCourse').value !== lower(e._new_course_value);
+      $('exsConsent').value !== (e.new_consenttext || '');
   }
   function saveBasics(btn) {
     var e = S.exam, errors = [];
@@ -606,7 +585,6 @@
     var opens = A.fromInput(opensV), closes = A.fromInput(closesV);
     var monthsV = String($('exsCertMonths').value).trim();
     var ver = $('exsConsentVer').value.trim();
-    var course = $('exsCourse').value, curCourse = lower(e._new_course_value);
     if (!name) { errors.push('Укажите название.'); }
     if (opensV && !opens) { errors.push('Начало: неверная дата.'); }
     if (closesV && !closes) { errors.push('Окончание: неверная дата.'); }
@@ -619,8 +597,6 @@
     if (ver.length > 20) { errors.push('Версия согласия — не длиннее 20 знаков.'); }
     if ($('exsRules').value.length > MAX_MEMO) { errors.push('Правила экзамена — не длиннее ' + A.fmtInt(MAX_MEMO) + ' знаков.'); }
     if ($('exsConsent').value.length > MAX_MEMO) { errors.push('Текст согласия — не длиннее ' + A.fmtInt(MAX_MEMO) + ' знаков.'); }
-    /* Отвязать курс через этот вызов нельзя — только заменить другим */
-    if (!course && curCourse) { errors.push('Убрать курс здесь нельзя — можно только выбрать другой.'); }
     if (errors.length) { A.toast(errors.join(' '), 'err'); return; }
 
     var body = {
@@ -632,7 +608,6 @@
       new_consenttext: $('exsConsent').value,
       new_consentversion: ver
     };
-    if (course && course !== curCourse) { body['new_course@odata.bind'] = '/msdynce_courses(' + course + ')'; }
 
     var warn = [];
     if (e.new_status !== V.EXAM_DRAFT) {
@@ -648,7 +623,6 @@
       return A.patch('new_exams', S.id, body).then(function () {
         e.new_name = name; e.new_opens = opens; e.new_closes = closes; e.new_certvalidmonths = months;
         e.new_rules_ru = body.new_rules_ru; e.new_consenttext = body.new_consenttext; e.new_consentversion = ver;
-        if (course) { e._new_course_value = course; }
         renderHeader();
         renderPublish();
         A.toast('Основные данные сохранены.', 'ok');

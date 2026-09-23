@@ -94,15 +94,8 @@
       return Promise.all([
         c,
         api("/_api/contacts(" + c._new_contact_value + ")?$select=fullname"),
-        api("/_api/new_exams(" + c._new_exam_value + ")?$select=new_name,_new_course_value")
+        api("/_api/new_exams(" + c._new_exam_value + ")?$select=new_name")
       ]);
-    })
-    .then(function (res) {
-      var c = res[0], person = res[1], exam = res[2];
-      var coursePromise = exam && exam._new_course_value
-        ? api("/_api/msdynce_courses(" + exam._new_course_value + ")?$select=msdynce_coursename")
-        : Promise.resolve({});
-      return coursePromise.then(function (course) { return [c, person, exam, course]; });
     })
     .then(function (res) {
       var c = res[0], person = res[1], exam = res[2];

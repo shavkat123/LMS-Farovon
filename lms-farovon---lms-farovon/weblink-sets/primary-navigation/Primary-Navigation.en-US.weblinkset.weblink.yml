@@ -13,7 +13,7 @@
 - adx_description: calendar3,#EEF2F9,#1E3A8A
   adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 6
+  adx_displayorder: 7
   adx_displaypagechildlinks: false
   adx_name: Мероприятия
   adx_openinnewwindow: false
@@ -49,7 +49,7 @@
 - adx_description: gift,#ECF6EF,#15803D
   adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 8
+  adx_displayorder: 9
   adx_displaypagechildlinks: false
   adx_name: Магазин наград
   adx_openinnewwindow: false
@@ -61,7 +61,7 @@
 - adx_description: trophy,#FAF3E8,#D97706
   adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 7
+  adx_displayorder: 8
   adx_displaypagechildlinks: false
   adx_name: Рейтинг
   adx_openinnewwindow: false
@@ -73,7 +73,7 @@
 - adx_description: person-circle,#F0F2F5,#475569
   adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 9
+  adx_displayorder: 10
   adx_displaypagechildlinks: false
   adx_name: Мой профиль
   adx_openinnewwindow: false
@@ -97,7 +97,7 @@
 - adx_description: chat-dots,#F0F2F5,#475569
   adx_disablepagevalidation: false
   adx_displayimageonly: false
-  adx_displayorder: 5
+  adx_displayorder: 6
   adx_displaypagechildlinks: false
   adx_name: Сообщество
   adx_openinnewwindow: false
@@ -105,4 +105,16 @@
   adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_robotsfollowlink: true
   adx_weblinkid: aa13e5ed-a538-f111-88b5-7ced8d76b3cc
+  adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_description: patch-check,#EEF2F9,#1E3A8A
+  adx_disablepagevalidation: false
+  adx_displayimageonly: false
+  adx_displayorder: 5
+  adx_displaypagechildlinks: false
+  adx_name: Аттестация
+  adx_openinnewwindow: false
+  adx_pageid: e1a10001-7c5a-4b21-9f31-2026091700a1
+  adx_publishingstateid: 1160e5f3-a538-f111-88b5-7ced8d76b3cc
+  adx_robotsfollowlink: true
+  adx_weblinkid: e4a20002-7c5a-4b21-9f31-2026091700d2
   adx_weblinksetid: af60e5f3-a538-f111-88b5-7ced8d76b3cc
