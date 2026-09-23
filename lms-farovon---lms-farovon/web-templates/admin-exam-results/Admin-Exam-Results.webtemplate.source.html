@@ -515,7 +515,8 @@
     var by = {};
     S.attempts.forEach(function (a) {
       var c = lc(a._new_contact_value);
-      if (a.new_isfinal === true && a.new_status !== V.ATT_ANNULLED && !by[c]) { by[c] = a; }
+      // Итог дают только оценённые попытки — как в потоке финализации
+      if (a.new_isfinal === true && a.new_status === V.ATT_GRADED && !by[c]) { by[c] = a; }
     });
     return by;
   }
@@ -1235,12 +1236,12 @@
   /* ── Журнал ─────────────────────────────────────────────────────────────────────────── */
   var GROUPS = {
     pub: ['EXAM_PUBLISHED', 'EXAM_PUBLISH_FAILED', 'EXAM_CLOSED'],
-    att: ['ATTEMPT_CREATED', 'ATTEMPT_TICKET_READY', 'TICKET_CELL_SUBSTITUTED', 'TICKET_DUPLICATE_FINGERPRINT', 'ATTEMPT_PREPARE_TIMEOUT', 'ATTEMPT_SUBMITTED', 'ATTEMPT_EXPIRED', 'ANSWER_REJECTED_LATE'],
+    att: ['ATTEMPT_CREATED', 'ATTEMPT_TICKET_READY', 'TICKET_CELL_SUBSTITUTED', 'TICKET_DUPLICATE_FINGERPRINT', 'ATTEMPT_PREPARE_TIMEOUT', 'ATTEMPT_TAMPERED', 'ATTEMPT_SUBMITTED', 'ATTEMPT_EXPIRED', 'ANSWER_REJECTED_LATE'],
     res: ['RESULT_FINAL'],
     cert: ['CERT_ISSUED', 'CERT_REVOKED', 'CERT_EXPIRED'],
     act: ['ACTION_EXECUTED'],
     bank: ['QUESTION_RETIRED', 'BANK_SHORTAGE', 'AI_JOB_DONE', 'QUESTION_APPROVED', 'QUESTION_REJECTED', 'AI_CALL', 'AI_CALL_FAILED'],
-    err: ['FLOW_ERROR', 'AI_CALL_FAILED', 'EXAM_PUBLISH_FAILED', 'ATTEMPT_PREPARE_TIMEOUT']
+    err: ['FLOW_ERROR', 'AI_CALL_FAILED', 'EXAM_PUBLISH_FAILED', 'ATTEMPT_PREPARE_TIMEOUT', 'ATTEMPT_TAMPERED']
   };
   /* Понятные подписи частых ключей в подробностях (остальные показываем как есть) */
   var KEY_RU = {

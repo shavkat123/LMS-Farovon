@@ -8,7 +8,11 @@
 Что проверяется:
   1. баланс скобок в каждом выражении (строки, начинающиеся с @ или содержащие @{...});
   2. ссылки на несуществующие действия в outputs('…') / body('…') / items('…');
-  3. runAfter, указывающий на действие, которого нет рядом.
+  3. runAfter, указывающий на действие, которого нет рядом;
+  4. secureData с outputs у Compose/Query/Select и пояснения длиннее 256 знаков — поток не сохранится;
+  5. empty() над числовым, логическим или выборочным столбцом: empty() принимает только строку,
+     массив или объект, и на заполненном числе выражение падает (так сломалась проверка статуса
+     в F-A3 — работала лишь на пустом значении). Типы берутся из tools/exam/exam-schema.json.
 """
 import io
 import json
@@ -18,6 +22,46 @@ import sys
 
 FLOWDIR = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                        '..', '..', 'power-automate', 'exam'))
+SCHEMA = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'exam-schema.json')
+
+
+def non_string_columns():
+    """Столбцы экзамена, значение которых приходит в поток не строкой: выбор, целое, дробное, да/нет."""
+    try:
+        schema = json.load(io.open(SCHEMA, encoding='utf-8'))
+    except (IOError, ValueError):
+        return set()
+    cols = set()
+    for t in schema.get('tables', []):
+        for c in t.get('columns', []):
+            if c.get('kind') in ('choice', 'int', 'decimal', 'bool'):
+                cols.add(c['logical'])
+    return cols
+
+
+NON_STRING = non_string_columns()
+def empty_args(expr):
+    """Аргументы всех вызовов empty(…) в выражении — с учётом вложенных скобок и кавычек."""
+    out, i = [], 0
+    while True:
+        i = expr.find('empty(', i)
+        if i < 0:
+            return out
+        j, depth, quote = i + len('empty('), 1, False
+        while j < len(expr) and depth:
+            ch = expr[j]
+            if ch == "'":
+                quote = not quote
+            elif not quote and ch == '(':
+                depth += 1
+            elif not quote and ch == ')':
+                depth -= 1
+            j += 1
+        out.append(expr[i + len('empty('):j - 1])
+        i = j
+
+
+COLUMN_REF = re.compile(r"\['(?:body/)?(new_[a-z0-9_]+)'\]")
 
 
 def balanced(expr):
@@ -146,6 +190,12 @@ def check_file(path):
             ok, why = balanced(e)
             if not ok:
                 problems.append('%s — %s: %s' % (where, why, e[:110]))
+        for arg in empty_args(s):
+            if arg.lstrip().startswith('string('):
+                continue
+            for col in COLUMN_REF.findall(arg):
+                if col in NON_STRING:
+                    problems.append('%s — empty() над нестроковым столбцом %s: оберните значение в string()' % (where, col))
         for fn in ('outputs', 'body', 'items'):
             for ref in re.findall(r"%s\('([^']+)'\)" % fn, s):
                 if ref not in names and ref not in ('Try', 'Catch'):

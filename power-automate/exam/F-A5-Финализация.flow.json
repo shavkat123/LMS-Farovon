@@ -814,6 +814,7 @@
             },
             "Попытки_сотрудника": {
               "type": "OpenApiConnection",
+              "description": "Итоговую выбираем только среди оценённых попыток: аннулированная, с ошибкой или незавершённая не может дать итог и сертификат, даже если в её полях стоит «Сдано».",
               "runAfter": {
                 "Разбор_заданий": [
                   "Succeeded"
@@ -827,7 +828,7 @@
                 },
                 "parameters": {
                   "entityName": "new_examattempts",
-                  "$filter": "statecode eq 0 and _new_exam_value eq '@{outputs('Попытка')?['body/_new_exam_value']}' and _new_contact_value eq '@{outputs('Попытка')?['body/_new_contact_value']}' and new_status ne 100000005",
+                  "$filter": "statecode eq 0 and _new_exam_value eq '@{outputs('Попытка')?['body/_new_exam_value']}' and _new_contact_value eq '@{outputs('Попытка')?['body/_new_contact_value']}' and new_status eq @{outputs('Константы')['attemptОценён']}",
                   "$select": "new_examattemptid,new_percent,new_passed,new_result,new_finalizedon,new_attemptno,new_isfinal",
                   "$top": 50
                 },

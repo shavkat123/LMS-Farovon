@@ -47,6 +47,7 @@
             "attemptАннулирован": 100000005,
             "attemptОшибка": 100000006,
             "resultНеСдано": 100000001,
+            "resultАннулировано": 100000002,
             "itemНеОтвечен": 100000000,
             "actionДопПопытка": 100000002,
             "actionВыполнено": 100000001,
@@ -129,15 +130,59 @@
             },
             "Чужой_статус": {
               "type": "If",
+              "description": "Статус и результаты ставит только поток. Попытка, пришедшая уже со статусом, создана в обход страницы (эти поля открыты участнику на чтение, а значит и на создание): аннулируем и пишем в журнал.",
               "runAfter": { "Попытка": [ "Succeeded" ] },
               "expression": {
                 "and": [
-                  { "not": { "equals": [ "@empty(coalesce(outputs('Попытка')?['body/new_status'], ''))", true ] } },
+                  { "not": { "equals": [ "@empty(string(coalesce(outputs('Попытка')?['body/new_status'], '')))", true ] } },
                   { "not": { "equals": [ "@outputs('Попытка')?['body/new_status']", "@outputs('Константы')['attemptГотовится']" ] } }
                 ]
               },
               "actions": {
-                "Выход_чужой_статус": { "type": "Terminate", "runAfter": {}, "inputs": { "runStatus": "Succeeded" } }
+                "Отклонить_подделку": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "UpdateOnlyRecord",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_examattempts",
+                      "recordId": "@triggerOutputs()?['body/new_examattemptid']",
+                      "item/new_status": "@outputs('Константы')['attemptАннулирован']",
+                      "item/new_result": "@outputs('Константы')['resultАннулировано']",
+                      "item/new_percent": 0,
+                      "item/new_casepercent": 0,
+                      "item/new_passed": false,
+                      "item/new_isfinal": false,
+                      "item/new_errortext": "Попытка не засчитана: при создании у неё уже был статус. Статус и результаты попытки ставит только система. Начните экзамен со страницы аттестации."
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Журнал_подделки": {
+                  "type": "OpenApiConnection",
+                  "runAfter": { "Отклонить_подделку": [ "Succeeded" ] },
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "CreateRecord",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_examlogs",
+                      "item/new_event": "ATTEMPT_TAMPERED",
+                      "item/new_actor": "F-A3 Сборка билета",
+                      "item/new_subjectid": "@triggerOutputs()?['body/new_examattemptid']",
+                      "item/new_payload": "Попытка создана сразу со статусом @{outputs('Попытка')?['body/new_status']} (процент @{outputs('Попытка')?['body/new_percent']}, результат @{outputs('Попытка')?['body/new_result']}) и аннулирована автоматически.",
+                      "item/new_attempt@odata.bind": "/new_examattempts(@{triggerOutputs()?['body/new_examattemptid']})"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Выход_чужой_статус": { "type": "Terminate", "runAfter": { "Журнал_подделки": [ "Succeeded" ] }, "inputs": { "runStatus": "Succeeded" } }
               },
               "else": { "actions": {} }
             },
