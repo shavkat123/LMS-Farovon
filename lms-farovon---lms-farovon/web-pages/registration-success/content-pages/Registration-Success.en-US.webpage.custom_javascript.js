@@ -12,17 +12,12 @@ $(document).ready(function(){
     loadImage(attendeeid,selector);   
 
     //Get the image
-    webapi.safeAjax({
-        type: "GET",
-        url: "/_api/msdynce_courses({{request.params['id']}})/msdynce_entityimage/?size=full",
-        contentType: "application/json",
-        success: function (res, status) {
-            if (res){
-                imgBaseString = res.value;
-                $(".image-view").attr("src", "data:image/png;base64," + imgBaseString);
-            }
-        }
-    });
+    // Столбец-картинку читаем как /$value: форма «/<столбец>/?size=full» после перехода
+    // на явные списки полей Web API трактуется как «все столбцы» и отдаёт 403 (90040101).
+    var courseCoverUrl = "/_api/msdynce_courses({{request.params['id']}})/msdynce_entityimage/$value?size=full";
+    var courseCoverProbe = new Image();
+    courseCoverProbe.onload = function () { $(".image-view").attr("src", courseCoverUrl); };
+    courseCoverProbe.src = courseCoverUrl;
 
     $(".card-body span.date").each(function(){
         var date = moment.utc(this.innerHTML);

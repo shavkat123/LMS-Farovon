@@ -1,0 +1,15 @@
+adx_append: true
+adx_appendto: true
+adx_contactrelationship: 
+adx_create: false
+adx_delete: false
+adx_entitylogicalname: new_examsubmission
+adx_entityname: Exam Submission Admin
+adx_entitypermission_webrole:
+- 3b5fe5f3-a538-f111-88b5-7ced8d76b3cc
+- a1b2c3d4-1111-2222-3333-000000000005
+adx_entitypermissionid: a1b2c3d4-3333-4444-5555-000000000032
+adx_parententitypermission: 
+adx_read: true
+adx_scope: 756150000
+adx_write: false

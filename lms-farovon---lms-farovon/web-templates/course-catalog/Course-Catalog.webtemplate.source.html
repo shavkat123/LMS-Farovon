@@ -18,9 +18,10 @@
 {% assign seasonFilter = request.params['season'] | xml_escape | default: currentSeason %}
 
 {% assign cardsPerRowValue = settings['ASP/Pagination/CardsPerRow'] | default: 3 %}
-{% assign cardsPerRow = cardsPerRowValue | times: 1.0 %}
+{% comment %} только integer: "times: 1.0" на строке из site setting даёт Enumerable.Repeat и роняет любое числовое сравнение {% endcomment %}
+{% assign cardsPerRow = cardsPerRowValue | integer | default: 3 %}
 {% assign cardsPerPageValue = settings['ASP/Pagination/CardsPerPage'] | default: 20 %}
-{% assign cardsPerPage = cardsPerPageValue | times: 1.0 %}
+{% assign cardsPerPage = cardsPerPageValue | integer | default: 20 %}
 {% assign cardCounter = 1 %}
 
 {% fetchxml courses %}

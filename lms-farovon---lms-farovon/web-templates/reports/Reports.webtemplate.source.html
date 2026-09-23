@@ -1,0 +1,355 @@
+{% comment %}
+  Analytics — Аналитика (/admin/reports)
+  Дизайн: admin_console/AdminConsole.html (Analytics.jsx). Примитивы .adm-* — customtheme.css.
+  Реально: KPI + топ-стажёры (aggregate new_h5pprogress). Демо: отделы, воронка.
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+{% comment %}
+  Считаем УНИКАЛЬНЫЕ уроки (countcolumn + distinct), а не строки прогресса:
+  на один урок у пользователя может быть несколько записей new_h5pprogress (пересдачи,
+  дубли сессий), и COUNT(new_h5pprogressid) завышал и «Попыток», и знаменатель завершаемости.
+{% endcomment %}
+{% fetchxml prog_by_user %}
+<fetch aggregate="true">
+  <entity name="new_h5pprogress">
+    <attribute name="new_user" groupby="true" alias="uid" />
+    <attribute name="new_h5pcontent" aggregate="countcolumn" distinct="true" alias="cnt" />
+    <link-entity name="contact" from="contactid" to="new_user" alias="ctc" link-type="outer">
+      <attribute name="fullname" groupby="true" alias="fname" />
+      <attribute name="jobtitle" groupby="true" alias="fjob" />
+    </link-entity>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}
+  new_completion — bit-поле (Yes/No): Dataverse не поддерживает SUM/AVG на bit-атрибуте
+  ("Aggregate AVG or SUM is not supported for attribute of type bit" — падает весь fetchxml).
+  Завершения на пользователя — отдельным countcolumn distinct по уроку с фильтром eq 1:
+  distinct нужен, чтобы повторные записи по одному уроку не считались за разные завершения.
+{% endcomment %}
+{% fetchxml prog_completed_by_user %}
+<fetch aggregate="true">
+  <entity name="new_h5pprogress">
+    <attribute name="new_user" groupby="true" alias="uid" />
+    <attribute name="new_h5pcontent" aggregate="countcolumn" distinct="true" alias="completed" />
+    <filter><condition attribute="new_completion" operator="eq" value="1" /></filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% fetchxml content_count %}
+<fetch aggregate="true">
+  <entity name="new_h5pcontent">
+    <attribute name="new_h5pcontentid" aggregate="count" alias="total" />
+    <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign total_active = 0 %}
+{% for r in content_count.results.entities %}{% assign total_active = r.total %}{% endfor %}
+
+{% comment %}
+  Строки прогресса без new_user (сироты) исключаем: раньше они увеличивали total_trainees
+  и total_attempts, но в ранжирование не попадали — KPI и топ-10 считались по разным множествам,
+  плюс в таблице появлялась пустая строка «Без имени».
+{% endcomment %}
+{% assign total_trainees = 0 %}
+{% assign total_attempts = 0 %}
+{% for r in prog_by_user.results.entities %}
+  {% assign _u = r.uid.id | default: r.uid %}
+  {% if _u == '' or _u == null %}{% continue %}{% endif %}
+  {% assign total_trainees = total_trainees | plus: 1 %}
+  {% assign total_attempts = total_attempts | plus: r.cnt %}
+{% endfor %}
+
+{% comment %}
+  Глобальные завершения собираем суммой по пользователям, а не отдельным агрегатом:
+  один общий countcolumn distinct по new_h5pcontent дал бы число РАЗНЫХ уроков по всему порталу,
+  а нужно число пар «пользователь-урок». Заодно числитель и знаменатель avg_rate
+  считаются по одному и тому же множеству.
+{% endcomment %}
+{% assign total_completions = 0 %}
+{% for r in prog_completed_by_user.results.entities %}
+  {% assign _u = r.uid.id | default: r.uid %}
+  {% if _u == '' or _u == null %}{% continue %}{% endif %}
+  {% assign total_completions = total_completions | plus: r.completed %}
+{% endfor %}
+
+{% assign avg_rate = 0 %}
+{% if total_attempts > 0 %}{% assign avg_rate = total_completions | times: 100 | divided_by: total_attempts %}{% endif %}
+
+<style>
+  .adma { padding: 24px 0 56px; }
+  .adma-head { margin-bottom: 20px; }
+  .adma-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .adma-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .adma-filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .adma-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .adma-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 20px; }
+  @media (max-width: 900px) { .adma-kpis { grid-template-columns: repeat(2, 1fr); } .adma-row { grid-template-columns: 1fr; } }
+  .adma-tbl-wrap { overflow-x: auto; }
+  .adma-funnel li { margin-bottom: 12px; }
+  .adma-funnel .fr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+</style>
+
+<div class="container adm-scope adma">
+
+  <div class="adma-head">
+    <span class="adm-eyebrow">Обзор</span>
+    <h1>Аналитика</h1>
+    <p>KPI обучения, разбивка по отделам, воронка прохождения.</p>
+  </div>
+
+  {% comment %}── Filter row (декоративно) + экспорт ──{% endcomment %}
+  <div class="adma-filters">
+    <button type="button" class="adm-chip" disabled><span class="l">Период:</span> Всё время <i class="bi bi-chevron-down" style="font-size:11px;color:var(--adm-fg-3);"></i></button>
+    <button type="button" class="adm-chip" disabled><span class="l">Отдел:</span> Все <i class="bi bi-chevron-down" style="font-size:11px;color:var(--adm-fg-3);"></i></button>
+    <button type="button" class="adm-chip" disabled><span class="l">Курс:</span> Все <i class="bi bi-chevron-down" style="font-size:11px;color:var(--adm-fg-3);"></i></button>
+    <div style="flex:1;"></div>
+    <button type="button" class="adm-btn adm-btn--ghost" id="admaExport"><i class="bi bi-download"></i> Экспорт PDF</button>
+  </div>
+
+  {% comment %}── KPI tiles (реальные) ──{% endcomment %}
+  <div class="adma-kpis">
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Активных стажёров</span><i class="bi bi-people" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ total_trainees }}</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">с прогрессом по урокам</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Уроков активно</span><i class="bi bi-collection-play" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ total_active }}</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">в каталоге</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Уроков пройдено</span><i class="bi bi-check2-all" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ total_completions }}</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">завершений всего</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Средняя завершаемость</span><i class="bi bi-graph-up" aria-hidden="true"></i></div>
+      <div class="adm-stat-val">{{ avg_rate }}%</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">завершено из начатых уроков</span></div>
+    </div>
+  </div>
+
+  {% comment %}── Отделы (демо) + Воронка (демо) ──{% endcomment %}
+  <div class="adma-row">
+    <div class="adm-card" style="overflow:hidden;">
+      <div class="adm-cardhead">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;"><span class="adm-eyebrow">По отделам</span><span class="adm-demo-chip">демо</span></div>
+          <div class="adm-cardhead-title">Завершаемость и нагрузка</div>
+        </div>
+      </div>
+      <div class="adma-tbl-wrap">
+        <table class="adm-table">
+          <thead>
+            <tr><th>Отдел</th><th class="adm-r" style="width:64px;">Люди</th><th style="width:190px;">Завершаемость</th><th class="adm-r" style="width:80px;">Часы</th><th style="width:56px;">Тренд</th></tr>
+          </thead>
+          <tbody>
+            {% assign depts = 'Операции|86|84|412|up;IT|54|76|298|up;Финансы|38|92|240|flat;HR|22|95|180|up;Маркетинг|28|68|142|down;Безопасность|14|88|96|flat' | split: ';' %}
+            {% for d in depts %}
+              {% assign f = d | split: '|' %}
+              {% comment %}
+                Приведение к числу — ТОЛЬКО через | integer.
+                | times: 1 на строке в DotLiquid = Enumerable.Repeat(string, 1), т.е. IEnumerable<string>,
+                и следующее же сравнение с числом кидает InvalidCastException прямо в разметку.
+                | plus: 0 на строке — конкатенация ("84" + "0" = "840").
+              {% endcomment %}
+              {% assign comp = f[2] | integer %}
+              {% if comp >= 85 %}{% assign bc = 'var(--adm-success)' %}{% elsif comp < 70 %}{% assign bc = 'var(--adm-danger)' %}{% else %}{% assign bc = 'var(--adm-primary)' %}{% endif %}
+            <tr>
+              <td style="font-weight:600;">{{ f[0] }}</td>
+              <td class="adm-r adm-num">{{ f[1] }}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div class="adm-bar" style="flex:1;"><div style="width:{{ comp }}%;background:{{ bc }};"></div></div>
+                  <span class="adm-num" style="font-size:11px;font-weight:600;color:var(--adm-fg-2);min-width:32px;">{{ comp }}%</span>
+                </div>
+              </td>
+              <td class="adm-r adm-num">{{ f[3] }}</td>
+              <td>
+                {% if f[4] == 'up' %}<i class="bi bi-arrow-up-right" style="color:var(--adm-success);"></i>{% elsif f[4] == 'down' %}<i class="bi bi-arrow-down-right" style="color:var(--adm-danger);"></i>{% else %}<i class="bi bi-dash" style="color:var(--adm-fg-3);"></i>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="adm-card" style="padding:20px;">
+      <div style="display:flex;align-items:center;gap:8px;"><span class="adm-eyebrow">Воронка прохождения</span><span class="adm-demo-chip">демо</span></div>
+      <div style="font-size:14px;font-weight:600;color:var(--adm-fg-1);margin-top:2px;">«Безопасность на рабочем месте»</div>
+      <ul class="adma-funnel" style="margin-top:18px;">
+        {% assign funnel = 'Назначено|312|100;Начали|281|90;Половина|234|75;Финальный тест|198|63;Сертификат|187|60' | split: ';' %}
+        {% for s in funnel %}
+          {% assign f = s | split: '|' %}
+          <li>
+            <div class="fr">
+              <span style="font-size:12px;color:var(--adm-fg-2);">{{ f[0] }}</span>
+              <span class="adm-num" style="font-size:12px;font-weight:600;color:var(--adm-fg-1);">{{ f[1] }} <span style="color:var(--adm-fg-3);font-weight:500;">· {{ f[2] }}%</span></span>
+            </div>
+            <div class="adm-bar" style="height:8px;"><div style="width:{{ f[2] }}%;"></div></div>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  {% comment %}── Топ-стажёры (реальные) ──{% endcomment %}
+  <div class="adm-card" style="overflow:hidden;">
+    <div class="adm-cardhead">
+      <div>
+        <span class="adm-eyebrow">Активность</span>
+        <div class="adm-cardhead-title">Топ-стажёры по прогрессу</div>
+      </div>
+      <a href="/leaderboard" class="adm-btn adm-btn--ghost" style="padding:4px 10px;font-size:12px;"><i class="bi bi-trophy"></i> Рейтинг</a>
+    </div>
+    {% if total_trainees > 0 %}
+    <div class="adma-tbl-wrap">
+      <table class="adm-table">
+        <thead>
+          <tr><th>Стажёр</th><th style="width:180px;">Должность</th><th class="adm-r" style="width:90px;">Начато</th><th class="adm-r" style="width:90px;">Пройдено</th><th class="adm-r" style="width:120px;">Завершаемость</th></tr>
+        </thead>
+        <tbody id="admaTopBody">
+          {% comment %}
+            Топ-10 по числу завершений: ранг = 1 + сколько других набрали больше completed
+            (тай-брейк — uid строкой). Без split-массивов и индексации по переменной —
+            паттерн, зафиксированный сегодня после прод-краша на /leaderboard.
+          {% endcomment %}
+          {% assign top_n = 10 %}
+          {% comment %}
+            Ранжируем ОДНИМ проходом по пользователям, а не по проходу на каждую из 10 позиций:
+            внешний цикл по позициям (for ri in 1..top_n) множил всю работу на 10 — было ~O(10*N*(N+M))
+            итераций Liquid, на паре сотен стажёров это секунды рендера. Строки печатаются в порядке выборки,
+            а нужный порядок восстанавливает скрипт внизу по data-rank: отсортировать вывод
+            средствами Liquid нельзя — потребовалась бы индексация массива переменной
+            ("Parameter count mismatch"). Без JS таблица покажет тот же топ-10, просто не по убыванию.
+          {% endcomment %}
+          {% assign done_cnt = 0 %}
+          {% for tc in prog_completed_by_user.results.entities %}
+            {% assign tc_uid = tc.uid.id | default: tc.uid %}
+            {% if tc_uid == '' or tc_uid == null %}{% continue %}{% endif %}
+            {% assign done_cnt = done_cnt | plus: 1 %}
+          {% endfor %}
+          {% for te in prog_by_user.results.entities %}
+              {% assign te_uid = te.uid.id | default: te.uid %}
+              {% if te_uid == '' or te_uid == null %}{% continue %}{% endif %}
+              {% assign te_cnt = te.cnt | plus: 0 %}
+              {% assign te_comp = 0 %}
+              {% for tc in prog_completed_by_user.results.entities %}
+                {% assign tc_uid = tc.uid.id | default: tc.uid %}
+                {% if tc_uid == te_uid %}{% assign te_comp = tc.completed | plus: 0 %}{% endif %}
+              {% endfor %}
+              {% comment %}
+                Если завершения есть уже у 10 человек и больше, «нулевой» пользователь в топ-10
+                не попадёт по определению — выходим ДО дорогого разбора ничьих (два полных прохода
+                на каждого такого).
+              {% endcomment %}
+              {% if te_comp == 0 and done_cnt >= top_n %}{% continue %}{% endif %}
+              {% comment %}
+                Ранг сравниваем не со всем prog_by_user, а только с prog_completed_by_user:
+                кого там нет — у того завершений 0, обогнать он никого не может.
+                Так убран внутренний двойной цикл (на каждого «другого» шёл ещё один проход
+                по завершениям) — было O(N*M) на каждого кандидата, стало O(M).
+              {% endcomment %}
+              {% assign te_rank = 1 %}
+              {% for tc in prog_completed_by_user.results.entities %}
+                {% assign tc_uid = tc.uid.id | default: tc.uid %}
+                {% if tc_uid == '' or tc_uid == null %}{% continue %}{% endif %}
+                {% if tc_uid == te_uid %}{% continue %}{% endif %}
+                {% assign tc_comp = tc.completed | plus: 0 %}
+                {% if tc_comp > te_comp %}{% assign te_rank = te_rank | plus: 1 %}{% endif %}
+                {% if tc_comp == te_comp and tc_uid < te_uid %}{% assign te_rank = te_rank | plus: 1 %}{% endif %}
+              {% endfor %}
+              {% if te_comp == 0 %}
+                {% comment %}
+                  Ничьи среди «нулевых»: их в prog_completed_by_user нет, поэтому считаем как
+                  «все с меньшим uid» минус «те из них, у кого есть завершения».
+                {% endcomment %}
+                {% assign lt_all = 0 %}
+                {% for to in prog_by_user.results.entities %}
+                  {% assign to_uid = to.uid.id | default: to.uid %}
+                  {% if to_uid == '' or to_uid == null %}{% continue %}{% endif %}
+                  {% if to_uid == te_uid %}{% continue %}{% endif %}
+                  {% if to_uid < te_uid %}{% assign lt_all = lt_all | plus: 1 %}{% endif %}
+                {% endfor %}
+                {% assign lt_done = 0 %}
+                {% for tc in prog_completed_by_user.results.entities %}
+                  {% assign tc_uid = tc.uid.id | default: tc.uid %}
+                  {% if tc_uid == '' or tc_uid == null %}{% continue %}{% endif %}
+                  {% if tc_uid == te_uid %}{% continue %}{% endif %}
+                  {% if tc_uid < te_uid %}{% assign lt_done = lt_done | plus: 1 %}{% endif %}
+                {% endfor %}
+                {% assign te_rank = te_rank | plus: lt_all | minus: lt_done %}
+              {% endif %}
+              {% if te_rank <= top_n %}
+            {% assign fname = te.fname | default: 'Без имени' %}
+            {% assign fjob  = te.fjob  | default: '—' %}
+            {% assign cnt   = te_cnt %}
+            {% assign comp  = te_comp %}
+            {% if cnt > 0 %}{% assign rate = comp | times: 100 | divided_by: cnt %}{% else %}{% assign rate = 0 %}{% endif %}
+            {% assign parts = fname | split: ' ' %}
+            {% assign ini1 = parts[0] | slice: 0, 1 | upcase %}
+            {% assign ini2 = '' %}
+            {% if parts.size > 1 %}{% assign ini2 = parts[1] | slice: 0, 1 | upcase %}{% endif %}
+            {% if rate >= 80 %}{% assign rc = 'var(--adm-success)' %}{% elsif rate >= 50 %}{% assign rc = 'var(--adm-accent)' %}{% else %}{% assign rc = 'var(--adm-danger)' %}{% endif %}
+          <tr data-rank="{{ te_rank }}">
+            <td>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="adm-avatar">{{ ini1 }}{{ ini2 }}</span>
+                <span style="font-weight:600;">{{ fname }}</span>
+              </div>
+            </td>
+            <td style="color:var(--adm-fg-2);">{{ fjob }}</td>
+            <td class="adm-r adm-num">{{ cnt }}</td>
+            <td class="adm-r adm-num">{{ comp }}</td>
+            <td class="adm-r adm-num" style="font-weight:700;color:{{ rc }};">{{ rate }}%</td>
+          </tr>
+              {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding:36px 20px;text-align:center;color:var(--adm-fg-3);font-size:13px;">
+      <i class="bi bi-graph-up" style="display:block;font-size:34px;color:#CBD5E1;margin-bottom:10px;"></i>
+      Пока нет прогресса. Данные появятся, когда стажёры начнут проходить уроки.
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  (function () {
+    var b = document.getElementById('admaExport');
+    if (b) b.addEventListener('click', function () { window.print(); });
+
+    // Порядок топ-10. Ранг считается на сервере за один проход, но напечатать строки
+    // сразу по возрастанию ранга в Liquid нельзя (нет сортировки без индексации массива
+    // переменной), поэтому переставляем уже готовые <tr> по data-rank.
+    var tb = document.getElementById('admaTopBody');
+    if (!tb) return;
+    var rows = Array.prototype.slice.call(tb.querySelectorAll('tr[data-rank]'));
+    rows.sort(function (x, y) {
+      return (parseInt(x.getAttribute('data-rank'), 10) || 0) - (parseInt(y.getAttribute('data-rank'), 10) || 0);
+    });
+    rows.forEach(function (r) { tb.appendChild(r); });
+  })();
+</script>
+
+{% endunless %}

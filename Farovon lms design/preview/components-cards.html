@@ -1,0 +1,34 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Components · Card</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 22px; background: var(--color-gray-50); font-family: var(--font-sans); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { background: #fff; border: 1px solid var(--border-1); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 20px; }
+  .card.mandatory { border-left: 4px solid #DC2626; }
+  h3 { font-size: 18px; font-weight: 600; color: var(--fg-1); margin: 0 0 4px 0; }
+  p { font-size: 14px; color: var(--fg-3); margin: 0 0 12px 0; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 12px; font-weight: 500; background: #FEE2E2; color: #991B1B; }
+  .progress { height: 4px; background: var(--color-gray-200); border-radius: 9999px; overflow: hidden; margin-top: 12px; }
+  .progress > div { height: 100%; background: #DC2626; width: 60%; border-radius: 9999px; }
+  .meta { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .meta .pct { font-size: 10px; font-weight: 900; color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.1em; }
+  .due { font-size: 12px; color: #B45309; font-weight: 600; margin-top: 8px; display: flex; align-items: center; gap: 4px; }
+</style></head>
+<body>
+  <div class="grid">
+    <div class="card mandatory">
+      <h3>Workplace Safety 101</h3>
+      <p>Complete to stay compliant with annual training requirements.</p>
+      <div class="meta"><span class="badge">Required</span><span class="pct">60% complete</span></div>
+      <div class="due">⏰ Due: 12 Mar 2026</div>
+      <div class="progress"><div></div></div>
+    </div>
+    <div class="card">
+      <h3>Onboarding for new hires</h3>
+      <p>Get up to speed in your first two weeks at Farovon.</p>
+      <div class="meta"><span class="badge" style="background:#DCFCE7;color:#166534">Completed</span></div>
+      <div class="progress"><div style="background:#28A745;width:100%"></div></div>
+    </div>
+  </div>
+</body></html>

@@ -1,0 +1,295 @@
+{% comment %}
+  Admin Users — Сотрудники (/admin/users). Дизайн: Users.jsx. Примитивы .adm-* — customtheme.css.
+  Источник списка — СПРАВОЧНИК КОНТАКТОВ (все активные), а не записи прогресса:
+  зарегистрированный сотрудник виден сразу, даже если ещё не открыл ни одного урока.
+  Прогресс подмешивается агрегатом new_h5pprogress по парам (сотрудник, урок) с max(scorescaled) —
+  дубли записей одного урока (новая запись на каждый сеанс плеера) не раздувают баллы и средний.
+  Баллы = завершённых_уроков*100 + round(sum(best_score)*50). Прогресс = завершённые / активные уроки каталога.
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+{% comment %}── Все активные контакты — справочник сотрудников ──{% endcomment %}
+{% fetchxml emps %}
+<fetch top="250" distinct="true">
+  <entity name="contact">
+    <attribute name="contactid" />
+    <attribute name="fullname" />
+    <attribute name="jobtitle" />
+    <attribute name="department" />
+    <attribute name="emailaddress1" />
+    <attribute name="createdon" />
+    <filter><condition attribute="statecode" operator="eq" value="0" /></filter>
+    {% comment %}
+      Кого показываем. Таблица contact общая с платформой продаж — это второй сайт Power Pages в той же
+      среде (Sales-admin), поэтому «все активные контакты» тянули и менеджеров продаж.
+      Признак сотрудника ЛМС — веб-роль ИМЕННО этого сайта (N:N powerpagecomponent_mspp_webrole_contact,
+      powerpagecomponenttype=11). Роли проставлены 16.09.2026: Administrators 2, «Новый сотрудник» 16.
+      Условие прогресса оставлено страховкой: если новому человеку забудут выдать роль, но он начнёт
+      учиться, он не пропадёт из админки. Проверено на данных: 57 активных контактов -> 18 в списке.
+      Соединения внешние, отбор — общий filter type="or"; distinct обязателен, иначе строки размножатся.
+    {% endcomment %}
+    <link-entity name="powerpagecomponent_mspp_webrole_contact" from="contactid" to="contactid" link-type="outer" intersect="true" alias="wr1">
+      <link-entity name="powerpagecomponent" from="powerpagecomponentid" to="powerpagecomponentid" link-type="outer" alias="lmsrole">
+        <filter type="and">
+          <condition attribute="powerpagecomponenttype" operator="eq" value="11" />
+          <condition attribute="powerpagesiteid" operator="eq" value="{{ website.id | default: 'ef30e0ff-a538-f111-88b5-7ced8d76b3cc' }}" />
+        </filter>
+      </link-entity>
+    </link-entity>
+    <link-entity name="new_h5pprogress" from="new_user" to="contactid" link-type="outer" alias="lmsprog" />
+    <filter type="or">
+      <condition entityname="lmsrole" attribute="powerpagecomponentid" operator="not-null" />
+      <condition entityname="lmsprog" attribute="new_h5pprogressid" operator="not-null" />
+    </filter>
+    <order attribute="createdon" descending="true" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Реальное число активных контактов: список выше обрезан top=250, а KPI «Всего» должен быть честным ──{% endcomment %}
+{% fetchxml emp_cnt %}
+<fetch aggregate="true">
+  <entity name="contact">
+    <attribute name="contactid" aggregate="countcolumn" distinct="true" alias="tc" />
+    <filter><condition attribute="statecode" operator="eq" value="0" /></filter>
+    {% comment %}
+      Кого показываем. Таблица contact общая с платформой продаж — это второй сайт Power Pages в той же
+      среде (Sales-admin), поэтому «все активные контакты» тянули и менеджеров продаж.
+      Признак сотрудника ЛМС — веб-роль ИМЕННО этого сайта (N:N powerpagecomponent_mspp_webrole_contact,
+      powerpagecomponenttype=11). Роли проставлены 16.09.2026: Administrators 2, «Новый сотрудник» 16.
+      Условие прогресса оставлено страховкой: если новому человеку забудут выдать роль, но он начнёт
+      учиться, он не пропадёт из админки. Проверено на данных: 57 активных контактов -> 18 в списке.
+      Соединения внешние, отбор — общий filter type="or"; distinct обязателен, иначе строки размножатся.
+    {% endcomment %}
+    <link-entity name="powerpagecomponent_mspp_webrole_contact" from="contactid" to="contactid" link-type="outer" intersect="true" alias="wr1">
+      <link-entity name="powerpagecomponent" from="powerpagecomponentid" to="powerpagecomponentid" link-type="outer" alias="lmsrole">
+        <filter type="and">
+          <condition attribute="powerpagecomponenttype" operator="eq" value="11" />
+          <condition attribute="powerpagesiteid" operator="eq" value="{{ website.id | default: 'ef30e0ff-a538-f111-88b5-7ced8d76b3cc' }}" />
+        </filter>
+      </link-entity>
+    </link-entity>
+    <link-entity name="new_h5pprogress" from="new_user" to="contactid" link-type="outer" alias="lmsprog" />
+    <filter type="or">
+      <condition entityname="lmsrole" attribute="powerpagecomponentid" operator="not-null" />
+      <condition entityname="lmsprog" attribute="new_h5pprogressid" operator="not-null" />
+    </filter>
+
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign emp_total = 0 %}
+{% for r in emp_cnt.results.entities %}{% assign emp_total = r.tc | default: 0 | plus: 0 %}{% endfor %}
+
+{% comment %}── Прогресс: лучший балл по каждой паре (сотрудник, урок) — устойчиво к дублям ──{% endcomment %}
+{% fetchxml up %}
+<fetch aggregate="true">
+  <entity name="new_h5pprogress">
+    <attribute name="new_user" groupby="true" alias="uid" />
+    <attribute name="new_h5pcontent" groupby="true" alias="cid" />
+    <attribute name="new_scorescaled" aggregate="max" alias="smax" />
+    <filter>
+      <condition attribute="new_completion" operator="eq" value="1" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Активных уроков каталога (знаменатель прогресса) ──{% endcomment %}
+{% fetchxml les_cnt %}
+<fetch aggregate="true">
+  <entity name="new_h5pcontent">
+    <attribute name="new_h5pcontentid" aggregate="count" alias="lc" />
+    <filter><condition attribute="new_isactive" operator="eq" value="1" /></filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign cat_total = 0 %}
+{% for r in les_cnt.results.entities %}{% assign cat_total = r.lc | plus: 0 %}{% endfor %}
+{% if cat_total == 0 %}{% assign cat_total = 1 %}{% endif %}
+
+{% comment %}── KPI: всего в справочнике / с активностью / завершений (уникальных уроков) ──{% endcomment %}
+{% assign g_total = emps.results.entities.size %}
+{% assign g_users = 0 %}
+{% assign g_done = 0 %}
+{% for c in emps.results.entities %}
+  {% assign has_act = false %}
+  {% for r in up.results.entities %}
+    {% assign ruid = r.uid.id | default: r.uid %}
+    {% if ruid == c.id %}
+      {% assign has_act = true %}
+      {% assign g_done = g_done | plus: 1 %}
+    {% endif %}
+  {% endfor %}
+  {% if has_act %}{% assign g_users = g_users | plus: 1 %}{% endif %}
+{% endfor %}
+{% comment %}страховка: если агрегат не отдал число, «Всего» не должно быть меньше уже показанных строк{% endcomment %}
+{% if emp_total < g_total %}{% assign emp_total = g_total %}{% endif %}
+
+<style>
+  .admu { padding: 24px 0 56px; }
+  .admu-head { margin-bottom: 20px; }
+  .admu-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .admu-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .admu-search { position: relative; flex: 1 1 260px; min-width: 220px; }
+  .admu-search i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--adm-fg-3); font-size: 14px; pointer-events: none; }
+  .admu-search .adm-input { padding-left: 32px; }
+  .admu-tbl-wrap { overflow-x: auto; }
+  .admu-name { font-weight: 600; color: var(--adm-fg-1); }
+  .admu-mail { font-size: 11px; color: var(--adm-fg-3); }
+  .admu-foot { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--adm-border-1); }
+  .admu-zero { color: var(--adm-fg-3); font-weight: 500; }
+</style>
+
+<div class="container adm-scope admu">
+
+  <div class="admu-head">
+    <span class="adm-eyebrow">Люди</span>
+    <h1>Сотрудники</h1>
+    <p>Всего: <b class="adm-num">{{ emp_total }}</b> · с учебной активностью: <b class="adm-num">{{ g_users }}</b> · завершений уроков: <b class="adm-num">{{ g_done }}</b>{% if emp_total > g_total %} <span style="color:var(--adm-fg-3);">(активность — по первым {{ g_total }})</span>{% endif %}</p>
+  </div>
+
+  {% comment %}── Toolbar ──{% endcomment %}
+  <div class="adm-card adm-toolbar" style="margin-bottom:16px;">
+    <div class="admu-search">
+      <i class="bi bi-search"></i>
+      <input type="text" class="adm-input" id="admuSearch" placeholder="Имя, email, отдел…" autocomplete="off">
+    </div>
+    <div style="flex:1;"></div>
+    <button type="button" class="adm-btn adm-btn--ghost" id="admuExport"><i class="bi bi-download"></i> Экспорт CSV</button>
+    <a href="/add-attendee" class="adm-btn adm-btn--primary"><i class="bi bi-plus-lg"></i> Добавить</a>
+  </div>
+
+  {% comment %}── Table ──{% endcomment %}
+  <div class="adm-card" style="overflow:hidden;">
+    {% if g_total == 0 %}
+    <div style="padding:48px 24px;text-align:center;color:var(--adm-fg-3);">
+      <i class="bi bi-people" style="display:block;font-size:40px;color:#CBD5E1;margin-bottom:12px;"></i>
+      Пока нет зарегистрированных сотрудников.
+    </div>
+    {% else %}
+    <div class="admu-tbl-wrap">
+      <table class="adm-table" id="admuTable">
+        <thead>
+          <tr>
+            <th>Сотрудник</th>
+            <th style="width:150px;">Отдел</th>
+            <th style="width:170px;">Должность</th>
+            <th style="width:170px;">Прогресс</th>
+            <th class="adm-r" style="width:100px;">Ср. балл</th>
+            <th class="adm-r" style="width:90px;">Баллы</th>
+          </tr>
+        </thead>
+        <tbody id="admuBody">
+          {% for c in emps.results.entities %}
+            {% assign cnt = 0 %}
+            {% assign bsum = 0 %}
+            {% for r in up.results.entities %}
+              {% assign ruid = r.uid.id | default: r.uid %}
+              {% if ruid == c.id %}
+                {% assign cnt = cnt | plus: 1 %}
+                {% assign s = r.smax | plus: 0 %}
+                {% assign bsum = bsum | plus: s %}
+              {% endif %}
+            {% endfor %}
+            {% comment %}escape при assign: значение уходит и в HTML-текст, и в data-атрибуты — кавычка в имени рвала бы разметку{% endcomment %}
+            {% assign fn = c.fullname | default: 'Без имени' | escape %}
+            {% assign em = c.emailaddress1 | default: '' | escape %}
+            {% assign jb = c.jobtitle | default: '' | escape %}
+            {% assign dp = c.department | default: '' | escape %}
+            {% assign bonus = bsum | times: 50 | round %}
+            {% assign pts = cnt | times: 100 | plus: bonus %}
+            {% assign avg = 0 %}{% if cnt > 0 %}{% assign avg = bsum | times: 100 | divided_by: cnt | round %}{% endif %}
+            {% assign pct = cnt | times: 100 | divided_by: cat_total %}
+            {% if pct > 100 %}{% assign pct = 100 %}{% endif %}
+            {% assign parts = fn | split: ' ' %}
+            {% assign in1 = parts[0] | slice: 0, 1 | upcase %}
+            {% assign in2 = '' %}
+            {% if parts.size > 1 %}{% assign in2 = parts[1] | slice: 0, 1 | upcase %}{% endif %}
+          {% comment %}отдельные data-* вместо склейки через «|»: символ | в имени/должности разъезжал колонки CSV{% endcomment %}
+          <tr data-search="{{ fn | downcase }} {{ em | downcase }} {{ dp | downcase }} {{ jb | downcase }}"
+              data-fn="{{ fn }}" data-em="{{ em }}" data-dp="{{ dp }}" data-jb="{{ jb }}" data-cnt="{{ cnt }}" data-pts="{{ pts }}">
+            <td>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="adm-avatar">{{ in1 }}{{ in2 }}</span>
+                <div style="min-width:0;">
+                  <div class="admu-name">{{ fn }}</div>
+                  <div class="admu-mail">{{ em }}</div>
+                </div>
+              </div>
+            </td>
+            <td>{% if dp != '' %}{{ dp }}{% else %}<span style="color:var(--adm-fg-3);">—</span>{% endif %}</td>
+            <td>{% if jb != '' %}{{ jb }}{% else %}<span style="color:var(--adm-fg-3);">—</span>{% endif %}</td>
+            <td>
+              {% if cnt > 0 %}
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div class="adm-bar" style="flex:1;"><div style="width:{{ pct }}%;background:{% if pct == 100 %}var(--adm-success){% else %}var(--adm-primary){% endif %};"></div></div>
+                <span class="adm-num" style="font-size:11px;font-weight:600;color:var(--adm-fg-2);min-width:36px;">{{ cnt }}/{{ cat_total }}</span>
+              </div>
+              {% else %}
+              <span class="admu-zero">Не начинал(а)</span>
+              {% endif %}
+            </td>
+            <td class="adm-r adm-num">{% if cnt > 0 %}{{ avg }}%{% else %}<span class="admu-zero">—</span>{% endif %}</td>
+            <td class="adm-r adm-num" style="font-weight:600;">{{ pts }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% comment %}честно говорим про обрезку top=250: иначе поиск/экспорт «не находят» существующего сотрудника{% endcomment %}
+    {% if emp_total > g_total %}
+    <div class="admu-foot"><span class="adm-eyebrow">Показаны первые {{ g_total }} из {{ emp_total }}</span><span class="adm-eyebrow">Поиск и экспорт работают только по показанным</span></div>
+    {% endif %}
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  (function () {
+    var search = document.getElementById('admuSearch');
+    var rows = function () { return document.querySelectorAll('#admuBody tr[data-search]'); };
+    if (search) {
+      search.addEventListener('input', function () {
+        var q = (search.value || '').toLowerCase();
+        rows().forEach(function (r) {
+          var m = !q || (r.getAttribute('data-search') || '').indexOf(q) !== -1;
+          r.style.display = m ? '' : 'none';
+        });
+      });
+    }
+    var exp = document.getElementById('admuExport');
+    if (exp) {
+      exp.addEventListener('click', function () {
+        var head = ['Имя', 'Email', 'Отдел', 'Должность', 'Завершено уроков', 'Баллы'];
+        var lines = [head.join(';')];
+        rows().forEach(function (r) {
+          if (r.style.display === 'none') return;
+          var d = ['fn', 'em', 'dp', 'jb', 'cnt', 'pts'].map(function (k) {
+            var c = r.getAttribute('data-' + k) || '';
+            // ведущий апостроф: иначе Excel исполнит значение как формулу (CSV injection)
+            if (/^[=+\-@]/.test(c)) { c = "'" + c; }
+            return '"' + c.replace(/"/g, '""') + '"';
+          });
+          lines.push(d.join(';'));
+        });
+        var blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'farovon-employees.csv';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      });
+    }
+  })();
+</script>
+
+{% endunless %}

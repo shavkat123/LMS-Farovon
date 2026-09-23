@@ -1,0 +1,480 @@
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Страница доступна только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+{% comment %}── Real tasks from Dataverse ──{% endcomment %}
+{% fetchxml all_tasks %}
+<fetch>
+  <entity name="new_task">
+    <attribute name="new_taskid" />
+    <attribute name="new_name" />
+    <attribute name="new_description" />
+    <attribute name="new_taskstatus" />
+    <attribute name="new_priority" />
+    <attribute name="new_category" />
+    <attribute name="new_assignee" />
+    <attribute name="new_mentor" />
+    <attribute name="new_duedate" />
+    <attribute name="createdon" />
+    <filter>
+      <condition attribute="statecode" operator="eq" value="0" />
+    </filter>
+    <order attribute="new_duedate" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% comment %}── Контакты для выбора исполнителя в модалке: read по contact даёт Contacts Admin Manage (те же роли, что и гейт страницы) ──{% endcomment %}
+{% fetchxml assignees %}
+<fetch top="200" distinct="true">
+  <entity name="contact">
+    <attribute name="contactid" />
+    <attribute name="fullname" />
+    <filter>
+      <condition attribute="statecode" operator="eq" value="0" />
+    </filter>
+    {% comment %}
+      Кого показываем. Таблица contact общая с платформой продаж — это второй сайт Power Pages в той же
+      среде (Sales-admin), поэтому «все активные контакты» тянули и менеджеров продаж.
+      Признак сотрудника ЛМС — веб-роль ИМЕННО этого сайта (N:N powerpagecomponent_mspp_webrole_contact,
+      powerpagecomponenttype=11). Роли проставлены 16.09.2026: Administrators 2, «Новый сотрудник» 16.
+      Условие прогресса оставлено страховкой: если новому человеку забудут выдать роль, но он начнёт
+      учиться, он не пропадёт из админки. Проверено на данных: 57 активных контактов -> 18 в списке.
+      Соединения внешние, отбор — общий filter type="or"; distinct обязателен, иначе строки размножатся.
+    {% endcomment %}
+    <link-entity name="powerpagecomponent_mspp_webrole_contact" from="contactid" to="contactid" link-type="outer" intersect="true" alias="wr1">
+      <link-entity name="powerpagecomponent" from="powerpagecomponentid" to="powerpagecomponentid" link-type="outer" alias="lmsrole">
+        <filter type="and">
+          <condition attribute="powerpagecomponenttype" operator="eq" value="11" />
+          <condition attribute="powerpagesiteid" operator="eq" value="{{ website.id | default: 'ef30e0ff-a538-f111-88b5-7ced8d76b3cc' }}" />
+        </filter>
+      </link-entity>
+    </link-entity>
+    <link-entity name="new_h5pprogress" from="new_user" to="contactid" link-type="outer" alias="lmsprog" />
+    <filter type="or">
+      <condition entityname="lmsrole" attribute="powerpagecomponentid" operator="not-null" />
+      <condition entityname="lmsprog" attribute="new_h5pprogressid" operator="not-null" />
+    </filter>
+    <order attribute="fullname" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+
+{% assign tasks_count = 0 %}
+{% for t in all_tasks.results.entities %}
+  {% assign tasks_count = tasks_count | plus: 1 %}
+{% endfor %}
+
+{% comment %}
+  Метки приоритета берём из реальных записей: локальный OptionSet из Liquid не перечислить,
+  а выдумывать подписи нельзя. Нет ни одной задачи с приоритетом — поле в форме не показываем.
+{% endcomment %}
+{% assign prio_lbl_0 = '' %}{% assign prio_lbl_1 = '' %}{% assign prio_lbl_2 = '' %}{% assign prio_lbl_3 = '' %}
+{% for t in all_tasks.results.entities %}
+  {% case t.new_priority.value %}
+    {% when 100000000 %}{% assign prio_lbl_0 = t.new_priority.label %}
+    {% when 100000001 %}{% assign prio_lbl_1 = t.new_priority.label %}
+    {% when 100000002 %}{% assign prio_lbl_2 = t.new_priority.label %}
+    {% when 100000003 %}{% assign prio_lbl_3 = t.new_priority.label %}
+  {% endcase %}
+{% endfor %}
+
+<style>
+  .fv-tm { padding: 12px 0 60px; font-family: 'Inter', ui-sans-serif, sans-serif; }
+  .fv-tm-breadcrumb { margin-bottom: 18px; }
+  .fv-tm-breadcrumb ol { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .fv-tm-breadcrumb li { font-size: 12px; color: #64748B; display: flex; align-items: center; gap: 6px; }
+  .fv-tm-breadcrumb li::after { content: '/'; color: #CBD5E1; }
+  .fv-tm-breadcrumb li:last-child::after { display: none; }
+  .fv-tm-breadcrumb a { color: #64748B; text-decoration: none; }
+  .fv-tm-breadcrumb a:hover { color: #15803D; }
+  .fv-tm-breadcrumb li:last-child { color: #0B1220; font-weight: 600; }
+
+  .fv-tm-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+  .fv-tm-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #15803D; display: block; margin-bottom: 5px; }
+  .fv-tm-title { font-size: 26px; font-weight: 800; color: #0B1220; margin: 0 0 5px; }
+  .fv-tm-sub { font-size: 13px; color: #64748B; margin: 0; }
+  .fv-tm-toolbar { display: flex; gap: 8px; }
+  .fv-tm-btn { background: #fff; border: 1px solid #E5E7EB; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; color: #374151; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .fv-tm-btn:hover { background: #ECF6EF; border-color: #15803D; color: #15803D; }
+  .fv-tm-btn.primary { background: #1E3A8A; color: #fff; border-color: #1E3A8A; }
+  .fv-tm-btn.primary:hover { background: #15306E; color: #fff; }
+
+  .fv-tm-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  @media (max-width: 1100px) { .fv-tm-board { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px)  { .fv-tm-board { grid-template-columns: 1fr; } }
+
+  .fv-tm-col { background: #F8FAFC; border-radius: 12px; padding: 14px; min-height: 400px; }
+  .fv-tm-col-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 4px; }
+  .fv-tm-col-name { font-size: 12px; font-weight: 700; color: #0B1220; text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: center; gap: 8px; }
+  .fv-tm-col-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .fv-tm-col-count { font-size: 11px; font-weight: 700; color: #64748B; background: #fff; padding: 2px 8px; border-radius: 999px; border: 1px solid #E5E7EB; }
+
+  .fv-tm-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.04); cursor: grab; transition: box-shadow .15s, transform .15s; }
+  .fv-tm-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.08); transform: translateY(-1px); }
+  .fv-tm-card-tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; margin-bottom: 8px; }
+  .fv-tm-card-name { font-size: 13px; font-weight: 600; color: #0B1220; margin: 0 0 8px; line-height: 1.4; }
+  .fv-tm-card-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11px; color: #64748B; }
+  .fv-tm-card-avatar { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, #6366F1, #1E3A8A); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
+  .fv-tm-card-due { display: flex; align-items: center; gap: 4px; }
+  .fv-tm-card-due.urgent { color: #DC2626; font-weight: 600; }
+  .fv-tm-card-priority { width: 4px; height: 18px; border-radius: 2px; display: inline-block; vertical-align: middle; margin-right: 4px; }
+
+  /* drag-n-drop реализован, поэтому cursor: grab на карточке больше не обманывает */
+  .fv-tm-cards { min-height: 60px; }
+  .fv-tm-card.is-dragging { opacity: .5; cursor: grabbing; }
+  .fv-tm-card.is-saving { opacity: .55; pointer-events: none; }
+  .fv-tm-col.is-over { outline: 2px dashed #1E3A8A; outline-offset: -4px; background: #EEF2F9; }
+
+  .fv-tm-modal { display: none; position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: rgba(11,18,32,.45); z-index: 1050; align-items: center; justify-content: center; padding: 16px; }
+  .fv-tm-modal-box { background: #fff; border-radius: 14px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; padding: 20px 22px; }
+  .fv-tm-modal-box h3 { font-size: 16px; font-weight: 700; color: #0B1220; margin: 0 0 14px; }
+  .fv-tm-fld { margin-bottom: 12px; }
+  .fv-tm-fld label { display: block; font-size: 11px; font-weight: 600; color: #64748B; margin-bottom: 4px; }
+  .fv-tm-fld input, .fv-tm-fld select, .fv-tm-fld textarea { width: 100%; border: 1px solid #E5E7EB; border-radius: 8px; padding: 8px 10px; font-size: 13px; color: #0B1220; font-family: inherit; background: #fff; }
+  .fv-tm-modal-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+  .fv-tm-err { display: none; background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; border-radius: 8px; padding: 8px 10px; font-size: 12px; margin-bottom: 10px; }
+</style>
+
+<div class="fv-tm container-fluid px-3 px-md-4">
+
+  <nav class="fv-tm-breadcrumb" aria-label="breadcrumb">
+    <ol>
+      <li><a href="/">Главная</a></li>
+      <li aria-current="page">Управление задачами</li>
+    </ol>
+  </nav>
+
+  <div class="fv-tm-header">
+    <div>
+      <span class="fv-tm-eyebrow">Администрирование</span>
+      <h1 class="fv-tm-title">Управление задачами</h1>
+      <p class="fv-tm-sub">Канбан-доска задач адаптации для стажёров.</p>
+    </div>
+    <div class="fv-tm-toolbar">
+      <button class="fv-tm-btn" type="button" disabled><i class="bi bi-funnel"></i> Фильтр</button>
+      {% comment %}страницы /task-edit в портале нет — задача создаётся модалкой через Web API new_tasks{% endcomment %}
+      <button class="fv-tm-btn primary" type="button" id="fvTmNew"><i class="bi bi-plus-lg"></i> Новая задача</button>
+    </div>
+  </div>
+
+  {% comment %}── Status integer values from local option set (alpha-create order) ──{% endcomment %}
+  {% assign status_todo   = 100000000 %}
+  {% assign status_doing  = 100000001 %}
+  {% assign status_review = 100000002 %}
+  {% assign status_done   = 100000003 %}
+
+  <div class="fv-tm-board">
+    {% comment %}── 4 Kanban columns: К выполнению / В работе / На проверке / Готово ──{% endcomment %}
+    {% for ci in (0..3) %}
+      {% assign col_color = '#94A3B8' %}
+      {% assign col_label = 'К выполнению' %}
+      {% assign col_status = status_todo %}
+      {% case ci %}
+        {% when 0 %}{% assign col_label = 'К выполнению' %}{% assign col_color = '#94A3B8' %}{% assign col_status = status_todo %}
+        {% when 1 %}{% assign col_label = 'В работе'      %}{% assign col_color = '#2563EB' %}{% assign col_status = status_doing %}
+        {% when 2 %}{% assign col_label = 'На проверке'   %}{% assign col_color = '#D97706' %}{% assign col_status = status_review %}
+        {% when 3 %}{% assign col_label = 'Готово'        %}{% assign col_color = '#22C55E' %}{% assign col_status = status_done %}
+      {% endcase %}
+
+      {% comment %}── Count tasks in this column ──{% endcomment %}
+      {% assign col_count = 0 %}
+      {% for t in all_tasks.results.entities %}
+        {% comment %}
+          Choice-поле в Liquid — объект, а не число: сравнивать нужно .value.
+          Прямое `t.new_taskstatus == 100000000` всегда false → колонки были пустыми.
+        {% endcomment %}
+        {% if t.new_taskstatus.value == col_status %}{% assign col_count = col_count | plus: 1 %}{% endif %}
+      {% endfor %}
+
+      <div class="fv-tm-col" data-status="{{ col_status }}">
+        <div class="fv-tm-col-head">
+          <div class="fv-tm-col-name"><span class="fv-tm-col-dot" style="background:{{ col_color }};"></span>{{ col_label }}</div>
+          <span class="fv-tm-col-count">{{ col_count }}</span>
+        </div>
+        <div class="fv-tm-cards" data-status="{{ col_status }}">
+
+        {% comment %}── Real task cards in this column ──{% endcomment %}
+        {% for t in all_tasks.results.entities %}
+          {% if t.new_taskstatus.value == col_status %}
+            {% comment %}─ Priority colour ─{% endcomment %}
+            {% assign prio_color = '#94A3B8' %}
+            {% case t.new_priority.value %}
+              {% when 100000000 %}{% assign prio_color = '#94A3B8' %}
+              {% when 100000001 %}{% assign prio_color = '#2563EB' %}
+              {% when 100000002 %}{% assign prio_color = '#D97706' %}
+              {% when 100000003 %}{% assign prio_color = '#DC2626' %}
+            {% endcase %}
+
+            {% comment %}─ Category tag colour (text-based fallback) ─{% endcomment %}
+            {% assign tag_bg = '#F1F5F9' %}{% assign tag_fg = '#64748B' %}
+            {% assign cat = t.new_category | default: '' %}
+            {% if cat contains 'Срочно' %}{% assign tag_bg = '#FEE2E2' %}{% assign tag_fg = '#DC2626' %}
+            {% elsif cat contains 'Обучение' %}{% assign tag_bg = '#E0F2FE' %}{% assign tag_fg = '#0369A1' %}
+            {% elsif cat contains 'Документ' %}{% assign tag_bg = '#FEF3C7' %}{% assign tag_fg = '#92400E' %}
+            {% elsif cat contains 'Встреча' %}{% assign tag_bg = '#ECF6EF' %}{% assign tag_fg = '#15803D' %}
+            {% elsif cat contains 'Практика' %}{% assign tag_bg = '#EEF2F9' %}{% assign tag_fg = '#1E3A8A' %}
+            {% endif %}
+
+            {% comment %}─ Assignee initials ─{% endcomment %}
+            {% assign assignee_name = t.new_assignee.name | default: '' %}
+            {% assign initials_parts = assignee_name | split: ' ' %}
+            {% assign ini1 = '' %}{% assign ini2 = '' %}
+            {% if initials_parts.size > 0 %}{% assign ini1 = initials_parts[0] | slice: 0, 1 | upcase %}{% endif %}
+            {% if initials_parts.size > 1 %}{% assign ini2 = initials_parts[1] | slice: 0, 1 | upcase %}{% endif %}
+
+            {% comment %}─ Due date display ─{% endcomment %}
+            {% assign due_text = '' %}
+            {% if t.new_duedate %}
+              {% assign due_text = t.new_duedate | date: 'd MMM' %}
+            {% endif %}
+
+            {% comment %}data-tid нужен для PATCH статуса при переносе карточки в другую колонку{% endcomment %}
+            <div class="fv-tm-card" draggable="true" data-tid="{{ t.new_taskid }}" data-status="{{ col_status }}" title="Перетащите карточку в другую колонку, чтобы сменить статус">
+              {% comment %}категория и название приходят из данных — только через escape, иначе хранимый XSS{% endcomment %}
+              {% if cat != '' %}<span class="fv-tm-card-tag" style="background:{{ tag_bg }};color:{{ tag_fg }};">{{ cat | escape }}</span>{% endif %}
+              <h4 class="fv-tm-card-name">
+                <span class="fv-tm-card-priority" style="background:{{ prio_color }};"></span>{{ t.new_name | escape }}
+              </h4>
+              <div class="fv-tm-card-meta">
+                {% if assignee_name != '' %}<span class="fv-tm-card-avatar" title="{{ assignee_name | escape }}">{{ ini1 }}{{ ini2 }}</span>{% else %}<span class="fv-tm-card-avatar" style="background:#CBD5E1;">?</span>{% endif %}
+                {% if due_text != '' %}<span class="fv-tm-card-due"><i class="bi bi-calendar-event"></i>{{ due_text }}</span>{% endif %}
+              </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+
+          {% comment %}заглушку рендерим всегда — после переноса карточки её показывает/прячет JS{% endcomment %}
+          <div class="fv-tm-empty" style="text-align:center;padding:20px 8px;font-size:11px;color:#64748B;{% if col_count > 0 %}display:none;{% endif %}">Нет задач</div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+</div>
+
+{% if tasks_count == 0 %}
+<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 16px;margin:20px auto 0;max-width:1200px;font-size:12px;color:#92400E;display:flex;align-items:center;gap:10px;">
+  <i class="bi bi-info-circle-fill" style="color:#F59E0B;flex-shrink:0;"></i>
+  <span>Пока ни одной задачи. Добавь задачи в Dataverse — таблица <code>new_task</code> — и они появятся в досках.</span>
+</div>
+{% endif %}
+
+{% comment %}── Модалка создания задачи: страницы /task-edit в портале нет, пишем через Web API new_tasks ──{% endcomment %}
+<div class="fv-tm-modal" id="fvTmModal" role="dialog" aria-modal="true" aria-labelledby="fvTmModalTitle">
+  <div class="fv-tm-modal-box">
+    <h3 id="fvTmModalTitle">Новая задача</h3>
+    <div class="fv-tm-err" id="fvTmErr"></div>
+
+    <div class="fv-tm-fld">
+      <label for="fvTmF_name">Название <span style="color:#DC2626;">*</span></label>
+      <input type="text" id="fvTmF_name" maxlength="200" placeholder="Например: Пройти вводный курс">
+    </div>
+    <div class="fv-tm-fld">
+      <label for="fvTmF_desc">Описание</label>
+      <textarea id="fvTmF_desc" rows="3"></textarea>
+    </div>
+    <div class="fv-tm-fld">
+      <label for="fvTmF_status">Статус</label>
+      <select id="fvTmF_status">
+        <option value="{{ status_todo }}">К выполнению</option>
+        <option value="{{ status_doing }}">В работе</option>
+        <option value="{{ status_review }}">На проверке</option>
+        <option value="{{ status_done }}">Готово</option>
+      </select>
+    </div>
+    {% comment %}приоритет показываем, только если метки удалось взять из реальных записей — выдумывать подписи OptionSet нельзя{% endcomment %}
+    {% if prio_lbl_0 != '' or prio_lbl_1 != '' or prio_lbl_2 != '' or prio_lbl_3 != '' %}
+    <div class="fv-tm-fld">
+      <label for="fvTmF_prio">Приоритет</label>
+      <select id="fvTmF_prio">
+        <option value="">— не задан —</option>
+        {% if prio_lbl_0 != '' %}<option value="100000000">{{ prio_lbl_0 | escape }}</option>{% endif %}
+        {% if prio_lbl_1 != '' %}<option value="100000001">{{ prio_lbl_1 | escape }}</option>{% endif %}
+        {% if prio_lbl_2 != '' %}<option value="100000002">{{ prio_lbl_2 | escape }}</option>{% endif %}
+        {% if prio_lbl_3 != '' %}<option value="100000003">{{ prio_lbl_3 | escape }}</option>{% endif %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="fv-tm-fld">
+      <label for="fvTmF_cat">Категория</label>
+      <input type="text" id="fvTmF_cat" maxlength="100" placeholder="Обучение / Документы / Встреча…">
+    </div>
+    <div class="fv-tm-fld">
+      <label for="fvTmF_assignee">Исполнитель</label>
+      <select id="fvTmF_assignee">
+        <option value="">— не назначен —</option>
+        {% for a in assignees.results.entities %}
+        <option value="{{ a.contactid }}">{{ a.fullname | escape }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="fv-tm-fld">
+      <label for="fvTmF_due">Срок</label>
+      <input type="date" id="fvTmF_due">
+    </div>
+
+    <div class="fv-tm-modal-foot">
+      <button type="button" class="fv-tm-btn" id="fvTmCancel">Отмена</button>
+      <button type="button" class="fv-tm-btn primary" id="fvTmSave">Создать</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    function getToken() {
+      return fetch('/_layout/tokenhtml', { credentials: 'include' })
+        .then(function (r) { return r.text(); })
+        .then(function (h) { var m = h.match(/name="__RequestVerificationToken"[^>]*value="([^"]+)"/); return m ? m[1] : ''; });
+    }
+    function chk(res) { if (res.ok) { return res; } return res.text().then(function (t) { throw new Error('HTTP ' + res.status + ' — ' + t.slice(0, 200)); }); }
+
+    // счётчики колонок и заглушки «Нет задач» после переноса карточки пересчитываем на клиенте
+    function refreshCounts() {
+      Array.prototype.forEach.call(document.querySelectorAll('.fv-tm-col'), function (col) {
+        var n = col.querySelectorAll('.fv-tm-card').length;
+        var badge = col.querySelector('.fv-tm-col-count');
+        if (badge) { badge.textContent = n; }
+        var empty = col.querySelector('.fv-tm-empty');
+        if (empty) { empty.style.display = n > 0 ? 'none' : ''; }
+      });
+    }
+
+    // ── Drag-n-drop: перенос карточки = PATCH new_taskstatus. Без него cursor:grab обещал бы несуществующее ──
+    var dragged = null;
+
+    Array.prototype.forEach.call(document.querySelectorAll('.fv-tm-card'), function (card) {
+      card.addEventListener('dragstart', function (e) {
+        dragged = card;
+        card.classList.add('is-dragging');
+        try { e.dataTransfer.setData('text/plain', card.getAttribute('data-tid') || ''); } catch (ex) {}
+        if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; }
+      });
+      card.addEventListener('dragend', function () {
+        card.classList.remove('is-dragging');
+        dragged = null;
+        Array.prototype.forEach.call(document.querySelectorAll('.fv-tm-col.is-over'), function (c) { c.classList.remove('is-over'); });
+      });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('.fv-tm-col'), function (col) {
+      col.addEventListener('dragover', function (e) {
+        if (!dragged) { return; }
+        e.preventDefault();
+        if (e.dataTransfer) { e.dataTransfer.dropEffect = 'move'; }
+        col.classList.add('is-over');
+      });
+      col.addEventListener('dragleave', function (e) {
+        if (!col.contains(e.relatedTarget)) { col.classList.remove('is-over'); }
+      });
+      col.addEventListener('drop', function (e) {
+        e.preventDefault();
+        col.classList.remove('is-over');
+        var card = dragged;
+        if (!card) { return; }
+        var newStatus = col.getAttribute('data-status');
+        var oldStatus = card.getAttribute('data-status');
+        var tid = card.getAttribute('data-tid');
+        if (!newStatus || !tid || newStatus === oldStatus) { return; }
+
+        // запоминаем исходное место: если PATCH упадёт, доска не должна показывать несохранённый статус
+        var homeList = card.parentNode;
+        var homeNext = card.nextSibling;
+        var list = col.querySelector('.fv-tm-cards');
+        if (!list) { return; }
+        var empty = list.querySelector('.fv-tm-empty');
+        if (empty) { list.insertBefore(card, empty); } else { list.appendChild(card); }
+        card.classList.add('is-saving');
+        refreshCounts();
+
+        getToken().then(function (tok) {
+          return fetch('/_api/new_tasks(' + tid + ')', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', '__RequestVerificationToken': tok },
+            body: JSON.stringify({ new_taskstatus: parseInt(newStatus, 10) })
+          }).then(chk);
+        }).then(function () {
+          card.setAttribute('data-status', newStatus);
+          card.classList.remove('is-saving');
+        }).catch(function (err) {
+          if (homeNext) { homeList.insertBefore(card, homeNext); } else { homeList.appendChild(card); }
+          card.classList.remove('is-saving');
+          refreshCounts();
+          window.alert('Не удалось изменить статус задачи: ' + err.message);
+        });
+      });
+    });
+
+    refreshCounts();
+
+    // ── Создание задачи через Web API ──
+    var modal = document.getElementById('fvTmModal');
+    var openBt = document.getElementById('fvTmNew');
+    if (!modal || !openBt) { return; }
+    var errBox = document.getElementById('fvTmErr');
+    var saveBt = document.getElementById('fvTmSave');
+    function show() { modal.style.display = 'flex'; document.getElementById('fvTmF_name').focus(); }
+    function hide() { modal.style.display = 'none'; }
+    openBt.addEventListener('click', show);
+    document.getElementById('fvTmCancel').addEventListener('click', hide);
+    modal.addEventListener('click', function (e) { if (e.target === modal) { hide(); } });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && modal.style.display === 'flex') { hide(); } });
+
+    function postTask(payload, tok) {
+      return fetch('/_api/new_tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', '__RequestVerificationToken': tok },
+        body: JSON.stringify(payload)
+      }).then(chk);
+    }
+    function withBind(base, prop, aid) {
+      var o = {};
+      for (var k in base) { if (Object.prototype.hasOwnProperty.call(base, k)) { o[k] = base[k]; } }
+      o[prop + '@odata.bind'] = '/contacts(' + aid + ')';
+      return o;
+    }
+
+    saveBt.addEventListener('click', function () {
+      errBox.style.display = 'none';
+      var name = document.getElementById('fvTmF_name').value.trim();
+      if (!name) { errBox.textContent = 'Укажите название задачи.'; errBox.style.display = 'block'; return; }
+
+      var base = {
+        new_name: name,
+        new_description: document.getElementById('fvTmF_desc').value,
+        new_taskstatus: parseInt(document.getElementById('fvTmF_status').value, 10)
+      };
+      var cat = document.getElementById('fvTmF_cat').value.trim();
+      if (cat) { base.new_category = cat; }
+      // срок задачи по таймзоне не сдвигаем — отправляем ровно то, что выбрал пользователь
+      var due = document.getElementById('fvTmF_due').value;
+      if (due) { base.new_duedate = due; }
+      var pel = document.getElementById('fvTmF_prio');
+      if (pel && pel.value) { base.new_priority = parseInt(pel.value, 10); }
+      var aid = document.getElementById('fvTmF_assignee').value;
+
+      saveBt.disabled = true; saveBt.textContent = 'Создание…'; // блокируем двойной клик — иначе дубли задач
+      getToken().then(function (tok) {
+        if (!aid) { return postTask(base, tok); }
+        // регистр навигационного свойства lookup зависит от схемы — пробуем оба варианта
+        return postTask(withBind(base, 'new_assignee', aid), tok).catch(function () {
+          return postTask(withBind(base, 'new_Assignee', aid), tok);
+        });
+      }).then(function () {
+        location.reload();
+      }).catch(function (e) {
+        errBox.textContent = 'Ошибка сохранения: ' + e.message;
+        errBox.style.display = 'block';
+        saveBt.disabled = false; saveBt.textContent = 'Создать';
+      });
+    });
+  })();
+</script>
+
+{% endunless %}

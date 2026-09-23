@@ -1,0 +1,41 @@
+<!doctype html>
+<!-- @dsCard group="Components" name="Sidebar Nav" subtitle="Wordmark + active state with right border + points strip" viewport="700x320" -->
+<html><head><meta charset="utf-8"><title>Components · Sidebar Nav</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 0; background: var(--color-gray-50); font-family: var(--font-sans); }
+  .shell { display: grid; grid-template-columns: 220px 1fr; height: 320px; }
+  .sb { background: #fff; border-right: 1px solid var(--border-1); display: flex; flex-direction: column; }
+  .brand { height: 56px; display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--border-1); }
+  .brand b { font-size: 18px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; }
+  .brand span { font-size: 14px; color: var(--fg-1); margin-left: 4px; font-weight: 500; }
+  ul { list-style: none; margin: 0; padding: 12px 0 0 0; flex: 1; }
+  li a { display: flex; align-items: center; gap: 12px; padding: 10px 20px; font-size: 14px; font-weight: 500; color: var(--fg-2); text-decoration: none; transition: background-color 200ms; }
+  li a:hover { background: var(--color-gray-50); color: var(--color-gray-900); }
+  li a.active { background: #EFF6FF; color: var(--color-primary); border-right: 4px solid var(--color-primary); }
+  .ic { width: 16px; height: 16px; opacity: 0.9; }
+  .points-strip { padding: 10px 16px; background: linear-gradient(to right, #F5F3FF, #EEF2FF); border-top: 1px solid var(--border-1); }
+  .points-strip .eye { font-size: 9px; font-weight: 900; color: #ADB5BD; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 2px; }
+  .points-strip .val { display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 700; color: var(--fg-1); }
+  .points-strip .val .star { color: #FBBF24; }
+</style></head>
+<body>
+  <div class="shell">
+    <aside class="sb">
+      <div class="brand"><b>FAROVON</b><span>LMS</span></div>
+      <ul>
+        <li><a class="active" href="#">🏠 Dashboard</a></li>
+        <li><a href="#">📚 Courses</a></li>
+        <li><a href="#">💬 Discussion Forum</a></li>
+        <li><a href="#">💡 FAQ</a></li>
+        <li><a href="#">🏆 My Contribution</a></li>
+        <li><a href="#">🛒 Shop</a></li>
+      </ul>
+      <div class="points-strip">
+        <div class="eye">Points</div>
+        <div class="val"><span class="star">⭐</span> 1,250 pts</div>
+      </div>
+    </aside>
+    <div></div>
+  </div>
+</body></html>

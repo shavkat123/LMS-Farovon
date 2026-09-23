@@ -10,7 +10,11 @@
   adx_sitesettingid: 0a61e5f3-a538-f111-88b5-7ced8d76b3cc
 - adx_name: Webapi/msdynce_course/fields
   adx_sitesettingid: 0fcfddf9-a538-f111-88b5-7ced8d76b3cc
-  adx_value: '*'
+  adx_value: msdynce_courseid,msdynce_coursename,msdynce_coursecategory,msdynce_coursedescription,msdynce_coursetype,msdynce_coursegradelevel,msdynce_coursedays,msdynce_frequency,msdynce_registerationmaxcapacity,msdynce_coursestartdateandtime,msdynce_courseenddateandtime,msdynce_registerationdeadline,msdynce_entityimage,msdynce_entityimage_file_name,msdynce_entityimage_file_type,msdynce_instructorname,_msdynce_instructorname_value,new_trajectory,_new_trajectory_value,new_trajectoryorder,statecode,statuscode
+- adx_name: HTTP/Content-Security-Policy/Style-Src/Append
+  adx_sitesettingid: 11f425d5-1a45-f111-bec6-7ced8d76b3cc
+  adx_source: 0
+  adx_value: 'blob:'
 - adx_description: Setting controls whether attachments will be displayed on Knowledge articles
   adx_name: KnowledgeManagement/DisplayNotes
   adx_sitesettingid: 1906e5ed-a538-f111-88b5-7ced8d76b3cc
@@ -42,9 +46,6 @@
   adx_name: KnowledgeManagement/NotesFilter
   adx_sitesettingid: 2c60e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: '*WEB*'
-- adx_name: Webapi/adx_webrole/fields
-  adx_sitesettingid: 305fe5f3-a538-f111-88b5-7ced8d76b3cc
-  adx_value: adx_name,adx_webroleid
 - adx_name: ASP/Pagination/PagesInLine
   adx_sitesettingid: 32cfddf9-a538-f111-88b5-7ced8d76b3cc
   adx_value: 6
@@ -58,9 +59,6 @@
 - adx_name: Profile/ForceSignUp
   adx_sitesettingid: 3860e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: False
-- adx_name: Webapi/adx_webrole_contact/enabled
-  adx_sitesettingid: 4060e5f3-a538-f111-88b5-7ced8d76b3cc
-  adx_value: true
 - adx_name: ASP/Course/Form/Validation/Field/Level
   adx_sitesettingid: 40cfddf9-a538-f111-88b5-7ced8d76b3cc
   adx_value: Level
@@ -77,6 +75,10 @@
 - adx_name: ASP/Icon/Validation/Error
   adx_sitesettingid: 50cfddf9-a538-f111-88b5-7ced8d76b3cc
   adx_value: /validation-icon.svg
+- adx_name: HTTP/Content-Security-Policy/Script-Src/Append
+  adx_sitesettingid: 53bbc2bf-1a45-f111-bec6-7ced8d76b3cc
+  adx_source: 0
+  adx_value: 'blob:'
 - adx_name: OnlineDomains
   adx_sitesettingid: 565fe5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: sharepoint.com;microsoftonline.com
@@ -92,12 +94,13 @@
   adx_name: Authentication/LoginThrottling/IpAddressTimeoutTimeSpan
   adx_sitesettingid: 5860e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: 00:15:00
+- adx_description: "ОТКАТ 2026-08-31. Пробовали сузить до script-src 'self' 'nonce' — портал сломался: H5P-урок не открывался, блокировался в том числе собственный скрипт Power Pages (ClientLogWrapper is not defined). В фактической политике браузера blob: не появился, хотя настройка Content-Security-Policy/Script-Src/Append = blob: существует, — значит Append не применяется к явно заданной базовой политике. Прежде чем сужать снова: проверять реальный заголовок в devtools, а не наличие настроек, и вести blob: и unsafe-eval прямо в этом значении."
+  adx_name: HTTP/Content-Security-Policy
+  adx_sitesettingid: 5fc338c5-b58f-4195-8643-d03d9d7de019
+  adx_value: script-src * 'nonce'
 - adx_name: Authentication/Registration/ExternalLoginEnabled
   adx_sitesettingid: 645fe5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: true
-- adx_name: Webapi/contact/fields
-  adx_sitesettingid: 685fe5f3-a538-f111-88b5-7ced8d76b3cc
-  adx_value: '*'
 - adx_name: Authentication/OpenAuth/Microsoft/ClientId
   adx_sitesettingid: 6ccfddf9-a538-f111-88b5-7ced8d76b3cc
 - adx_name: ASP/Course/Form/Validation/Field/Deadline
@@ -106,6 +109,13 @@
 - adx_name: Search/IndexNotesAttachments
   adx_sitesettingid: 7660e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: false
+- adx_name: webfiles/blockedextensions
+  adx_sitesettingid: 76af91ba-9043-f111-88b4-7ced8d76b3cc
+  adx_source: 0
+  adx_value: .exe|.bat|.vbs|.cmd
+- adx_name: Webapi/new_h5pprogress/enabled
+  adx_sitesettingid: 77f5a26e-b202-4e0b-b0a3-61c524aea74c
+  adx_value: true
 - adx_name: Authentication/OpenAuth/Twitter/ConsumerKey
   adx_sitesettingid: 7dcfddf9-a538-f111-88b5-7ced8d76b3cc
 - adx_name: Webapi/msdynce_registration/enabled
@@ -138,13 +148,32 @@
   adx_value: false
 - adx_name: Webapi/msdynce_registration/fields
   adx_sitesettingid: 9605e5ed-a538-f111-88b5-7ced8d76b3cc
-  adx_value: '*'
+  adx_value: msdynce_registrationid
 - adx_name: Search/Enabled
   adx_sitesettingid: 9a5fe5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: false
 - adx_name: ASP/Course/Form/Validation/Field/Required
   adx_sitesettingid: a1cfddf9-a538-f111-88b5-7ced8d76b3cc
   adx_value: 'Missing required fields:'
+- adx_name: Webapi/new_rewardpurchase/enabled
+  adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000001
+  adx_value: true
+- adx_name: Webapi/new_rewardpurchase/fields
+  adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000002
+  adx_value: new_rewardpurchaseid,new_name,new_pointsspent,new_rewarditem,_new_rewarditem_value,new_user,_new_user_value
+- adx_name: Webapi/new_rewarditem/enabled
+  adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000003
+  adx_value: true
+- adx_name: Webapi/new_rewarditem/fields
+  adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000004
+  adx_value: new_rewarditemid
+- adx_name: Webapi/contact/enabled
+  adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000005
+  adx_value: true
+- adx_description: "Явный список вместо *: contact читается Web API глобально (ASP Contacts, scope Global). Поля нужны страницам профилей (firstname/lastname/birthdate/entityimage). Дубль-запись со '*' удалена."
+  adx_name: Webapi/contact/fields
+  adx_sitesettingid: a3b4c5d6-e7f8-4a9b-bc01-300000000006
+  adx_value: fullname,emailaddress1,firstname,lastname,contactid,birthdate,entityimage,msdynce_entityimage_file_name,msdynce_entityimage_file_type,parentcustomerid,_parentcustomerid_value,new_certstatus,new_certvaliduntil
 - adx_name: Profile/ShowMarketingOptionsPanel
   adx_sitesettingid: a65fe5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: True
@@ -188,23 +217,50 @@
   adx_name: Authentication/Registration/AzureADLoginEnabled
   adx_sitesettingid: bc5fe5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: true
-- adx_name: Webapi/adx_webrole_contact/fields
-  adx_sitesettingid: bc60e5f3-a538-f111-88b5-7ced8d76b3cc
-  adx_value: '*'
 - adx_name: WebAPI/enableReadOperationPreview
   adx_sitesettingid: bd05e5ed-a538-f111-88b5-7ced8d76b3cc
   adx_value: true
 - adx_description: A date/time value in GMT format to represent the effective date of the current published terms and conditions. If the terms agreement is enabled, portal users that have not accepted the terms after this date will be asked to accept them the next time they sign in. If the date is not provided, and the terms agreement is enabled, the terms will be presented every time portal users sign in.
   adx_name: Authentication/Registration/TermsPublicationDate
   adx_sitesettingid: c060e5f3-a538-f111-88b5-7ced8d76b3cc
-- adx_name: Webapi/contact/enabled
-  adx_sitesettingid: c460e5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_name: Webapi/new_task/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-400000000001
   adx_value: true
+- adx_name: Webapi/new_task/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-400000000002
+  adx_value: new_taskid,new_name,new_description,new_taskstatus,new_priority,new_category,new_duedate,new_assignee,_new_assignee_value
+- adx_name: Webapi/new_broadcast/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000b1
+  adx_value: true
+- adx_name: Webapi/new_broadcast/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000b2
+  adx_value: new_broadcastid,new_name,new_body,new_channel,new_audience,new_status,new_senddatetime,new_isactive
+- adx_name: Webapi/new_trajectory/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000c1
+  adx_value: true
+- adx_name: Webapi/new_trajectory/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000c2
+  adx_value: new_trajectoryid,new_name,new_description,new_department,new_targetrole,new_isactive
+- adx_name: Webapi/new_forumthread/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000d1
+  adx_value: true
+- adx_name: Webapi/new_forumthread/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000d2
+  adx_value: new_forumthreadid,new_name,new_body,new_tag,new_votes,new_ispinned,new_author,_new_author_value
+- adx_name: Webapi/new_forumreply/enabled
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000e1
+  adx_value: true
+- adx_name: Webapi/new_forumreply/fields
+  adx_sitesettingid: c4d5e6f7-a8b9-4c01-9d12-4000000000e2
+  adx_value: new_forumreplyid,new_name,new_body,new_thread,_new_thread_value,new_author,_new_author_value
 - adx_name: Authentication/OpenIdConnect/AzureAD/Caption
   adx_sitesettingid: c63d4519-a638-f111-88b5-7ced8d76b3cc
   adx_value: Microsoft Entra ID
 - adx_name: Authentication/OpenAuth/Microsoft/ClientSecret
   adx_sitesettingid: c65fe5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_name: Webapi/new_h5pcontent/enabled
+  adx_sitesettingid: c7d8e9f0-1a2b-3c4d-5e6f-7890abcdef12
+  adx_value: true
 - adx_name: Authentication/OpenIdConnect/AzureAD/RebrandDisclaimerEnabled
   adx_sitesettingid: c83d4519-a638-f111-88b5-7ced8d76b3cc
   adx_value: false
@@ -228,6 +284,13 @@
   adx_name: Header/OutputCache/Enabled
   adx_sitesettingid: d530e0ff-a538-f111-88b5-7ced8d76b3cc
   adx_value: True
+- adx_description: "Список полей не подходит: плеер фильтрует по _new_user_value и _new_h5pcontent_value (форма lookup-значения), а в белом списке лежат new_user/new_h5pcontent — Web API отбивал GET с 403, из-за чего плеер не находил существующую запись прогресса и плодил дубли. Сузить обратно можно только проверив на живом портале, что GET с фильтром по _x_value проходит."
+  adx_name: Webapi/new_h5pprogress/fields
+  adx_sitesettingid: d693edf3-ff10-46e7-af6d-2f51450a778d
+  adx_value: new_h5pprogressid,new_name,new_xapistatements,new_lastupdated,new_lastposition,new_scoreraw,new_scoremax,new_scorescaled,new_completion,new_success,new_user,_new_user_value,new_h5pcontent,_new_h5pcontent_value
+- adx_name: Webapi/new_h5pcontent/fields
+  adx_sitesettingid: d8e9f012-3a4b-5c6d-7e8f-90abcdef1234
+  adx_value: new_h5pcontentid,new_name,new_librarytype,new_durationseconds,new_isactive,new_courseorder,new_thumbnailurl,new_thumbnailfile,new_h5pfile,createdon,new_relatedcourse,_new_relatedcourse_value,new_uploadedby,_new_uploadedby_value
 - adx_name: ASP/Course/Form/Validation/Field/DescriptionToLong
   adx_sitesettingid: dd30e0ff-a538-f111-88b5-7ced8d76b3cc
   adx_value: Description can't be longer than 1000 characters.
@@ -273,6 +336,135 @@
 - adx_name: ASP/Course/ProcessingMessage
   adx_sitesettingid: fb60e5f3-a538-f111-88b5-7ced8d76b3cc
   adx_value: Processing...
-- adx_name: Webapi/adx_webrole/enabled
-  adx_sitesettingid: fd5ee5f3-a538-f111-88b5-7ced8d76b3cc
+- adx_name: Webapi/new_certification/enabled
+  adx_sitesettingid: a9e8a692-9da9-4888-ba30-9aa2ff3fb88b
+  adx_source: 0
   adx_value: true
+- adx_name: Webapi/new_certification/fields
+  adx_sitesettingid: 3cf991bc-a332-4497-a786-ead8153eb5f1
+  adx_source: 0
+  adx_value: new_certificationid,new_name,new_issuedon,new_validuntil,new_status,new_revokereason,new_contact,_new_contact_value,new_exam,_new_exam_value,new_attempt,_new_attempt_value
+- adx_name: Webapi/new_exam/enabled
+  adx_sitesettingid: dcac75b8-c983-465d-aa0d-871cbf2632b4
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_exam/fields
+  adx_sitesettingid: 21ef069f-16d8-4d8d-946c-0b5be6e9b97c
+  adx_source: 0
+  adx_value: new_examid,new_name,new_status,new_opens,new_closes,new_rules_ru,new_consenttext,new_consentversion,new_paramsjson,new_certvalidmonths,new_publishedon,new_course,_new_course_value
+- adx_name: Webapi/new_examanswer/enabled
+  adx_sitesettingid: 070772d6-402f-4d21-a2c3-18a6706537a5
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_examanswer/fields
+  adx_sitesettingid: 568056ba-8e4b-4252-8cf0-e4d9d10bc631
+  adx_source: 0
+  adx_value: new_examanswerid,new_name,new_selected,new_text,new_idempotencykey,new_clientts,new_accepted,createdon,new_ticketitem,_new_ticketitem_value,new_attempt,_new_attempt_value,new_contact,_new_contact_value
+- adx_name: Webapi/new_examappeal/enabled
+  adx_sitesettingid: 84ae836c-48a3-421f-b3af-ee995e9e0db9
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_examappeal/fields
+  adx_sitesettingid: 48b6c45e-775a-43a1-ada0-2a655dddd342
+  adx_source: 0
+  adx_value: new_examappealid,new_name,new_items,new_reason,new_status,new_outcomejson,new_decidedon,new_idempotencykey,createdon,new_attempt,_new_attempt_value,new_contact,_new_contact_value
+- adx_name: Webapi/new_examattempt/enabled
+  adx_sitesettingid: 1f792dcc-e61b-485d-85ee-77370d4d73ad
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_examattempt/fields
+  adx_sitesettingid: 11fce3ce-6324-49e0-ac1f-1616a181f19b
+  adx_source: 0
+  adx_value: new_examattemptid,new_name,new_attemptno,new_status,new_consentgiven,new_consentversion,new_ticketreadyon,new_startedon,new_deadline,new_submittedon,new_finalizedon,new_appealuntil,new_itemcount,new_percent,new_casepercent,new_passed,new_result,new_blockscores,new_isfinal,new_resultversion,new_errortext,new_idempotencykey,createdon,new_exam,_new_exam_value,new_contact,_new_contact_value
+- adx_name: Webapi/new_examsubmission/enabled
+  adx_sitesettingid: b0ecca3c-7fce-450a-80e6-b15729b725c4
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_examsubmission/fields
+  adx_sitesettingid: 7586b198-4ab4-47e3-a58b-8f4d0a85917b
+  adx_source: 0
+  adx_value: new_examsubmissionid,new_name,new_kind,new_idempotencykey,new_processedon,new_result,createdon,new_attempt,_new_attempt_value,new_contact,_new_contact_value
+- adx_name: Webapi/new_examticketitem/enabled
+  adx_sitesettingid: 8c54db31-bae1-4388-b51d-032d803e9ac4
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_examticketitem/fields
+  adx_sitesettingid: be77ec69-c72b-41e2-b8c5-4b6949c3db9d
+  adx_source: 0
+  adx_value: new_examticketitemid,new_name,new_order,new_type,new_modulename,new_stem,new_optionsjson,new_points,new_answerlimitchars,new_status,new_earned,new_revealjson,new_neutralized,new_attempt,_new_attempt_value,new_contact,_new_contact_value
+- adx_name: Exam/AnswerGraceSeconds
+  adx_sitesettingid: ed6c1840-9e7c-4f05-a3a1-473d0f4fca77
+  adx_source: 0
+  adx_value: 30
+- adx_name: Exam/PollIntervalMs
+  adx_sitesettingid: edcfc3ff-339c-40cd-a019-fac9a3f557da
+  adx_source: 0
+  adx_value: 3000
+- adx_name: Exam/SupportContact
+  adx_sitesettingid: df784327-6739-438e-b06f-6ecbd4637f33
+  adx_source: 0
+  adx_value: hr@farovon.tj
+- adx_name: Webapi/new_exammodule/enabled
+  adx_sitesettingid: a83177d2-2050-436c-abd2-2b4fb34d6b11
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_exammodule/fields
+  adx_sitesettingid: ec0ebfed-95a7-4140-b217-0fdcb64e25da
+  adx_source: 0
+  adx_value: new_exammoduleid,new_name,new_exam,_new_exam_value,new_order,new_section,new_weight,new_sourcekind,new_file,new_h5pcontent,_new_h5pcontent_value,new_text,new_narration,new_narrationsource,new_textchars,new_extractedon,new_status,createdon,statecode
+- adx_name: Webapi/new_examslide/enabled
+  adx_sitesettingid: 20f5dd85-f958-4540-b814-292e9a2a9d2c
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_examslide/fields
+  adx_sitesettingid: 0c3cc775-71c6-4800-8bfd-03c55e46440c
+  adx_source: 0
+  adx_value: new_examslideid,new_name,new_module,_new_module_value,new_number,new_source,new_text,new_imagebase64,new_status,new_errortext,createdon
+- adx_name: Webapi/new_examquestion/enabled
+  adx_sitesettingid: d772c92a-2bf5-4c12-a5bb-3d54741c72e5
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_examquestion/fields
+  adx_sitesettingid: 29eb26db-15fd-456c-8ee9-c7a7c7bb4520
+  adx_source: 0
+  adx_value: new_examquestionid,new_name,new_exam,_new_exam_value,new_module,_new_module_value,new_type,new_difficulty,new_stem,new_optionsjson,new_explanation,new_reference,new_rubricjson,new_points,new_slides,new_sourcequote,new_status,new_reviewjson,new_reviewfirstpass,new_source,new_job,_new_job_value,new_contenthash,new_exposures,new_version,new_parentquestion,_new_parentquestion_value,createdon,statecode
+- adx_name: Webapi/new_aijob/enabled
+  adx_sitesettingid: 14a8710a-9c08-496d-bbea-968acd5557e0
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_aijob/fields
+  adx_sitesettingid: 0a21b418-7eb6-46fa-b33c-43c7436838ce
+  adx_source: 0
+  adx_value: new_aijobid,new_name,new_exam,_new_exam_value,new_module,_new_module_value,new_status,new_specjson,new_created,new_approved,new_rejected,new_inputtokens,new_outputtokens,new_costusd,new_errortext,new_idempotencykey,createdon
+- adx_name: Webapi/new_aiprompt/enabled
+  adx_sitesettingid: 3f58ad97-5efe-4cbe-83df-d3411b6608b3
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_aiprompt/fields
+  adx_sitesettingid: 4fbd6e24-7f66-4dd6-8f72-2a0a8441a5d9
+  adx_source: 0
+  adx_value: new_aipromptid,new_name,new_code,new_version,new_status,new_systemtext,new_schemajson,new_model,new_effort,new_maxtokens,createdon,statecode
+- adx_name: Webapi/new_examgrade/enabled
+  adx_sitesettingid: 5ffa4e35-05a7-4cc6-94d2-208470d78294
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_examgrade/fields
+  adx_sitesettingid: 4f468245-b288-4389-94e0-6480532440cd
+  adx_source: 0
+  adx_value: new_examgradeid,new_name,new_ticketitem,_new_ticketitem_value,new_attempt,_new_attempt_value,new_run,new_model,new_promptversion,new_status,new_score,new_criteriajson,new_flags,new_language,new_rawjson,new_inputtokens,new_outputtokens,new_latencyms,new_costusd,new_isfinal,new_tries,new_nextretryon,new_idempotencykey,new_errortext,createdon
+- adx_name: Webapi/new_examadminaction/enabled
+  adx_sitesettingid: 610f1035-095b-4694-b124-6869ad4c0d8e
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_examadminaction/fields
+  adx_sitesettingid: 49b3c707-c52a-4c3d-90e3-c140162ef008
+  adx_source: 0
+  adx_value: new_examadminactionid,new_name,new_kind,new_exam,_new_exam_value,new_attempt,_new_attempt_value,new_question,_new_question_value,new_contact,_new_contact_value,new_requestedby,_new_requestedby_value,new_reason,new_status,new_result,createdon
+- adx_name: Webapi/new_examlog/enabled
+  adx_sitesettingid: 76a1ebd9-348c-4d64-9b1b-02666681d8a6
+  adx_source: 0
+  adx_value: true
+- adx_name: Webapi/new_examlog/fields
+  adx_sitesettingid: e448e9cd-8a5e-4e16-8d7d-50b075719215
+  adx_source: 0
+  adx_value: new_examlogid,new_name,new_event,new_exam,_new_exam_value,new_attempt,_new_attempt_value,new_subjectid,new_payload,new_actor,createdon

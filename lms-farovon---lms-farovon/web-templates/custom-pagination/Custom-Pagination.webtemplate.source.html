@@ -1,6 +1,16 @@
 <!-- Pagination -->
 {% assign pagesInLineValue = settings['ASP/Pagination/PagesInLine'] %}
-{% assign pagesInLine = pagesInLineValue | times: 1.0 %}
+{% comment %}
+  Site setting приходит СТРОКОЙ. В Power Pages строку в число приводит только фильтр
+  integer (или decimal): "| times: 1.0" на строке даёт Enumerable.Repeat, и любое
+  сравнение/деление ниже (limit, offset) падает с InvalidCastException.
+  Значение по умолчанию 6 — на случай, если настройки нет или в ней мусор.
+{% endcomment %}
+{% assign pagesInLine = 6 %}
+{% if pagesInLineValue != blank %}
+  {% assign pagesInLineParsed = pagesInLineValue | integer %}
+  {% if pagesInLineParsed > 0 %}{% assign pagesInLine = pagesInLineParsed %}{% endif %}
+{% endif %}
 
 {% if pages > 1 %}
     {% assign limit = pagesInLine %}      

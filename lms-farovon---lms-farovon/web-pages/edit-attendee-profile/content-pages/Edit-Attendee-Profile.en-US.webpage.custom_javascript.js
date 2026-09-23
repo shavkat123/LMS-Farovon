@@ -1,15 +1,10 @@
 function getAttendees() {
-  webapi.safeAjax({
-    type: 'GET',
-    url: "/_api/contacts({{request.params['id']}})/entityimage/?size=full",
-    contentType: 'application/json',
-    success: function (res, status) {
-      if (res) {
-        imgBaseString = res.value;
-        $('.image-preview-area img').attr('src', 'data:image/png;base64,' + imgBaseString);
-      }
-    },
-  });
+  // Столбец-картинку читаем как /$value: форма «/<столбец>/?size=full» после перехода
+  // на явные списки полей Web API трактуется как «все столбцы» и отдаёт 403 (90040101).
+  var avatarUrl = "/_api/contacts({{request.params['id']}})/entityimage/$value?size=full";
+  var avatarProbe = new Image();
+  avatarProbe.onload = function () { $('.image-preview-area img').attr('src', avatarUrl); };
+  avatarProbe.src = avatarUrl;
 }
 
 var documentbodyContents;

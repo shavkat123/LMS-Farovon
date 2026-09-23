@@ -1,0 +1,20 @@
+<!doctype html>
+<!-- @dsCard group="Spacing" name="Elevation" subtitle="shadow-sm cards · shadow-2xl modals only" viewport="700x180" -->
+<html><head><meta charset="utf-8"><title>Spacing · Elevation</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 28px; background: var(--color-gray-50); font-family: var(--font-sans); }
+  .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  .item { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .card { width: 110px; height: 70px; background: #fff; border-radius: var(--radius-lg); border: 1px solid var(--border-1); }
+  .lbl { font-size: 11px; color: var(--fg-3); text-align: center; line-height: 1.5; }
+  .lbl b { display: block; color: var(--fg-1); font-size: 12px; font-weight: 600; }
+</style></head>
+<body>
+  <div class="row">
+    <div class="item"><div class="card" style="box-shadow: var(--shadow-sm);"></div><div class="lbl"><b>shadow-sm</b>cards · resting</div></div>
+    <div class="item"><div class="card" style="box-shadow: var(--shadow-md);"></div><div class="lbl"><b>shadow-md</b>banners · hover</div></div>
+    <div class="item"><div class="card" style="box-shadow: var(--shadow-lg);"></div><div class="lbl"><b>shadow-lg</b>menus · popovers</div></div>
+    <div class="item"><div class="card" style="box-shadow: var(--shadow-2xl);"></div><div class="lbl"><b>shadow-2xl</b>modals only</div></div>
+  </div>
+</body></html>

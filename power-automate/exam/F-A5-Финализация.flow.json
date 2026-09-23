@@ -1,0 +1,1185 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedcommondataserviceforapps_73c39"
+        },
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "Button",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "title": "attemptId",
+                  "type": "string",
+                  "description": "Идентификатор попытки",
+                  "x-ms-dynamically-added": true
+                },
+                "text_1": {
+                  "title": "mode",
+                  "type": "string",
+                  "description": "Первичная | Апелляция | Нейтрализация | Аннулирование | Переоценка",
+                  "x-ms-dynamically-added": true
+                }
+              },
+              "required": [
+                "text",
+                "text_1"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Константы": {
+          "type": "Compose",
+          "runAfter": {},
+          "inputs": {
+            "attemptОценён": 100000004,
+            "attemptАннулирован": 100000005,
+            "resultСдано": 100000000,
+            "resultНеСдано": 100000001,
+            "resultАннулировано": 100000002,
+            "itemОценён": 100000002,
+            "itemНейтрализован": 100000003,
+            "type": {
+              "single": 100000000,
+              "multi": 100000001,
+              "case": 100000002,
+              "control": 100000003
+            },
+            "certДействует": 100000000,
+            "certИстёк": 100000001,
+            "certОтозван": 100000002,
+            "contactНет": 100000000,
+            "contactДействует": 100000001,
+            "contactИстёк": 100000002
+          }
+        },
+        "ВесаСумма": {
+          "type": "InitializeVariable",
+          "runAfter": {
+            "Константы": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "variables": [
+              {
+                "name": "ВесаСумма",
+                "type": "float",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "ВзвешенныйИтог": {
+          "type": "InitializeVariable",
+          "runAfter": {
+            "ВесаСумма": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "variables": [
+              {
+                "name": "ВзвешенныйИтог",
+                "type": "float",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "Заработано": {
+          "type": "InitializeVariable",
+          "runAfter": {
+            "ВзвешенныйИтог": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "variables": [
+              {
+                "name": "Заработано",
+                "type": "float",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "Максимум": {
+          "type": "InitializeVariable",
+          "runAfter": {
+            "Заработано": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "variables": [
+              {
+                "name": "Максимум",
+                "type": "float",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "КейсНабрано": {
+          "type": "InitializeVariable",
+          "runAfter": {
+            "Максимум": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "variables": [
+              {
+                "name": "КейсНабрано",
+                "type": "float",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "КейсМакс": {
+          "type": "InitializeVariable",
+          "runAfter": {
+            "КейсНабрано": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "variables": [
+              {
+                "name": "КейсМакс",
+                "type": "float",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "Блоки": {
+          "type": "InitializeVariable",
+          "runAfter": {
+            "КейсМакс": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "variables": [
+              {
+                "name": "Блоки",
+                "type": "array",
+                "value": []
+              }
+            ]
+          }
+        },
+        "Try": {
+          "type": "Scope",
+          "runAfter": {
+            "Блоки": [
+              "Succeeded"
+            ]
+          },
+          "actions": {
+            "Попытка": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "GetItem",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examattempts",
+                  "recordId": "@triggerBody()?['text']"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Экзамен": {
+              "type": "OpenApiConnection",
+              "runAfter": {
+                "Попытка": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "GetItem",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_exams",
+                  "recordId": "@outputs('Попытка')?['body/_new_exam_value']"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "P": {
+              "type": "Compose",
+              "runAfter": {
+                "Экзамен": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": "@if(empty(coalesce(outputs('Экзамен')?['body/new_configsnapshot'], '')), json(coalesce(outputs('Экзамен')?['body/new_paramsjson'], '{}')), json(outputs('Экзамен')?['body/new_configsnapshot'])?['params'])"
+            },
+            "Задания": {
+              "type": "OpenApiConnection",
+              "runAfter": {
+                "P": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examticketitems",
+                  "$filter": "statecode eq 0 and _new_attempt_value eq '@{triggerBody()?['text']}'",
+                  "$select": "new_examticketitemid,new_order,new_type,new_points,new_earned,new_neutralized,new_status,_new_question_value",
+                  "$orderby": "new_order asc",
+                  "$top": 300
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Итоговые_оценки": {
+              "type": "OpenApiConnection",
+              "runAfter": {
+                "Задания": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examgrades",
+                  "$filter": "statecode eq 0 and _new_attempt_value eq '@{triggerBody()?['text']}' and new_isfinal eq true",
+                  "$select": "_new_ticketitem_value,new_score,new_criteriajson",
+                  "$top": 300
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Пары_оценок": {
+              "type": "Select",
+              "runAfter": {
+                "Итоговые_оценки": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@outputs('Итоговые_оценки')?['body/value']",
+                "select": "@concat('\"', item()?['_new_ticketitem_value'], '\":', string(coalesce(item()?['new_score'], 0)))"
+              }
+            },
+            "КартаОценок": {
+              "type": "Compose",
+              "runAfter": {
+                "Пары_оценок": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": "@if(equals(length(body('Пары_оценок')), 0), json('{}'), json(concat('{', join(body('Пары_оценок'), ','), '}')))"
+            },
+            "Цикл_блоков": {
+              "type": "Foreach",
+              "runAfter": {
+                "КартаОценок": [
+                  "Succeeded"
+                ]
+              },
+              "foreach": "@outputs('P')?['blocks']",
+              "runtimeConfiguration": {
+                "concurrency": {
+                  "repetitions": 1
+                }
+              },
+              "actions": {
+                "Тип_блока": {
+                  "type": "Compose",
+                  "runAfter": {},
+                  "inputs": "@outputs('Константы')['type'][items('Цикл_блоков')?['type']]"
+                },
+                "Задания_блока": {
+                  "type": "Query",
+                  "runAfter": {
+                    "Тип_блока": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "from": "@outputs('Задания')?['body/value']",
+                    "where": "@equals(item()?['new_type'], outputs('Тип_блока'))"
+                  }
+                },
+                "Сбросить_Заработано": {
+                  "type": "SetVariable",
+                  "runAfter": {
+                    "Задания_блока": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "name": "Заработано",
+                    "value": 0
+                  }
+                },
+                "Сбросить_Максимум": {
+                  "type": "SetVariable",
+                  "runAfter": {
+                    "Сбросить_Заработано": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "name": "Максимум",
+                    "value": 0
+                  }
+                },
+                "Цикл_заданий_блока": {
+                  "type": "Foreach",
+                  "runAfter": {
+                    "Сбросить_Максимум": [
+                      "Succeeded"
+                    ]
+                  },
+                  "foreach": "@body('Задания_блока')",
+                  "runtimeConfiguration": {
+                    "concurrency": {
+                      "repetitions": 1
+                    }
+                  },
+                  "actions": {
+                    "Учитывать_задание": {
+                      "type": "If",
+                      "runAfter": {},
+                      "expression": {
+                        "or": [
+                          {
+                            "not": {
+                              "equals": [
+                                "@coalesce(items('Цикл_заданий_блока')?['new_neutralized'], false)",
+                                true
+                              ]
+                            }
+                          },
+                          {
+                            "equals": [
+                              "@coalesce(outputs('P')?['neutralizeRule'], 'exclude')",
+                              "creditAll"
+                            ]
+                          }
+                        ]
+                      },
+                      "actions": {
+                        "Плюс_максимум": {
+                          "type": "IncrementVariable",
+                          "runAfter": {},
+                          "inputs": {
+                            "name": "Максимум",
+                            "value": "@float(coalesce(items('Цикл_заданий_блока')?['new_points'], 0))"
+                          }
+                        },
+                        "Плюс_заработано": {
+                          "type": "IncrementVariable",
+                          "runAfter": {
+                            "Плюс_максимум": [
+                              "Succeeded"
+                            ]
+                          },
+                          "inputs": {
+                            "name": "Заработано",
+                            "value": "@if(equals(coalesce(items('Цикл_заданий_блока')?['new_neutralized'], false), true), float(coalesce(items('Цикл_заданий_блока')?['new_points'], 0)), if(or(equals(items('Цикл_заданий_блока')?['new_type'], outputs('Константы')['type']['case']), equals(items('Цикл_заданий_блока')?['new_type'], outputs('Константы')['type']['control'])), float(coalesce(outputs('КартаОценок')?[items('Цикл_заданий_блока')?['new_examticketitemid']], 0)), float(coalesce(items('Цикл_заданий_блока')?['new_earned'], 0))))"
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {}
+                      }
+                    }
+                  }
+                },
+                "Блок_не_пуст": {
+                  "type": "If",
+                  "runAfter": {
+                    "Цикл_заданий_блока": [
+                      "Succeeded"
+                    ]
+                  },
+                  "expression": {
+                    "greater": [
+                      "@variables('Максимум')",
+                      0
+                    ]
+                  },
+                  "actions": {
+                    "Плюс_вес": {
+                      "type": "IncrementVariable",
+                      "runAfter": {},
+                      "inputs": {
+                        "name": "ВесаСумма",
+                        "value": "@float(items('Цикл_блоков')?['weight'])"
+                      }
+                    },
+                    "Плюс_взвешенное": {
+                      "type": "IncrementVariable",
+                      "runAfter": {
+                        "Плюс_вес": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "name": "ВзвешенныйИтог",
+                        "value": "@mul(float(items('Цикл_блоков')?['weight']), div(variables('Заработано'), variables('Максимум')))"
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {}
+                  }
+                },
+                "Это_кейсы": {
+                  "type": "If",
+                  "runAfter": {
+                    "Блок_не_пуст": [
+                      "Succeeded"
+                    ]
+                  },
+                  "expression": {
+                    "equals": [
+                      "@items('Цикл_блоков')?['type']",
+                      "case"
+                    ]
+                  },
+                  "actions": {
+                    "Запомнить_кейс_набрано": {
+                      "type": "SetVariable",
+                      "runAfter": {},
+                      "inputs": {
+                        "name": "КейсНабрано",
+                        "value": "@variables('Заработано')"
+                      }
+                    },
+                    "Запомнить_кейс_макс": {
+                      "type": "SetVariable",
+                      "runAfter": {
+                        "Запомнить_кейс_набрано": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "name": "КейсМакс",
+                        "value": "@variables('Максимум')"
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {}
+                  }
+                },
+                "Добавить_блок": {
+                  "type": "AppendToArrayVariable",
+                  "runAfter": {
+                    "Это_кейсы": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "name": "Блоки",
+                    "value": {
+                      "type": "@{items('Цикл_блоков')?['type']}",
+                      "weight": "@items('Цикл_блоков')?['weight']",
+                      "earned": "@variables('Заработано')",
+                      "max": "@variables('Максимум')"
+                    }
+                  }
+                }
+              }
+            },
+            "Процент": {
+              "type": "Compose",
+              "runAfter": {
+                "Цикл_блоков": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": "@if(greater(variables('ВесаСумма'), 0), float(formatNumber(mul(div(variables('ВзвешенныйИтог'), variables('ВесаСумма')), 100), '0.00', 'en-US')), 0)"
+            },
+            "КейсПроцент": {
+              "type": "Compose",
+              "runAfter": {
+                "Процент": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": "@if(greater(variables('КейсМакс'), 0), float(formatNumber(mul(div(variables('КейсНабрано'), variables('КейсМакс')), 100), '0.00', 'en-US')), 0)"
+            },
+            "Сдано": {
+              "type": "Compose",
+              "runAfter": {
+                "КейсПроцент": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": "@and(greaterOrEquals(outputs('Процент'), float(coalesce(outputs('P')?['passPercent'], 75))), or(equals(variables('КейсМакс'), 0), greaterOrEquals(outputs('КейсПроцент'), float(coalesce(outputs('P')?['casePassMinPercent'], 0)))))"
+            },
+            "Результат": {
+              "type": "Compose",
+              "runAfter": {
+                "Сдано": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": "@if(equals(triggerBody()?['text_1'], 'Аннулирование'), outputs('Константы')['resultАннулировано'], if(equals(outputs('Сдано'), true), outputs('Константы')['resultСдано'], outputs('Константы')['resultНеСдано']))"
+            },
+            "Обновить_попытку": {
+              "type": "OpenApiConnection",
+              "description": "При аннулировании снимаем new_isfinal вместе со статусом: цикл отметок итога обходит только неаннулированные попытки, иначе аннулированная могла остаться «итоговой». В остальных режимах флаг сохраняем как был — его переставит цикл отметок.",
+              "runAfter": {
+                "Результат": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "UpdateOnlyRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examattempts",
+                  "recordId": "@triggerBody()?['text']",
+                  "item/new_percent": "@outputs('Процент')",
+                  "item/new_casepercent": "@outputs('КейсПроцент')",
+                  "item/new_passed": "@outputs('Сдано')",
+                  "item/new_result": "@outputs('Результат')",
+                  "item/new_blockscores": "@{string(variables('Блоки'))}",
+                  "item/new_status": "@if(equals(triggerBody()?['text_1'], 'Аннулирование'), outputs('Константы')['attemptАннулирован'], outputs('Константы')['attemptОценён'])",
+                  "item/new_isfinal": "@if(equals(triggerBody()?['text_1'], 'Аннулирование'), false, coalesce(outputs('Попытка')?['body/new_isfinal'], false))",
+                  "item/new_resultversion": "@add(int(coalesce(outputs('Попытка')?['body/new_resultversion'], 0)), 1)"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Первичная_финализация": {
+              "type": "If",
+              "runAfter": {
+                "Обновить_попытку": [
+                  "Succeeded"
+                ]
+              },
+              "expression": {
+                "equals": [
+                  "@triggerBody()?['text_1']",
+                  "Первичная"
+                ]
+              },
+              "actions": {
+                "Проставить_сроки": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "UpdateOnlyRecord",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_examattempts",
+                      "recordId": "@triggerBody()?['text']",
+                      "item/new_finalizedon": "@{utcNow()}",
+                      "item/new_appealuntil": "@{addHours(utcNow(), int(coalesce(outputs('P')?['appealWindowHours'], 72)))}"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              }
+            },
+            "Разбор_заданий": {
+              "type": "Foreach",
+              "runAfter": {
+                "Первичная_финализация": [
+                  "Succeeded"
+                ]
+              },
+              "foreach": "@outputs('Задания')?['body/value']",
+              "runtimeConfiguration": {
+                "concurrency": {
+                  "repetitions": 5
+                }
+              },
+              "actions": {
+                "Это_задание_с_выбором": {
+                  "type": "If",
+                  "runAfter": {},
+                  "expression": {
+                    "or": [
+                      {
+                        "equals": [
+                          "@items('Разбор_заданий')?['new_type']",
+                          "@outputs('Константы')['type']['single']"
+                        ]
+                      },
+                      {
+                        "equals": [
+                          "@items('Разбор_заданий')?['new_type']",
+                          "@outputs('Константы')['type']['multi']"
+                        ]
+                      }
+                    ]
+                  },
+                  "actions": {
+                    "Вопрос": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {},
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_commondataserviceforapps",
+                          "operationId": "GetItem",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "new_examquestions",
+                          "recordId": "@items('Разбор_заданий')?['_new_question_value']"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Принятый_ответ": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Вопрос": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_commondataserviceforapps",
+                          "operationId": "ListRecords",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "new_examanswers",
+                          "$filter": "statecode eq 0 and _new_ticketitem_value eq '@{items('Разбор_заданий')?['new_examticketitemid']}' and new_accepted eq true",
+                          "$select": "new_selected,new_text",
+                          "$top": 1
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Верные_варианты": {
+                      "type": "Query",
+                      "runAfter": {
+                        "Принятый_ответ": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "from": "@json(coalesce(outputs('Вопрос')?['body/new_optionsjson'], '[]'))",
+                        "where": "@equals(coalesce(item()?['correct'], false), true)"
+                      }
+                    },
+                    "Разбор_выбора": {
+                      "type": "Compose",
+                      "runAfter": {
+                        "Верные_варианты": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "kind": "choice",
+                        "mode": "@{coalesce(outputs('P')?['revealMode'], 'full')}",
+                        "selected": "@if(equals(length(outputs('Принятый_ответ')?['body/value']), 0), '', coalesce(first(outputs('Принятый_ответ')?['body/value'])?['new_selected'], ''))",
+                        "correct": "@if(equals(coalesce(outputs('P')?['revealMode'], 'full'), 'full'), body('Верные_варианты'), null)",
+                        "explanation": "@if(equals(coalesce(outputs('P')?['revealMode'], 'full'), 'full'), coalesce(outputs('Вопрос')?['body/new_explanation'], ''), '')",
+                        "earned": "@coalesce(items('Разбор_заданий')?['new_earned'], 0)",
+                        "points": "@coalesce(items('Разбор_заданий')?['new_points'], 0)",
+                        "neutralized": "@coalesce(items('Разбор_заданий')?['new_neutralized'], false)"
+                      }
+                    },
+                    "Записать_разбор_выбора": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Разбор_выбора": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_commondataserviceforapps",
+                          "operationId": "UpdateOnlyRecord",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "new_examticketitems",
+                          "recordId": "@items('Разбор_заданий')?['new_examticketitemid']",
+                          "item/new_revealjson": "@{string(outputs('Разбор_выбора'))}",
+                          "item/new_status": "@if(equals(coalesce(items('Разбор_заданий')?['new_neutralized'], false), true), outputs('Константы')['itemНейтрализован'], outputs('Константы')['itemОценён'])"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Оценка_задания": {
+                        "type": "Query",
+                        "runAfter": {},
+                        "inputs": {
+                          "from": "@outputs('Итоговые_оценки')?['body/value']",
+                          "where": "@equals(item()?['_new_ticketitem_value'], items('Разбор_заданий')?['new_examticketitemid'])"
+                        }
+                      },
+                      "Разбор_письменного": {
+                        "type": "Compose",
+                        "runAfter": {
+                          "Оценка_задания": [
+                            "Succeeded"
+                          ]
+                        },
+                        "inputs": {
+                          "kind": "written",
+                          "criteria": "@if(equals(length(body('Оценка_задания')), 0), json('[]'), json(coalesce(first(body('Оценка_задания'))?['new_criteriajson'], '[]')))",
+                          "earned": "@if(equals(length(body('Оценка_задания')), 0), 0, coalesce(first(body('Оценка_задания'))?['new_score'], 0))",
+                          "points": "@coalesce(items('Разбор_заданий')?['new_points'], 0)",
+                          "neutralized": "@coalesce(items('Разбор_заданий')?['new_neutralized'], false)"
+                        }
+                      },
+                      "Записать_разбор_письменного": {
+                        "type": "OpenApiConnection",
+                        "runAfter": {
+                          "Разбор_письменного": [
+                            "Succeeded"
+                          ]
+                        },
+                        "inputs": {
+                          "host": {
+                            "connectionName": "shared_commondataserviceforapps",
+                            "operationId": "UpdateOnlyRecord",
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                          },
+                          "parameters": {
+                            "entityName": "new_examticketitems",
+                            "recordId": "@items('Разбор_заданий')?['new_examticketitemid']",
+                            "item/new_revealjson": "@{string(outputs('Разбор_письменного'))}",
+                            "item/new_earned": "@if(equals(length(body('Оценка_задания')), 0), 0, coalesce(first(body('Оценка_задания'))?['new_score'], 0))",
+                            "item/new_status": "@if(equals(coalesce(items('Разбор_заданий')?['new_neutralized'], false), true), outputs('Константы')['itemНейтрализован'], outputs('Константы')['itemОценён'])"
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "Попытки_сотрудника": {
+              "type": "OpenApiConnection",
+              "description": "Итоговую выбираем только среди оценённых попыток: аннулированная, с ошибкой или незавершённая не может дать итог и сертификат, даже если в её полях стоит «Сдано».",
+              "runAfter": {
+                "Разбор_заданий": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examattempts",
+                  "$filter": "statecode eq 0 and _new_exam_value eq '@{outputs('Попытка')?['body/_new_exam_value']}' and _new_contact_value eq '@{outputs('Попытка')?['body/_new_contact_value']}' and new_status eq @{outputs('Константы')['attemptОценён']}",
+                  "$select": "new_examattemptid,new_percent,new_passed,new_result,new_finalizedon,new_attemptno,new_isfinal",
+                  "$top": 50
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Ключи_итоговой": {
+              "type": "Select",
+              "runAfter": {
+                "Попытки_сотрудника": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@outputs('Попытки_сотрудника')?['body/value']",
+                "select": {
+                  "id": "@item()?['new_examattemptid']",
+                  "k": "@if(equals(coalesce(outputs('P')?['attemptRule'], 'best'), 'last'), int(coalesce(item()?['new_attemptno'], 0)), add(mul(int(mul(float(coalesce(item()?['new_percent'], 0)), 100)), 1000), int(coalesce(item()?['new_attemptno'], 0))))",
+                  "passed": "@coalesce(item()?['new_passed'], false)"
+                }
+              }
+            },
+            "Итоговая_попытка": {
+              "type": "Compose",
+              "runAfter": {
+                "Ключи_итоговой": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": "@last(sort(body('Ключи_итоговой'), 'k'))"
+            },
+            "Цикл_отметок_итога": {
+              "type": "Foreach",
+              "runAfter": {
+                "Итоговая_попытка": [
+                  "Succeeded"
+                ]
+              },
+              "foreach": "@outputs('Попытки_сотрудника')?['body/value']",
+              "runtimeConfiguration": {
+                "concurrency": {
+                  "repetitions": 5
+                }
+              },
+              "actions": {
+                "Отметить_итоговую": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "UpdateOnlyRecord",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_examattempts",
+                      "recordId": "@items('Цикл_отметок_итога')?['new_examattemptid']",
+                      "item/new_isfinal": "@equals(items('Цикл_отметок_итога')?['new_examattemptid'], outputs('Итоговая_попытка')?['id'])"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                }
+              }
+            },
+            "Сертификаты_сотрудника": {
+              "type": "OpenApiConnection",
+              "description": "Берём только действующие сертификаты: отозванный или истёкший не должен мешать выдать новый после повторной сдачи, а при несдаче отзывать повторно уже отозванные (и писать CERT_REVOKED каждый раз) незачем.",
+              "runAfter": {
+                "Цикл_отметок_итога": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_certifications",
+                  "$filter": "statecode eq 0 and _new_exam_value eq '@{outputs('Попытка')?['body/_new_exam_value']}' and _new_contact_value eq '@{outputs('Попытка')?['body/_new_contact_value']}' and new_status eq @{outputs('Константы')['certДействует']}",
+                  "$select": "new_certificationid,new_status,new_validuntil",
+                  "$top": 10
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Итог_сдан": {
+              "type": "If",
+              "runAfter": {
+                "Сертификаты_сотрудника": [
+                  "Succeeded"
+                ]
+              },
+              "expression": {
+                "equals": [
+                  "@outputs('Итоговая_попытка')?['passed']",
+                  true
+                ]
+              },
+              "actions": {
+                "Нет_ли_сертификата": {
+                  "type": "If",
+                  "runAfter": {},
+                  "expression": {
+                    "equals": [
+                      "@length(outputs('Сертификаты_сотрудника')?['body/value'])",
+                      0
+                    ]
+                  },
+                  "actions": {
+                    "Выдать_сертификат": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {},
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_commondataserviceforapps",
+                          "operationId": "CreateRecord",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "new_certifications",
+                          "item/new_issuedon": "@{utcNow('yyyy-MM-dd')}",
+                          "item/new_validuntil": "@{addToTime(utcNow(), int(coalesce(outputs('Экзамен')?['body/new_certvalidmonths'], 12)), 'Month', 'yyyy-MM-dd')}",
+                          "item/new_status": "@outputs('Константы')['certДействует']",
+                          "item/new_contact@odata.bind": "/contacts(@{outputs('Попытка')?['body/_new_contact_value']})",
+                          "item/new_exam@odata.bind": "/new_exams(@{outputs('Попытка')?['body/_new_exam_value']})",
+                          "item/new_attempt@odata.bind": "/new_examattempts(@{outputs('Итоговая_попытка')?['id']})"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Журнал_выдачи": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Выдать_сертификат": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_commondataserviceforapps",
+                          "operationId": "CreateRecord",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "new_examlogs",
+                          "item/new_event": "CERT_ISSUED",
+                          "item/new_actor": "F-A5 Финализация",
+                          "item/new_subjectid": "@outputs('Попытка')?['body/_new_contact_value']",
+                          "item/new_exam@odata.bind": "/new_exams(@{outputs('Попытка')?['body/_new_exam_value']})",
+                          "item/new_attempt@odata.bind": "/new_examattempts(@{triggerBody()?['text']})"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {}
+                  }
+                }
+              },
+              "else": {
+                "actions": {
+                  "Цикл_отзыва": {
+                    "type": "Foreach",
+                    "runAfter": {},
+                    "foreach": "@outputs('Сертификаты_сотрудника')?['body/value']",
+                    "runtimeConfiguration": {
+                      "concurrency": {
+                        "repetitions": 1
+                      }
+                    },
+                    "actions": {
+                      "Отозвать": {
+                        "type": "OpenApiConnection",
+                        "runAfter": {},
+                        "inputs": {
+                          "host": {
+                            "connectionName": "shared_commondataserviceforapps",
+                            "operationId": "UpdateOnlyRecord",
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                          },
+                          "parameters": {
+                            "entityName": "new_certifications",
+                            "recordId": "@items('Цикл_отзыва')?['new_certificationid']",
+                            "item/new_status": "@outputs('Константы')['certОтозван']",
+                            "item/new_revokereason": "@{concat('Итог экзамена изменён: ', triggerBody()?['text_1'])}"
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      },
+                      "Журнал_отзыва": {
+                        "type": "OpenApiConnection",
+                        "runAfter": {
+                          "Отозвать": [
+                            "Succeeded"
+                          ]
+                        },
+                        "inputs": {
+                          "host": {
+                            "connectionName": "shared_commondataserviceforapps",
+                            "operationId": "CreateRecord",
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                          },
+                          "parameters": {
+                            "entityName": "new_examlogs",
+                            "item/new_event": "CERT_REVOKED",
+                            "item/new_actor": "F-A5 Финализация",
+                            "item/new_subjectid": "@items('Цикл_отзыва')?['new_certificationid']",
+                            "item/new_attempt@odata.bind": "/new_examattempts(@{triggerBody()?['text']})"
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "Журнал_итога": {
+              "type": "OpenApiConnection",
+              "runAfter": {
+                "Итог_сдан": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "CreateRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examlogs",
+                  "item/new_event": "RESULT_FINAL",
+                  "item/new_actor": "@{concat('F-A5 Финализация (', triggerBody()?['text_1'], ')')}",
+                  "item/new_subjectid": "@triggerBody()?['text']",
+                  "item/new_payload": "@{concat('{\"percent\":', string(outputs('Процент')), ',\"casePercent\":', string(outputs('КейсПроцент')), ',\"passed\":', string(outputs('Сдано')), ',\"version\":', string(add(int(coalesce(outputs('Попытка')?['body/new_resultversion'], 0)), 1)), ',\"blocks\":', string(variables('Блоки')), '}')}",
+                  "item/new_exam@odata.bind": "/new_exams(@{outputs('Попытка')?['body/_new_exam_value']})",
+                  "item/new_attempt@odata.bind": "/new_examattempts(@{triggerBody()?['text']})"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Ответ": {
+              "type": "Response",
+              "kind": "Http",
+              "runAfter": {
+                "Журнал_итога": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "statusCode": 200,
+                "body": {
+                  "ok": true,
+                  "percent": "@outputs('Процент')",
+                  "casePercent": "@outputs('КейсПроцент')",
+                  "passed": "@outputs('Сдано')"
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "percent": {
+                      "type": "number"
+                    },
+                    "casePercent": {
+                      "type": "number"
+                    },
+                    "passed": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "Catch": {
+          "type": "Scope",
+          "runAfter": {
+            "Try": [
+              "Failed",
+              "TimedOut"
+            ]
+          },
+          "actions": {
+            "Журнал_сбоя": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "CreateRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examlogs",
+                  "item/new_event": "FLOW_ERROR",
+                  "item/new_actor": "F-A5 Финализация",
+                  "item/new_subjectid": "@{workflow()?['run']?['name']}",
+                  "item/new_payload": "@{string(result('Try'))}"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Ответ_с_ошибкой": {
+              "type": "Response",
+              "kind": "Http",
+              "runAfter": {
+                "Журнал_сбоя": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "statusCode": 200,
+                "body": {
+                  "ok": false,
+                  "percent": 0,
+                  "casePercent": 0,
+                  "passed": false
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "percent": {
+                      "type": "number"
+                    },
+                    "casePercent": {
+                      "type": "number"
+                    },
+                    "passed": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}

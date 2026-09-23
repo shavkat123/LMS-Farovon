@@ -1,0 +1,33 @@
+<!doctype html>
+<!-- @dsCard group="Brand" name="Logo" subtitle="Logomark on light, dark, and wordmark" viewport="700x220" -->
+<html><head><meta charset="utf-8"><title>Brand · Logo</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 24px; background: #fff; }
+  .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; align-items: stretch; }
+  .tile { border: 1px solid var(--border-1); border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 160px; }
+  .tile.dark { background: var(--color-gray-800); }
+  .tile.brand { background: var(--brand-red); }
+  .tile img { width: 72px; height: 72px; object-fit: contain; }
+  .lab { font: var(--weight-medium) var(--text-xs)/1.3 var(--font-sans); color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.12em; }
+  .lab.inv { color: rgba(255,255,255,0.85); }
+  .wm { display: flex; align-items: baseline; gap: 6px; }
+  .wm b { font: var(--weight-bold) 22px var(--font-sans); color: var(--color-primary); letter-spacing: -0.01em; }
+  .wm span { font: var(--weight-medium) 16px var(--font-sans); color: var(--fg-1); }
+</style></head>
+<body>
+  <div class="row">
+    <div class="tile">
+      <img src="../assets/farovon-logo.png" alt="Farovon logomark">
+      <div class="lab">Logomark · light</div>
+    </div>
+    <div class="tile dark">
+      <img src="../assets/farovon-logo.png" alt="Farovon logomark dark">
+      <div class="lab inv">Logomark · dark</div>
+    </div>
+    <div class="tile">
+      <div class="wm"><b>FAROVON</b><span>LMS</span></div>
+      <div class="lab">Wordmark · Roboto</div>
+    </div>
+  </div>
+</body></html>

@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Colors · Brand</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 20px; background: #fff; font-family: var(--font-sans); }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .sw { border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border-1); }
+  .sw .chip { height: 84px; }
+  .sw .meta { padding: 10px 12px; }
+  .sw .name { font-size: 13px; font-weight: 600; color: var(--fg-1); }
+  .sw .hex { font-size: 11px; color: var(--fg-3); font-family: var(--font-mono); margin-top: 2px; }
+  .note { margin-top: 10px; font-size: 11px; color: var(--fg-3); line-height: 1.5; }
+</style></head>
+<body>
+  <div class="grid">
+    <div class="sw"><div class="chip" style="background:#FF1F1F"></div><div class="meta"><div class="name">brand-red</div><div class="hex">#FF1F1F · logomark lower</div></div></div>
+    <div class="sw"><div class="chip" style="background:#F2A088"></div><div class="meta"><div class="name">brand-coral</div><div class="hex">#F2A088 · logomark upper</div></div></div>
+    <div class="sw"><div class="chip" style="background:#D91A1A"></div><div class="meta"><div class="name">brand-red-deep</div><div class="hex">#D91A1A · marketing</div></div></div>
+  </div>
+  <p class="note">Logomark reds are reserved for brand surfaces (logo, marketing, danger). Inside the product UI, blue is the action color.</p>
+</body></html>

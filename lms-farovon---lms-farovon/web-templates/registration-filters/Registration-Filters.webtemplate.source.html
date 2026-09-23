@@ -4,15 +4,15 @@
 {% assign summer = snippets['Filter/Season/Summer'] %}
 {% assign currentSeason = '' %}
 
-{% assign today = now | date: "%M" | integer %}
+{% assign today = now | date: "%m" | integer %}
 {% if today >= 9 and today <= 11 %}
-{% assign currentSeason = winter %}
-{% elsif today == 12 or today <= 2 %}
-{% assign currentSeason = spring %}
-{% elsif today >= 3 and today <= 5 %}
-{% assign currentSeason = summer %}
-{% elsif today >= 6 and today <= 8 %}
 {% assign currentSeason = fall %}
+{% elsif today == 12 or today <= 2 %}
+{% assign currentSeason = winter %}
+{% elsif today >= 3 and today <= 5 %}
+{% assign currentSeason = spring %}
+{% elsif today >= 6 and today <= 8 %}
+{% assign currentSeason = summer %}
 {% endif %}
 
 {% fetchxml attendees %}

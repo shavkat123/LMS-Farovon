@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- @dsCard group="Components" name="Welcome Banner" subtitle="Student blue · Mentor indigo→purple · Admin gray gradient" viewport="700x280" -->
+<html><head><meta charset="utf-8"><title>Components · Banner</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 16px; background: var(--color-gray-50); font-family: var(--font-sans); }
+  .banner { position: relative; overflow: hidden; border-radius: var(--radius-xl); padding: 28px 32px; color: #fff; box-shadow: var(--shadow-md); margin-bottom: 12px; }
+  .b-student { background: linear-gradient(to right, #2563EB, #60A5FA); }
+  .b-mentor { background: linear-gradient(to right, #4F46E5, #A855F7); }
+  .b-admin { background: linear-gradient(to right, #1F2937, #4B5563); }
+  h1 { font-size: 24px; font-weight: 700; margin: 0 0 4px 0; }
+  p { font-size: 14px; opacity: 0.9; margin: 0; max-width: 480px; }
+  .medal { position: absolute; top: -24px; right: -24px; font-size: 140px; opacity: 0.18; line-height: 1; }
+</style></head>
+<body>
+  <div class="banner b-student">
+    <h1>Welcome back, Aziz!</h1>
+    <p>You're doing great. Continue your development path to unlock more skills and rewards.</p>
+    <div class="medal">🏅</div>
+  </div>
+  <div class="banner b-mentor">
+    <h1>Mentor Portal</h1>
+    <p>Manage your courses and track student progress.</p>
+    <div class="medal">🏅</div>
+  </div>
+</body></html>

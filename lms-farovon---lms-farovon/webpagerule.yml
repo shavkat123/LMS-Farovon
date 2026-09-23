@@ -28,6 +28,17 @@
   - e330e0ff-a538-f111-88b5-7ced8d76b3cc
   adx_webpageaccesscontrolruleid: 79cfddf9-a538-f111-88b5-7ced8d76b3cc
   adx_webpageid: 66cfddf9-a538-f111-88b5-7ced8d76b3cc
+- adx_name: Restrict Read on Admin Section
+  adx_right: 2
+  adx_scope: 1
+  adx_webpageaccesscontrolrule_webrole:
+  - 3b5fe5f3-a538-f111-88b5-7ced8d76b3cc
+  - a1b2c3d4-1111-2222-3333-000000000001
+  - a1b2c3d4-1111-2222-3333-000000000002
+  - a1b2c3d4-1111-2222-3333-000000000003
+  - a1b2c3d4-1111-2222-3333-000000000005
+  adx_webpageaccesscontrolruleid: a1b2c3d4-6666-7777-8888-00000000ad01
+  adx_webpageid: b1b2c3d4-2222-3333-4444-00000000ad01
 - adx_name: Restrict Read on C1 Courses Home
   adx_right: 2
   adx_scope: 1
@@ -48,6 +59,10 @@
   adx_right: 2
   adx_scope: 1
   adx_webpageaccesscontrolrule_webrole:
+  - 3b5fe5f3-a538-f111-88b5-7ced8d76b3cc
+  - a1b2c3d4-1111-2222-3333-000000000001
+  - a1b2c3d4-1111-2222-3333-000000000002
+  - a1b2c3d4-1111-2222-3333-000000000003
   - e330e0ff-a538-f111-88b5-7ced8d76b3cc
   adx_webpageaccesscontrolruleid: ec5ee5f3-a538-f111-88b5-7ced8d76b3cc
   adx_webpageid: 4a60e5f3-a538-f111-88b5-7ced8d76b3cc
@@ -55,6 +70,10 @@
   adx_right: 2
   adx_scope: 1
   adx_webpageaccesscontrolrule_webrole:
+  - 3b5fe5f3-a538-f111-88b5-7ced8d76b3cc
+  - a1b2c3d4-1111-2222-3333-000000000001
+  - a1b2c3d4-1111-2222-3333-000000000002
+  - a1b2c3d4-1111-2222-3333-000000000003
   - e330e0ff-a538-f111-88b5-7ced8d76b3cc
   adx_webpageaccesscontrolruleid: f35fe5f3-a538-f111-88b5-7ced8d76b3cc
   adx_webpageid: d805e5ed-a538-f111-88b5-7ced8d76b3cc

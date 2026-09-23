@@ -1,0 +1,135 @@
+{% comment %}
+  Admin Roles — Роли и доступы (/admin/roles). Примитивы .adm-* — customtheme.css.
+  РЕАЛЬНО: web-роли приложения + матрица прав = фактическая модель доступа. KPI «Сотрудников» — aggregate по contact.
+  Назначение ролей — в Power Platform / Power Pages Management (портальный Web API на adx_webrole в этом env не пишет).
+{% endcomment %}
+
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+{% comment %}── Реальное число сотрудников (безопасный aggregate) ──{% endcomment %}
+{% fetchxml emp_agg %}
+<fetch aggregate="true">
+  <entity name="contact">
+    <attribute name="contactid" aggregate="countcolumn" distinct="true" alias="cnt" />
+    {% comment %}только активные контакты — тот же фильтр, что в /admin/groups, иначе KPI расходятся{% endcomment %}
+    <filter><condition attribute="statecode" operator="eq" value="0" /></filter>
+    {% comment %}
+      Кого показываем. Таблица contact общая с платформой продаж — это второй сайт Power Pages в той же
+      среде (Sales-admin), поэтому «все активные контакты» тянули и менеджеров продаж.
+      Признак сотрудника ЛМС — веб-роль ИМЕННО этого сайта (N:N powerpagecomponent_mspp_webrole_contact,
+      powerpagecomponenttype=11). Роли проставлены 16.09.2026: Administrators 2, «Новый сотрудник» 16.
+      Условие прогресса оставлено страховкой: если новому человеку забудут выдать роль, но он начнёт
+      учиться, он не пропадёт из админки. Проверено на данных: 57 активных контактов -> 18 в списке.
+      Соединения внешние, отбор — общий filter type="or"; distinct обязателен, иначе строки размножатся.
+    {% endcomment %}
+    <link-entity name="powerpagecomponent_mspp_webrole_contact" from="contactid" to="contactid" link-type="outer" intersect="true" alias="wr1">
+      <link-entity name="powerpagecomponent" from="powerpagecomponentid" to="powerpagecomponentid" link-type="outer" alias="lmsrole">
+        <filter type="and">
+          <condition attribute="powerpagecomponenttype" operator="eq" value="11" />
+          <condition attribute="powerpagesiteid" operator="eq" value="{{ website.id | default: 'ef30e0ff-a538-f111-88b5-7ced8d76b3cc' }}" />
+        </filter>
+      </link-entity>
+    </link-entity>
+    <link-entity name="new_h5pprogress" from="new_user" to="contactid" link-type="outer" alias="lmsprog" />
+    <filter type="or">
+      <condition entityname="lmsrole" attribute="powerpagecomponentid" operator="not-null" />
+      <condition entityname="lmsprog" attribute="new_h5pprogressid" operator="not-null" />
+    </filter>
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign emp_total = 0 %}
+{% if emp_agg.results.entities.size > 0 %}{% assign emp_total = emp_agg.results.entities[0].cnt %}{% endif %}
+
+<style>
+  .admr { padding: 24px 0 56px; }
+  .admr-head { margin-bottom: 20px; }
+  .admr-head h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--adm-fg-1); margin: 2px 0 3px; }
+  .admr-head p { font-size: 13px; color: var(--adm-fg-2); margin: 0; }
+  .admr-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+  @media (max-width: 900px) { .admr-cards { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .admr-cards { grid-template-columns: 1fr; } }
+  .admr-card { padding: 16px; }
+  .admr-ico { width: 32px; height: 32px; border-radius: var(--adm-radius-sm); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .admr-cap { display: inline-block; font-size: 11px; font-weight: 600; color: var(--adm-fg-2); background: var(--adm-bg-muted); border-radius: 6px; padding: 2px 8px; margin-top: 10px; }
+  .admr-tbl-wrap { overflow-x: auto; }
+  .admr-tbl th.rcol, .admr-tbl td.rcol { text-align: center; }
+  .admr-note { background: var(--adm-primary-50); border: 1px solid #DBEAFE; border-radius: 10px; padding: 10px 16px; margin-top: 16px; font-size: 12px; color: var(--adm-primary); display: flex; align-items: flex-start; gap: 10px; }
+</style>
+
+<div class="container adm-scope admr">
+
+  <div class="admr-head">
+    <span class="adm-eyebrow">Люди</span>
+    <h1>Роли и доступы</h1>
+    <p>Роли пользователей портала и матрица разрешений. Всего сотрудников в системе: <b>{{ emp_total }}</b>.</p>
+  </div>
+
+  {% comment %}── Реальные web-роли приложения: имя|описание|ключевой доступ|иконка|цвет ──{% endcomment %}
+  {% comment %}имена ролей — как в таблице Web Roles портала, чтобы карточку можно было сопоставить с реальной ролью{% endcomment %}
+  {% assign roles = 'Сотрудник (Authenticated Users)|Базовый доступ: курсы, уроки, рейтинг, магазин, профиль|Обучение|mortarboard|var(--adm-fg-2);Новый сотрудник|Онбординг и адаптация + базовое обучение|Адаптация|person-plus|var(--adm-success);Наставник|Ведёт стажёров, видит прогресс, привязывает контент|Наставничество|people|var(--adm-primary);Руководитель|Обзор команды, отчёты и аналитика|Аналитика|graph-up|var(--adm-accent);HR|Управление людьми, курсами, рассылками, отчётность|HR-функции|briefcase|var(--adm-accent);Администратор (Administrators)|Полный доступ: настройки, роли, аудит|Всё|shield-lock|var(--adm-danger)' | split: ';' %}
+  <div class="admr-cards">
+    {% for r in roles %}
+      {% assign f = r | split: '|' %}
+    <div class="adm-card admr-card">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="admr-ico" style="color:{{ f[4] }};background:var(--adm-bg-muted);"><i class="bi bi-{{ f[3] }}"></i></span>
+        <div style="font-size:14px;font-weight:700;color:var(--adm-fg-1);">{{ f[0] }}</div>
+      </div>
+      <div style="font-size:12px;color:var(--adm-fg-3);margin-top:8px;line-height:1.5;">{{ f[1] }}</div>
+      <span class="admr-cap">{{ f[2] }}</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="adm-card" style="overflow:hidden;">
+    <div class="adm-cardhead"><div class="adm-cardhead-title" style="margin-top:0;">Матрица прав доступа</div></div>
+    <div class="admr-tbl-wrap">
+      <table class="adm-table admr-tbl">
+        <thead>
+          <tr>
+            <th>Возможность</th>
+            <th class="rcol" style="width:110px;">Сотрудник</th>
+            <th class="rcol" style="width:110px;">Наставник</th>
+            <th class="rcol" style="width:110px;">Руководитель</th>
+            <th class="rcol" style="width:110px;">HR</th>
+            <th class="rcol" style="width:110px;">Админ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% comment %} строка: возможность|сотр|наст|рук|hr|админ (1=есть) — по фактическим гейтам ролей {% endcomment %}
+          {% comment %}
+            Настройки / Роли / Аудит закрыты тем же гейтом, что и остальная админка
+            (HR, Наставник, Руководитель, Administrators) — раньше матрица показывала их как admin-only и врала.
+            Если доступ нужно реально сузить до администраторов — менять гейт в Admin-Settings, Admin-Roles, Admin-Audit, а не подпись здесь.
+          {% endcomment %}
+          {% assign perms = 'Курсы и уроки|1|1|1|1|1;Рейтинг и магазин наград|1|1|1|1|1;H5P-прогресс (свой)|1|1|1|1|1;Админ-консоль|0|1|1|1|1;Управление курсами|0|1|1|1|1;Пользователи и группы|0|1|1|1|1;Отчёты и аналитика|0|1|1|1|1;Рассылки|0|1|1|1|1;Настройки|0|1|1|1|1;Роли и доступы|0|1|1|1|1;Журнал аудита|0|1|1|1|1' | split: ';' %}
+          {% for p in perms %}
+            {% assign f = p | split: '|' %}
+          <tr>
+            <td style="font-weight:500;">{{ f[0] }}</td>
+            {% for i in (1..5) %}
+              <td class="rcol">{% if f[i] == '1' %}<i class="bi bi-check-lg" style="color:var(--adm-success);font-size:16px;"></i>{% else %}<span style="color:var(--adm-border-2);">—</span>{% endif %}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="admr-note">
+    <i class="bi bi-info-circle-fill" style="flex-shrink:0;margin-top:1px;"></i>
+    <span>Матрица отражает фактическую модель доступа портала. Назначение сотрудников на роли выполняется в Power Platform / Power Pages Management (таблица Web Roles → Contacts). Прямое назначение из портала недоступно из-за ограничений Web API текущего окружения.</span>
+  </div>
+
+</div>
+
+{% endunless %}

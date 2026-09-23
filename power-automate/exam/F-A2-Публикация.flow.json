@@ -1,0 +1,695 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedcommondataserviceforapps_73c39"
+        },
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "Когда_экзамен_изменён": {
+          "type": "OpenApiConnectionWebhook",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "SubscribeWebhookTrigger",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "subscriptionRequest/message": 3,
+              "subscriptionRequest/entityname": "new_exam",
+              "subscriptionRequest/scope": 4,
+              "subscriptionRequest/filteringattributes": "new_status"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      },
+      "actions": {
+        "Константы": {
+          "type": "Compose",
+          "runAfter": {},
+          "inputs": {
+            "examЧерновик": 100000000,
+            "examОпубликован": 100000001,
+            "qОдобрен": 100000001,
+            "promptУтверждён": 100000001,
+            "лимит_errortext": 3900,
+            "type": {
+              "single": 100000000,
+              "multi": 100000001,
+              "case": 100000002,
+              "control": 100000003
+            },
+            "difficulty": {
+              "basic": 100000000,
+              "medium": 100000001,
+              "advanced": 100000002
+            },
+            "коды_промптов": [
+              "TRIAGE",
+              "GRADE_CASE",
+              "GRADE_CONTROL",
+              "APPEAL",
+              "ARBITER"
+            ]
+          }
+        },
+        "Ошибки": {
+          "type": "InitializeVariable",
+          "runAfter": {
+            "Константы": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "variables": [
+              {
+                "name": "Ошибки",
+                "type": "array",
+                "value": []
+              }
+            ]
+          }
+        },
+        "Только_публикация": {
+          "type": "If",
+          "runAfter": {
+            "Ошибки": [
+              "Succeeded"
+            ]
+          },
+          "expression": {
+            "equals": [
+              "@triggerOutputs()?['body/new_status']",
+              "@outputs('Константы')['examОпубликован']"
+            ]
+          },
+          "actions": {
+            "Try": {
+              "type": "Scope",
+              "runAfter": {},
+              "actions": {
+                "Экзамен": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "GetItem",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_exams",
+                      "recordId": "@triggerOutputs()?['body/new_examid']"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Снимок_уже_есть": {
+                  "type": "If",
+                  "runAfter": {
+                    "Экзамен": [
+                      "Succeeded"
+                    ]
+                  },
+                  "expression": {
+                    "not": {
+                      "equals": [
+                        "@empty(coalesce(outputs('Экзамен')?['body/new_configsnapshot'], ''))",
+                        true
+                      ]
+                    }
+                  },
+                  "actions": {
+                    "Выход_снимок_есть": {
+                      "type": "Terminate",
+                      "runAfter": {},
+                      "inputs": {
+                        "runStatus": "Succeeded"
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {}
+                  }
+                },
+                "Параметры_пусты": {
+                  "type": "If",
+                  "runAfter": {
+                    "Снимок_уже_есть": [
+                      "Succeeded"
+                    ]
+                  },
+                  "expression": {
+                    "equals": [
+                      "@empty(coalesce(outputs('Экзамен')?['body/new_paramsjson'], ''))",
+                      true
+                    ]
+                  },
+                  "actions": {
+                    "Добавить_ошибку_параметров": {
+                      "type": "AppendToArrayVariable",
+                      "runAfter": {},
+                      "inputs": {
+                        "name": "Ошибки",
+                        "value": "Не заданы параметры экзамена (new_paramsjson). Сохраните раскладку на странице настройки."
+                      }
+                    },
+                    "Выход_без_параметров": {
+                      "type": "Terminate",
+                      "runAfter": {
+                        "Вернуть_в_черновик_без_параметров": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "runStatus": "Succeeded"
+                      }
+                    },
+                    "Вернуть_в_черновик_без_параметров": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Добавить_ошибку_параметров": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_commondataserviceforapps",
+                          "operationId": "UpdateOnlyRecord",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "new_exams",
+                          "recordId": "@triggerOutputs()?['body/new_examid']",
+                          "item/new_status": "@outputs('Константы')['examЧерновик']",
+                          "item/new_errortext": "@{first(variables('Ошибки'))}"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {}
+                  }
+                },
+                "P": {
+                  "type": "Compose",
+                  "runAfter": {
+                    "Параметры_пусты": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": "@json(outputs('Экзамен')?['body/new_paramsjson'])"
+                },
+                "Модули": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {
+                    "P": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_exammodules",
+                      "$filter": "statecode eq 0 and _new_exam_value eq '@{triggerOutputs()?['body/new_examid']}'",
+                      "$select": "new_exammoduleid,new_name,new_text,new_narration,new_textchars",
+                      "$top": 200
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Уроки_без_текста": {
+                  "type": "Query",
+                  "runAfter": {
+                    "Модули": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "from": "@outputs('Модули')?['body/value']",
+                    "where": "@and(empty(coalesce(item()?['new_text'], '')), empty(coalesce(item()?['new_narration'], '')))"
+                  }
+                },
+                "Если_уроки_без_текста": {
+                  "type": "If",
+                  "runAfter": {
+                    "Уроки_без_текста": [
+                      "Succeeded"
+                    ]
+                  },
+                  "expression": {
+                    "greater": [
+                      "@length(body('Уроки_без_текста'))",
+                      0
+                    ]
+                  },
+                  "actions": {
+                    "Имена_уроков_без_текста": {
+                      "type": "Select",
+                      "runAfter": {},
+                      "inputs": {
+                        "from": "@body('Уроки_без_текста')",
+                        "select": "@item()?['new_name']"
+                      }
+                    },
+                    "Ошибка_уроков": {
+                      "type": "AppendToArrayVariable",
+                      "runAfter": {
+                        "Имена_уроков_без_текста": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "name": "Ошибки",
+                        "value": "@{concat('Нет текста у уроков: ', join(body('Имена_уроков_без_текста'), ', '), '. Загрузите текст озвучки или распознайте слайды.')}"
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {}
+                  }
+                },
+                "Утверждённые_промпты": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {
+                    "Если_уроки_без_текста": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_aiprompts",
+                      "$filter": "statecode eq 0 and new_status eq 100000001",
+                      "$select": "new_code,new_version",
+                      "$top": 200
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Цикл_промптов": {
+                  "type": "Foreach",
+                  "runAfter": {
+                    "Утверждённые_промпты": [
+                      "Succeeded"
+                    ]
+                  },
+                  "foreach": "@outputs('Константы')['коды_промптов']",
+                  "runtimeConfiguration": {
+                    "concurrency": {
+                      "repetitions": 1
+                    }
+                  },
+                  "actions": {
+                    "Нужная_версия": {
+                      "type": "Compose",
+                      "runAfter": {},
+                      "inputs": "@coalesce(outputs('P')?['prompts']?[items('Цикл_промптов')], 0)"
+                    },
+                    "Есть_такой_промпт": {
+                      "type": "Query",
+                      "runAfter": {
+                        "Нужная_версия": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "from": "@outputs('Утверждённые_промпты')?['body/value']",
+                        "where": "@and(equals(item()?['new_code'], items('Цикл_промптов')), equals(item()?['new_version'], outputs('Нужная_версия')))"
+                      }
+                    },
+                    "Если_промпта_нет": {
+                      "type": "If",
+                      "runAfter": {
+                        "Есть_такой_промпт": [
+                          "Succeeded"
+                        ]
+                      },
+                      "expression": {
+                        "equals": [
+                          "@length(body('Есть_такой_промпт'))",
+                          0
+                        ]
+                      },
+                      "actions": {
+                        "Ошибка_промпта": {
+                          "type": "AppendToArrayVariable",
+                          "runAfter": {},
+                          "inputs": {
+                            "name": "Ошибки",
+                            "value": "@{concat('Нет утверждённого промпта ', items('Цикл_промптов'), ' версии ', string(outputs('Нужная_версия')), '.')}"
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {}
+                      }
+                    }
+                  }
+                },
+                "Цикл_раскладки": {
+                  "type": "Foreach",
+                  "runAfter": {
+                    "Цикл_промптов": [
+                      "Succeeded"
+                    ]
+                  },
+                  "foreach": "@outputs('P')?['blueprint']",
+                  "runtimeConfiguration": {
+                    "concurrency": {
+                      "repetitions": 1
+                    }
+                  },
+                  "actions": {
+                    "Нужно_вопросов": {
+                      "type": "Compose",
+                      "runAfter": {},
+                      "inputs": "@mul(mul(int(items('Цикл_раскладки')?['count']), add(int(coalesce(outputs('P')?['maxAttempts'], 2)), 1)), int(coalesce(outputs('P')?['bankFactor'], 2)))"
+                    },
+                    "Есть_в_банке": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Нужно_вопросов": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_commondataserviceforapps",
+                          "operationId": "ListRecords",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "new_examquestions",
+                          "$filter": "statecode eq 0 and _new_exam_value eq '@{triggerOutputs()?['body/new_examid']}' and _new_module_value eq '@{items('Цикл_раскладки')?['module']}' and new_type eq @{outputs('Константы')['type'][items('Цикл_раскладки')?['type']]} and new_difficulty eq @{outputs('Константы')['difficulty'][items('Цикл_раскладки')?['difficulty']]} and new_status eq 100000001",
+                          "$select": "new_examquestionid",
+                          "$top": "@outputs('Нужно_вопросов')"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Если_не_хватает": {
+                      "type": "If",
+                      "runAfter": {
+                        "Есть_в_банке": [
+                          "Succeeded"
+                        ]
+                      },
+                      "expression": {
+                        "less": [
+                          "@length(outputs('Есть_в_банке')?['body/value'])",
+                          "@outputs('Нужно_вопросов')"
+                        ]
+                      },
+                      "actions": {
+                        "Ошибка_нехватки": {
+                          "type": "AppendToArrayVariable",
+                          "runAfter": {},
+                          "inputs": {
+                            "name": "Ошибки",
+                            "value": "@{concat('Не хватает вопросов: тип ', items('Цикл_раскладки')?['type'], ', сложность ', items('Цикл_раскладки')?['difficulty'], ', урок ', items('Цикл_раскладки')?['module'], ' — есть ', string(length(outputs('Есть_в_банке')?['body/value'])), ' из ', string(outputs('Нужно_вопросов')), '.')}"
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {}
+                      }
+                    }
+                  }
+                },
+                "Есть_ли_ошибки": {
+                  "type": "If",
+                  "runAfter": {
+                    "Цикл_раскладки": [
+                      "Succeeded"
+                    ]
+                  },
+                  "expression": {
+                    "greater": [
+                      "@length(variables('Ошибки'))",
+                      0
+                    ]
+                  },
+                  "actions": {
+                    "Текст_ошибок": {
+                      "type": "Compose",
+                      "description": "Столбец new_errortext вмещает 4000 символов: длинный список ошибок ронял обновление, и Catch затирал его общим текстом. В экзамен пишем не больше лимита, полный список — в EXAM_PUBLISH_FAILED.",
+                      "runAfter": {},
+                      "inputs": "@{join(variables('Ошибки'), '\n')}"
+                    },
+                    "Вернуть_в_черновик": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Текст_ошибок": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_commondataserviceforapps",
+                          "operationId": "UpdateOnlyRecord",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "new_exams",
+                          "recordId": "@triggerOutputs()?['body/new_examid']",
+                          "item/new_status": "@outputs('Константы')['examЧерновик']",
+                          "item/new_errortext": "@{if(greater(length(outputs('Текст_ошибок')), outputs('Константы')['лимит_errortext']), concat(substring(outputs('Текст_ошибок'), 0, outputs('Константы')['лимит_errortext']), '… (полный список — в журнале экзамена)'), outputs('Текст_ошибок'))}"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Журнал_неудачной_публикации": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Вернуть_в_черновик": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_commondataserviceforapps",
+                          "operationId": "CreateRecord",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "new_examlogs",
+                          "item/new_event": "EXAM_PUBLISH_FAILED",
+                          "item/new_actor": "F-A2 Публикация",
+                          "item/new_subjectid": "@triggerOutputs()?['body/new_examid']",
+                          "item/new_payload": "@{outputs('Текст_ошибок')}",
+                          "item/new_exam@odata.bind": "/new_exams(@{triggerOutputs()?['body/new_examid']})"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Выход_с_ошибками": {
+                      "type": "Terminate",
+                      "runAfter": {
+                        "Журнал_неудачной_публикации": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "runStatus": "Succeeded"
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Допущенные_вопросы": {
+                        "type": "OpenApiConnection",
+                        "runAfter": {},
+                        "inputs": {
+                          "host": {
+                            "connectionName": "shared_commondataserviceforapps",
+                            "operationId": "ListRecords",
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                          },
+                          "parameters": {
+                            "entityName": "new_examquestions",
+                            "$filter": "statecode eq 0 and _new_exam_value eq '@{triggerOutputs()?['body/new_examid']}' and new_status eq 100000001",
+                            "$select": "new_examquestionid,new_type,new_difficulty,new_version,_new_module_value",
+                            "$top": 5000
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      },
+                      "Вопросы_снимка": {
+                        "type": "Select",
+                        "runAfter": {
+                          "Допущенные_вопросы": [
+                            "Succeeded"
+                          ]
+                        },
+                        "inputs": {
+                          "from": "@outputs('Допущенные_вопросы')?['body/value']",
+                          "select": {
+                            "id": "@item()?['new_examquestionid']",
+                            "type": "@item()?['new_type']",
+                            "module": "@item()?['_new_module_value']",
+                            "difficulty": "@item()?['new_difficulty']",
+                            "version": "@item()?['new_version']"
+                          }
+                        }
+                      },
+                      "Снимок": {
+                        "type": "Compose",
+                        "runAfter": {
+                          "Вопросы_снимка": [
+                            "Succeeded"
+                          ]
+                        },
+                        "inputs": {
+                          "takenAt": "@{utcNow()}",
+                          "params": "@outputs('P')",
+                          "questions": "@body('Вопросы_снимка')",
+                          "prompts": "@outputs('P')?['prompts']",
+                          "models": "@outputs('P')?['models']"
+                        }
+                      },
+                      "Записать_снимок": {
+                        "type": "OpenApiConnection",
+                        "runAfter": {
+                          "Снимок": [
+                            "Succeeded"
+                          ]
+                        },
+                        "inputs": {
+                          "host": {
+                            "connectionName": "shared_commondataserviceforapps",
+                            "operationId": "UpdateOnlyRecord",
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                          },
+                          "parameters": {
+                            "entityName": "new_exams",
+                            "recordId": "@triggerOutputs()?['body/new_examid']",
+                            "item/new_configsnapshot": "@{string(outputs('Снимок'))}",
+                            "item/new_publishedon": "@{utcNow()}",
+                            "item/new_errortext": ""
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      },
+                      "Журнал_публикации": {
+                        "type": "OpenApiConnection",
+                        "runAfter": {
+                          "Записать_снимок": [
+                            "Succeeded"
+                          ]
+                        },
+                        "inputs": {
+                          "host": {
+                            "connectionName": "shared_commondataserviceforapps",
+                            "operationId": "CreateRecord",
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                          },
+                          "parameters": {
+                            "entityName": "new_examlogs",
+                            "item/new_event": "EXAM_PUBLISHED",
+                            "item/new_actor": "F-A2 Публикация",
+                            "item/new_subjectid": "@triggerOutputs()?['body/new_examid']",
+                            "item/new_payload": "@{concat('Вопросов в снимке: ', string(length(body('Вопросы_снимка'))))}",
+                            "item/new_exam@odata.bind": "/new_exams(@{triggerOutputs()?['body/new_examid']})"
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "Catch": {
+              "type": "Scope",
+              "runAfter": {
+                "Try": [
+                  "Failed",
+                  "TimedOut"
+                ]
+              },
+              "actions": {
+                "Журнал_сбоя": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "CreateRecord",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_examlogs",
+                      "item/new_event": "FLOW_ERROR",
+                      "item/new_actor": "F-A2 Публикация",
+                      "item/new_subjectid": "@{workflow()?['run']?['name']}",
+                      "item/new_payload": "@{string(result('Try'))}"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Вернуть_в_черновик_после_сбоя": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {
+                    "Журнал_сбоя": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "UpdateOnlyRecord",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_exams",
+                      "recordId": "@triggerOutputs()?['body/new_examid']",
+                      "item/new_status": "@outputs('Константы')['examЧерновик']",
+                      "item/new_errortext": "Публикация не удалась из-за сбоя потока. Подробности — в журнале экзамена."
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "actions": {}
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}

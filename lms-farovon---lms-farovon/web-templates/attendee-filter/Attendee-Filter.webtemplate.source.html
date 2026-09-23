@@ -19,6 +19,7 @@
   {% assign totalCount = attendees.results.total_record_count %}
 
 
+  {% comment %}ФИО приходит из данных: и в атрибут alt, и в текст выводим через escape, иначе хранимый XSS{% endcomment %}
   {% for attendee in attendeeResults %}
     <li>
       <span class="child-my-registration-card">
@@ -26,8 +27,8 @@
               <input type="checkbox" id="child{{attendee.contactid}}" class="checkAttendee" name="child" value="{{attendee.contactid}}">
               <span class="checkmark-registration"></span>
               <label for="child{{attendee.contactid}}"></label>
-              <img id="img{{attendee.contactid}}" data-contact="{{attendee.contactid}}" src="/child-placeholder.svg" alt="{{attendee.fullname}} profile photo">
-              <p class="card-text-xsmall text-center">{{attendee.fullname}}</p>
+              <img id="img{{attendee.contactid}}" data-contact="{{attendee.contactid}}" src="/child-placeholder.svg" alt="{{ attendee.fullname | escape }} profile photo">
+              <p class="card-text-xsmall text-center">{{ attendee.fullname | escape }}</p>
           </label>
       </span>
     </li>

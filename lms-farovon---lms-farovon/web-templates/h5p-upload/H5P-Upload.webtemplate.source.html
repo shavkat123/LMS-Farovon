@@ -1,0 +1,375 @@
+{% comment %}
+  Гейт совпадает с остальными /admin/* шаблонами (Admin-Library, Admin-Courses и т.д.):
+  «Загрузка H5P» есть в админ-рейле Header для роли Руководитель, поэтому без неё
+  в этом списке пункт меню вёл на «Доступ запрещён».
+{% endcomment %}
+{% unless user.roles contains 'HR' or user.roles contains 'Наставник' or user.roles contains 'Руководитель' or user.roles contains 'Administrators' %}
+<div class="container py-5 text-center">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только администраторам, HR, наставникам и руководителям.</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+<style>
+  .fv-upload-page { padding: 12px 0 48px; }
+  .fv-upload-header { margin-bottom: 24px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .fv-upload-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #64748B; display: block; margin-bottom: 4px; }
+  .fv-upload-title { font-size: 22px; font-weight: 700; color: #0B1220; margin: 0 0 4px; }
+  .fv-upload-sub { font-size: 13px; color: #64748B; margin: 0; }
+  .fv-upload-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(11,18,32,0.04); margin-bottom: 16px; }
+  .fv-upload-hint { background: #EEF2F9; border: 1px solid #DBEAFE; border-radius: 10px; padding: 14px 18px; font-size: 13px; color: #1E40AF; display: flex; gap: 12px; align-items: flex-start; }
+  .fv-upload-hint i { flex-shrink: 0; font-size: 16px; margin-top: 1px; }
+</style>
+
+<div class="container fv-upload-page">
+  <div class="fv-upload-header">
+    <div>
+      <span class="fv-upload-eyebrow">Администрирование</span>
+      <h1 class="fv-upload-title">Загрузка H5P урока</h1>
+      <p class="fv-upload-sub">Создайте запись урока и загрузите .h5p файл</p>
+    </div>
+    <a href="/h5p-catalog" class="btn btn-outline-secondary btn-sm" style="border-radius:8px;font-size:13px;">
+      <i class="bi bi-arrow-left"></i> Назад к каталогу
+    </a>
+  </div>
+
+  <div class="fv-upload-hint mb-4">
+    <i class="bi bi-info-circle-fill"></i>
+    <div>
+      <strong>Как создать .h5p файл:</strong> скачайте
+      <a href="https://lumi.education" target="_blank" rel="noopener" style="color:#1E3A8A;font-weight:600;">Lumi Desktop</a>,
+      создайте Interactive Video и экспортируйте как <code>.h5p</code>.
+    </div>
+  </div>
+
+  <div class="fv-upload-card">
+    <div style="font-size:13px;font-weight:600;color:#0B1220;margin-bottom:4px;">Шаг 1 — Заполните данные урока</div>
+    <p style="font-size:12px;color:#64748B;margin-bottom:16px;">Введите название, описание и другие параметры. После сохранения откроется шаг 2 с загрузкой файла.</p>
+
+{% entityform name:'H5P Upload Form' %}
+
+  </div><!-- /fv-upload-card step 1 -->
+
+  {% comment %}
+    contactid отдаём через data-атрибут, а не в <script>: внутри тега script HTML-сущности
+    не декодируются, поэтому серверные значения читаем через getAttribute.
+  {% endcomment %}
+  <div id="fvUploadCfg" data-contact="{{ user.contactid | escape }}" hidden></div>
+
+  <div id="h5p-upload-notice" class="mt-2"></div>
+
+  <div id="h5p-file-upload-section" style="display:none" class="fv-upload-card mt-2">
+    <div style="font-size:13px;font-weight:600;color:#0B1220;margin-bottom:4px;"><i class="bi bi-file-earmark-zip" style="color:#1E3A8A;"></i> Шаг 2 — Загрузите .h5p файл</div>
+    <p style="font-size:12px;color:#64748B;margin-bottom:6px;">Запись создана. Выберите <code>.h5p</code> файл для загрузки.</p>
+    <div id="h5p-record-label" style="font-size:12px;color:#0B1220;margin-bottom:14px;"></div>
+    <div class="input-group">
+      <input type="file" id="h5p-file-input" class="form-control" accept=".h5p">
+      <button id="h5p-upload-btn" class="btn btn-primary" type="button">Загрузить файл</button>
+    </div>
+    <div id="h5p-upload-progress" class="mt-3" style="display:none">
+      <div class="progress"><div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width:100%"></div></div>
+      <small class="text-muted">Загрузка файла…</small>
+    </div>
+    <div id="h5p-upload-result" class="mt-2"></div>
+  </div>
+
+</div><!-- /fv-upload-page -->
+
+<script>
+(function () {
+  var recordId = null;
+
+  var cfgEl = document.getElementById('fvUploadCfg');
+  var myContact = cfgEl ? String(cfgEl.getAttribute('data-contact') || '').replace(/[{}]/g, '').trim().toLowerCase() : '';
+
+  // Форма создаёт запись полным постбэком (adx_onsuccess = «показать сообщение», без ?id=),
+  // поэтому id приходится восстанавливать запросом. Просто «последняя в каталоге» — неверно:
+  // это может быть чужая запись, созданная параллельно, и файл уехал бы не в свой урок.
+  // Поэтому до отправки формы запоминаем «что было до» (baseline) и принимаем только запись,
+  // которой в baseline не было.
+  var BASE_KEY = 'fvH5pUploadBaseline';
+  var LATEST_URL = '/_api/new_h5pcontents?$orderby=createdon desc&$top=1' +
+                   '&$select=new_h5pcontentid,new_name,createdon,_new_uploadedby_value';
+
+  function readBaseline() {
+    try { return JSON.parse(sessionStorage.getItem(BASE_KEY) || 'null'); } catch (e) { return null; }
+  }
+  function writeBaseline(v) {
+    try { sessionStorage.setItem(BASE_KEY, JSON.stringify(v)); } catch (e) { /* приватный режим */ }
+  }
+  function clearBaseline() {
+    try { sessionStorage.removeItem(BASE_KEY); } catch (e) { /* приватный режим */ }
+  }
+
+  function normId(rawId) {
+    var id = '';
+    if (typeof rawId === 'string') {
+      id = rawId;
+    } else if (rawId && typeof rawId === 'object') {
+      var ref = rawId.entityReference || rawId;
+      id = String(ref.id || ref.Id || ref.entityId || '');
+    }
+    id = id.replace(/[{}]/g, '').trim();
+    return id.length >= 10 ? id.toLowerCase() : '';
+  }
+
+  function notice(type, html) {
+    var nt = document.getElementById('h5p-upload-notice');
+    if (nt) nt.innerHTML = '<div class="alert alert-' + type + '">' + html + '</div>';
+  }
+
+  function revealStep2(rawId, label) {
+    if (recordId) return;
+    var id = normId(rawId);
+    if (!id) return;
+    recordId = id;
+    clearBaseline();
+    var nt = document.getElementById('h5p-upload-notice');
+    if (nt) nt.innerHTML = '';
+    var lbl = document.getElementById('h5p-record-label');
+    if (lbl) lbl.innerHTML = label ? 'Урок: <strong>' + escHtml(label) + '</strong>' : '';
+    var sec = document.getElementById('h5p-file-upload-section');
+    if (sec) sec.style.display = '';
+  }
+
+  function apiGetFirst(url) {
+    return fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+        'OData-MaxVersion': '4.0',
+        'OData-Version': '4.0'
+      }
+    })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { return (d && d.value && d.value[0]) || null; });
+  }
+
+  function askConfirm(id, name) {
+    if (!id) {
+      notice('danger', 'Не удалось определить созданную запись. Обновите страницу и попробуйте ещё раз.');
+      return;
+    }
+    notice('warning',
+      'Не удалось однозначно определить только что созданную запись. Последний урок в каталоге — ' +
+      '<strong>' + escHtml(name || 'без названия') + '</strong>. Продолжайте, только если это ваш урок.' +
+      '<br><button type="button" class="btn btn-sm btn-warning mt-2" id="h5p-confirm-btn">Это мой урок — продолжить</button>');
+    var b = document.getElementById('h5p-confirm-btn');
+    if (b) b.addEventListener('click', function () { revealStep2(id, name); });
+  }
+
+  function resolveCreatedRecord() {
+    apiGetFirst(LATEST_URL).then(function (rec) {
+      if (!rec) {
+        notice('danger', 'Запись сохранена, но каталог уроков недоступен — обновите страницу.');
+        return;
+      }
+      var id = normId(rec.new_h5pcontentid);
+      var owner = String(rec._new_uploadedby_value || '').replace(/[{}]/g, '').trim().toLowerCase();
+      // Явно чужая запись — не предлагаем даже подтвердить.
+      if (owner && myContact && owner !== myContact) {
+        notice('danger', 'Последний урок каталога создан другим пользователем — файл к нему не привязываем. Откройте свой урок в каталоге и повторите загрузку.');
+        return;
+      }
+      var base = readBaseline();
+      var isNew = base && id && id !== base.id &&
+                  (!base.t || (Date.parse(rec.createdon) || 0) >= base.t);
+      if (isNew) { revealStep2(id, rec.new_name); return; }
+      askConfirm(id, rec.new_name);
+    })
+    .catch(function () {
+      notice('danger', 'Не удалось получить id созданной записи (ошибка сети). Обновите страницу.');
+    });
+  }
+
+  function captureBaseline() {
+    apiGetFirst(LATEST_URL).then(function (rec) {
+      writeBaseline(rec
+        ? { id: normId(rec.new_h5pcontentid), t: Date.parse(rec.createdon) || 0 }
+        : { id: '', t: 0 });
+    })
+    .catch(function () { /* без baseline шаг 2 попросит подтверждение */ });
+  }
+
+  // Сообщение об успехе рендерит сервер, но пробуем несколько раз: если форма
+  // отрисует его позже, шаг 2 всё равно появится (пусть и через подтверждение).
+  var ticks = 0;
+  function start() {
+    if (recordId) return;
+    if (document.querySelector('.alert-success')) {
+      resolveCreatedRecord();
+      return;
+    }
+    // Сообщения об успехе нет — это рендер до отправки формы: фиксируем точку отсчёта.
+    if (ticks === 0) captureBaseline();
+    ticks = ticks + 1;
+    if (ticks < 4) setTimeout(start, 700);
+  }
+
+  // Запускаем и через DOMContentLoaded, и сразу если DOM уже готов
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(start, 500); });
+  } else {
+    setTimeout(start, 500);
+  }
+
+  // Основной источник id, если форма всё-таки сохраняется по AJAX: событие Power Pages.
+  if (window.jQuery) {
+    window.jQuery(document).on('saved saved.entityForm', function (e, data) {
+      revealStep2(data);
+    });
+  }
+
+  document.getElementById('h5p-upload-btn').addEventListener('click', function () {
+    var fileInput = document.getElementById('h5p-file-input');
+    if (!fileInput.files || !fileInput.files[0]) {
+      showResult('warning', 'Выберите .h5p файл');
+      return;
+    }
+    if (!recordId) {
+      showResult('danger', 'ID записи не получен — сохраните форму ещё раз');
+      return;
+    }
+
+    var file = fileInput.files[0];
+    // Power Pages Web API отдаёт и принимает файл одним вызовом максимум на 16 МБ.
+    // Больше — молча приедет обрезанным, и плеер потом ругнётся «повреждён».
+    if (file.size > 16 * 1024 * 1024) {
+      showResult('danger', 'Файл ' + (file.size / 1048576).toFixed(1) + ' МБ — больше лимита в 16 МБ ' +
+        'для загрузки через портал. Уменьшите вес урока (обычно тяжелее всего видео) ' +
+        'или положите .h5p в SharePoint-библиотеку урока.');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      var bad = zipProblem(ev.target.result);
+      if (bad) {
+        showResult('danger', 'Это не целый .h5p-архив: ' + bad + '. ' +
+          'Экспортируйте урок из H5P заново и загрузите файл целиком.');
+        return;
+      }
+      uploadFile(file.name, ev.target.result);
+    };
+    reader.onerror = function () {
+      showResult('danger', 'Ошибка чтения файла');
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  // Целость .h5p = сигнатура zip в начале И запись конца центрального каталога (PK\x05\x06)
+  // в хвосте. Только по первым байтам обрезанный архив неотличим от целого.
+  function zipProblem(b) {
+    if (!b || b.byteLength < 22) return 'файл пустой или обрезан (' + (b ? b.byteLength : 0) + ' байт)';
+    var head = new Uint8Array(b, 0, 4);
+    if (!(head[0] === 0x50 && head[1] === 0x4B && head[2] === 0x03 && head[3] === 0x04)) {
+      return 'это не zip-архив';
+    }
+    var tailLen = Math.min(b.byteLength, 65557);
+    var tail = new Uint8Array(b, b.byteLength - tailLen, tailLen);
+    for (var i = tail.length - 22; i >= 0; i--) {
+      if (tail[i] === 0x50 && tail[i + 1] === 0x4B && tail[i + 2] === 0x05 && tail[i + 3] === 0x06) return null;
+    }
+    return 'архив обрезан — не найден конец центрального каталога';
+  }
+
+  function getToken() {
+    // Сначала пробуем токен из DOM (если форма ещё там)
+    var tok = document.querySelector('input[name="__RequestVerificationToken"]');
+    if (tok && tok.value) return Promise.resolve(tok.value);
+    // После перезагрузки страницы форма исчезает — берём токен с /_layout/tokenhtml
+    return fetch('/_layout/tokenhtml')
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        // Сначала ищем именно input с __RequestVerificationToken: голый /value="…"/ ловил
+        // первый попавшийся атрибут (id/name/type) и отдавал мусор вместо токена.
+        var im = html.match(/<input[^>]+__RequestVerificationToken[^>]*>/i);
+        var vm = im && im[0].match(/value="([^"]+)"/i);
+        if (vm) return vm[1];
+        var m = html.match(/value="([^"]{20,})"/i);
+        return m ? m[1] : null;
+      });
+  }
+
+  function uploadFile(filename, buffer) {
+    document.getElementById('h5p-upload-progress').style.display = '';
+    document.getElementById('h5p-upload-result').innerHTML = '';
+
+    getToken().then(function (token) {
+      var headers = {
+        'Content-Type': 'application/octet-stream',
+        'x-ms-file-name': encodeURIComponent(filename),
+        'OData-MaxVersion': '4.0',
+        'OData-Version': '4.0'
+      };
+      if (token) headers['__RequestVerificationToken'] = token;
+
+      return fetch('/_api/new_h5pcontents(' + recordId + ')/new_h5pfile', {
+        method: 'PATCH',
+        headers: headers,
+        body: buffer
+      });
+    })
+    .then(function (res) {
+      document.getElementById('h5p-upload-progress').style.display = 'none';
+      if (res.ok || res.status === 204) {
+        // Сразу проверяем, что в базе лежит ровно то, что отправили: PATCH отвечает 204
+        // и на оборванной передаче, а разбираться приходится уже в плеере.
+        return verifyStored(filename, buffer.byteLength);
+      } else {
+        return res.text().then(function (t) {
+          showResult('danger', 'Ошибка загрузки файла (HTTP ' + res.status + '): ' + escHtml(t.slice(0, 200)));
+        });
+      }
+    })
+    .catch(function (err) {
+      document.getElementById('h5p-upload-progress').style.display = 'none';
+      showResult('danger', 'Ошибка сети: ' + escHtml(err.message));
+    });
+  }
+
+  // Читаем файл обратно из Dataverse и сверяем размер и целость архива.
+  function verifyStored(filename, sentBytes) {
+    var openLink = '<a href="/h5p-player?id=' + recordId + '" class="alert-link">Открыть плеер</a>';
+    showResult('info', 'Файл отправлен, проверяем сохранённую копию…');
+    return fetch('/_api/new_h5pcontents(' + recordId + ')/new_h5pfile/$value', {
+      // без no-store браузер отдаёт копию из кэша: битая загрузка выглядела бы целой
+      headers: { 'Accept': 'application/octet-stream' }, credentials: 'same-origin', cache: 'no-store'
+    })
+      .then(function (r) { return r.ok ? r.arrayBuffer() : null; })
+      .then(function (stored) {
+        if (!stored) {
+          showResult('warning', 'Файл <strong>' + escHtml(filename) + '</strong> отправлен, ' +
+            'но проверить сохранённую копию не удалось. ' + openLink);
+          return;
+        }
+        var bad = zipProblem(stored);
+        if (bad || stored.byteLength !== sentBytes) {
+          showResult('danger', 'Файл сохранился повреждённым: ' +
+            escHtml(bad || ('в базе ' + stored.byteLength + ' байт вместо ' + sentBytes)) +
+            '. Загрузите его ещё раз — урок сейчас не откроется.');
+          return;
+        }
+        showResult('success', 'Файл <strong>' + escHtml(filename) + '</strong> успешно загружен ' +
+          'и проверен (' + (sentBytes / 1048576).toFixed(1) + ' МБ). ' + openLink);
+      })
+      .catch(function () {
+        showResult('warning', 'Файл <strong>' + escHtml(filename) + '</strong> отправлен, ' +
+          'но проверить сохранённую копию не удалось. ' + openLink);
+      });
+  }
+
+  function showResult(type, html) {
+    document.getElementById('h5p-upload-result').innerHTML =
+      '<div class="alert alert-' + type + '">' + html + '</div>';
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+})();
+</script>
+
+{% endunless %}

@@ -1,0 +1,1471 @@
+{% comment %}
+  Admin Exam Results — результаты аттестации одного экзамена (/admin/exam-results?id=<экзамен>).
+  Только роль «Аттестация: администратор»: общий админ-гейт (HR, Наставник…) здесь нельзя —
+  наставники как раз сдают этот экзамен.
+
+  Что на странице: сводка, попытки с подробностями билета, действия администратора
+  (нейтрализация вопроса, аннулирование попытки, дополнительная попытка), апелляции,
+  сертификаты и журнал. Все баллы только для чтения: у роли нет права записи в попытки,
+  задания, ответы, оценки и сертификаты — любые изменения идут через запись
+  new_examadminaction, которую выполняет поток F-A7.
+
+  Почему здесь есть серверный запрос: номер вопроса банка у задания билета закрыт для Web API
+  (участники читают свои задания через тот же список полей), поэтому связку
+  «задание → вопрос → попытка» отдаём из fetchxml скрытыми строками data-*. По ним
+  строится выбор вопроса для нейтрализации и подсказка правильного ответа в подробностях.
+  Имена вопросов берём в том же запросе (короткое поле), формулировки — через Web API
+  по требованию: 5000 длинных формулировок сделали бы страницу тяжёлой.
+{% endcomment %}
+{% assign ex_is_admin = false %}
+{% if user and user.roles contains 'Аттестация: администратор' %}{% assign ex_is_admin = true %}{% endif %}
+{% unless ex_is_admin %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только роли «Аттестация: администратор».</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+{% include 'Exam Admin Common' %}
+
+{% comment %}
+  Номер экзамена из адреса: экранируем и проверяем GUID до fetchxml (длина 36, части 8-4-4-4-12,
+  только шестнадцатеричные знаки), иначе мусор в адресе ломает запрос. Проверка знаков: убираем
+  все 0-9, a-f и дефисы — если что-то осталось, это не GUID (так же строго, как проверка в браузере).
+{% endcomment %}
+{% assign exr_id = request.params['id'] | xml_escape %}
+{% assign exr_len = exr_id | size %}
+{% assign exr_parts = exr_id | split: '-' %}
+{% assign exr_rest = exr_id | downcase | remove: '0' | remove: '1' | remove: '2' | remove: '3' | remove: '4' | remove: '5' | remove: '6' | remove: '7' | remove: '8' | remove: '9' | remove: 'a' | remove: 'b' | remove: 'c' | remove: 'd' | remove: 'e' | remove: 'f' | remove: '-' %}
+{% assign exr_rest_len = exr_rest | size %}
+{% assign exr_ok = false %}
+{% if exr_len == 36 and exr_parts.size == 5 and exr_rest_len == 0 %}
+{% assign exr_p0 = exr_parts[0] | size %}{% assign exr_p1 = exr_parts[1] | size %}{% assign exr_p2 = exr_parts[2] | size %}{% assign exr_p3 = exr_parts[3] | size %}{% assign exr_p4 = exr_parts[4] | size %}
+{% if exr_p0 == 8 and exr_p1 == 4 and exr_p2 == 4 and exr_p3 == 4 and exr_p4 == 12 %}{% assign exr_ok = true %}{% endif %}
+{% endif %}
+{% assign exr_rows = 0 %}
+<div id="exrItems" hidden>
+{% if exr_ok %}
+{% fetchxml exr_items %}
+<fetch top="5000">
+  <entity name="new_examticketitem">
+    <attribute name="new_examticketitemid" />
+    <attribute name="new_question" />
+    <attribute name="new_attempt" />
+    <attribute name="new_neutralized" />
+    <filter>
+      <condition attribute="statecode" operator="eq" value="0" />
+      <condition attribute="new_question" operator="not-null" />
+    </filter>
+    <link-entity name="new_examattempt" from="new_examattemptid" to="new_attempt" link-type="inner" alias="xa">
+      <attribute name="new_status" />
+      <filter>
+        <condition attribute="new_exam" operator="eq" value="{{ exr_id }}" />
+      </filter>
+    </link-entity>
+    <link-entity name="new_examquestion" from="new_examquestionid" to="new_question" link-type="outer" alias="xq">
+      <attribute name="new_name" />
+    </link-entity>
+    <order attribute="new_attempt" />
+  </entity>
+</fetch>
+{% endfetchxml %}
+{% assign exr_rows = exr_items.results.entities.size %}
+{% for t in exr_items.results.entities %}{% assign exr_st = t['xa.new_status'] %}<div data-item="{{ t.id }}" data-q="{{ t.new_question.id }}" data-qname="{{ t['xq.new_name'] | escape }}" data-att="{{ t.new_attempt.id }}" data-attst="{{ exr_st.value }}" data-neu="{{ t.new_neutralized }}"></div>
+{% endfor %}
+{% endif %}
+</div>
+<div id="exrItemsMeta" hidden data-count="{{ exr_rows }}"></div>
+
+<style>
+  .exr .adm-cardhead { flex-wrap: wrap; gap: 8px 12px; }
+  /* колонка 320px не влезает в карточку на экране 360px — ужимаем до ширины карточки */
+  .exr .exad-grid--2 { grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); }
+  .exr .adm-cardhead .exad-muted { margin-top: 2px; }
+  .exr-jump { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
+  .exr-jump a { font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--adm-border-2);
+                background: #fff; color: var(--adm-fg-2) !important; text-decoration: none; }
+  .exr-jump a:hover { color: var(--adm-primary) !important; border-color: var(--adm-primary); }
+  .exr-filters .adm-input { flex: 1 1 160px; min-width: 0; max-width: 100%; }
+  .exr-filters .exr-search { flex: 2 1 220px; }
+  .exr-row { cursor: pointer; }
+  .exr-row:focus { outline: 2px solid var(--adm-primary); outline-offset: -2px; }
+  .exr-name { font-weight: 600; color: var(--adm-fg-1); }
+  .exr-err { color: var(--adm-danger); font-size: 12px; max-width: 220px; }
+  .exr-nowrap { white-space: nowrap; }
+  .exr-stat-bad .adm-stat-val { color: var(--adm-danger); }
+  .exr-stat-ok .adm-stat-val { color: var(--adm-success); }
+  .exr-more summary { cursor: pointer; list-style: revert; }
+  .exr-more[open] summary { color: var(--adm-fg-2); }
+  .exr-text { white-space: pre-wrap; word-break: break-word; }
+  .exr-kv { display: grid; grid-template-columns: minmax(90px, max-content) 1fr; gap: 2px 10px; margin: 0; font-size: 12px; }
+  .exr-kv dt { font-weight: 600; color: var(--adm-fg-2); }
+  .exr-kv dd { margin: 0; word-break: break-word; }
+  .exr-sum { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px 16px; margin-bottom: 16px; }
+  .exr-sum div span { display: block; font-size: 11px; color: var(--adm-fg-3); }
+  .exr-h3 { font-size: 13px; font-weight: 700; margin: 18px 0 8px; color: var(--adm-fg-1); }
+  .exr-ans { margin-top: 6px; font-size: 12px; }
+  .exr-grade { border-top: 1px dashed var(--adm-border-1); margin-top: 6px; padding-top: 6px; font-size: 12px; }
+  .exr-count { font-size: 11px; color: var(--adm-fg-3); text-align: right; }
+  .exr-count.is-bad { color: var(--adm-danger); }
+  .exr-panel[hidden] { display: none; }
+  .exr-progress { margin-top: 12px; }
+  .exr-ok { color: var(--adm-success); font-weight: 700; }
+  .exr-code { font-size: 11px; color: var(--adm-fg-3); display: block; }
+</style>
+
+<div class="container adm-scope exad exr" id="exrPage">
+  <div id="exrHead"></div>
+  <div id="exrFatal"></div>
+
+  <div class="exad-stats" id="exrKpi"></div>
+
+  <nav class="exr-jump" aria-label="Разделы страницы">
+    <a href="#exrSecAttempts">Попытки</a>
+    <a href="#exrSecActions">Действия администратора</a>
+    <a href="#exrSecAppeals">Апелляции</a>
+    <a href="#exrSecCerts">Сертификаты</a>
+    <a href="#exrSecLog">Журнал</a>
+  </nav>
+
+  <!-- ── Попытки ── -->
+  <section class="adm-card exad-section" id="exrSecAttempts">
+    <div class="adm-cardhead">
+      <div>
+        <div class="adm-cardhead-title">Попытки</div>
+        <div class="exad-muted">Нажмите на строку, чтобы открыть билет, ответы и баллы. Баллы изменить нельзя.</div>
+      </div>
+      <div class="exad-actions">
+        <button type="button" class="adm-btn adm-btn--ghost" id="exrCsv"><i class="bi bi-download" aria-hidden="true"></i> Выгрузить CSV</button>
+      </div>
+    </div>
+    <div class="adm-toolbar exr-filters">
+      <select class="adm-input" id="exrFStatus" aria-label="Статус попытки"><option value="">Все статусы</option></select>
+      <select class="adm-input" id="exrFResult" aria-label="Результат"><option value="">Все результаты</option></select>
+      <input type="search" class="adm-input exr-search" id="exrFSearch" placeholder="Поиск по имени, почте или номеру попытки" aria-label="Поиск">
+    </div>
+    <div class="exad-card-body" id="exrAttNotes" style="padding-top:0;padding-bottom:0;"></div>
+    <div class="exad-scroll">
+      <table class="adm-table">
+        <thead>
+          <tr>
+            <th>Сотрудник</th><th class="adm-r">№</th><th>Статус</th><th>Начата</th><th>Сдана</th><th>Подсчитана</th>
+            <th class="adm-r">Заданий</th><th class="adm-r">Процент</th><th class="adm-r">По кейсам</th><th>Результат</th>
+            <th>Итоговая</th><th class="adm-r">Версия результата</th><th>Апелляция до</th><th>Ошибка</th>
+          </tr>
+        </thead>
+        <tbody id="exrAttBody"><tr><td colspan="14" class="exad-empty"><span class="exad-spin"></span> Загружаем попытки…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="exad-card-body exad-actions" id="exrAttMore"></div>
+  </section>
+
+  <!-- ── Действия администратора ── -->
+  <section class="adm-card exad-section" id="exrSecActions">
+    <div class="adm-cardhead">
+      <div>
+        <div class="adm-cardhead-title">Действия администратора</div>
+        <div class="exad-muted">Действие выполняется сразу после подтверждения и не отменяется. Каждое действие записывается в историю и журнал.</div>
+      </div>
+    </div>
+    <div class="exad-card-body">
+      <div class="exad-grid exad-grid--2">
+        <div class="exad-field">
+          <label for="exrKind">Что сделать</label>
+          <select class="adm-input" id="exrKind">
+            <option value="">— выберите действие —</option>
+            <option value="100000000">Нейтрализовать вопрос</option>
+            <option value="100000001">Аннулировать попытку</option>
+            <option value="100000002">Дополнительная попытка</option>
+            <option value="100000003" disabled>Переоценить после сбоя — недоступно: оценка письменных ответов ещё не подключена</option>
+          </select>
+          <span class="exad-hint">«Переоценить после сбоя» недоступно: оценка письменных ответов ещё не подключена.</span>
+        </div>
+      </div>
+
+      <div class="exr-panel" id="exrPanelN" hidden>
+        <div class="exad-grid exad-grid--2" style="margin-top:12px;">
+          <div class="exad-field">
+            <label for="exrQFilter">Найти вопрос</label>
+            <input type="search" class="adm-input" id="exrQFilter" placeholder="Номер или слова из формулировки">
+          </div>
+          <div class="exad-field">
+            <label for="exrQ">Вопрос из билетов этого экзамена</label>
+            <select class="adm-input" id="exrQ"><option value="">— выберите вопрос —</option></select>
+          </div>
+        </div>
+        <div id="exrQTrunc" style="margin-top:12px;"></div>
+        <div id="exrQInfo" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="exr-panel" id="exrPanelA" hidden>
+        <div class="exad-grid exad-grid--2" style="margin-top:12px;">
+          <div class="exad-field">
+            <label for="exrAtt">Попытка</label>
+            <select class="adm-input" id="exrAtt"><option value="">— выберите попытку —</option></select>
+            <span class="exad-hint">Аннулировать можно только оценённую попытку или попытку с ошибкой. Попытку, которая ещё идёт, аннулировать нельзя: завершение сотрудником вернёт её обратно.</span>
+          </div>
+        </div>
+        <div id="exrAttInfo" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="exr-panel" id="exrPanelE" hidden>
+        <div class="exad-grid exad-grid--2" style="margin-top:12px;">
+          <div class="exad-field">
+            <label for="exrEmp">Сотрудник</label>
+            <select class="adm-input" id="exrEmp"><option value="">— выберите сотрудника —</option></select>
+            <span class="exad-hint">В списке — сотрудники, у которых уже есть попытки по этому экзамену.</span>
+          </div>
+        </div>
+        <div id="exrEmpInfo" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="exr-panel" id="exrPanelR" hidden>
+        <div class="exad-note exad-note--warn" style="margin-top:12px;">Переоценка недоступна: оценка письменных ответов ещё не подключена. Запись такого действия ничего не пересчитает.</div>
+      </div>
+
+      <div class="exr-panel" id="exrPanelReason" hidden>
+        <div class="exad-field" style="margin-top:12px;">
+          <label for="exrReason">Обоснование</label>
+          <textarea class="adm-input" id="exrReason" maxlength="2000" placeholder="Почему нужно это действие: что случилось, кто сообщил, на что это повлияет"></textarea>
+          <div class="exr-count" id="exrReasonCount">0 знаков, нужно не меньше 20</div>
+        </div>
+        <div class="exad-actions" style="margin-top:12px;">
+          <button type="button" class="adm-btn adm-btn--primary" id="exrSubmit">Выполнить действие…</button>
+          <span class="exad-dialog-err" id="exrActErr" style="margin-right:0;"></span>
+        </div>
+      </div>
+
+      <div id="exrActProgress" class="exr-progress"></div>
+    </div>
+
+    <div class="adm-cardhead" style="border-top:1px solid var(--adm-border-1);">
+      <div class="adm-cardhead-title">История действий</div>
+      <button type="button" class="adm-btn adm-btn--ghost" id="exrActRefresh"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Обновить</button>
+    </div>
+    <div class="exad-scroll">
+      <table class="adm-table">
+        <thead><tr><th>Когда</th><th>Действие</th><th>Кого касается</th><th>Обоснование</th><th>Кто</th><th>Статус</th><th>Результат</th></tr></thead>
+        <tbody id="exrActBody"><tr><td colspan="7" class="exad-empty"><span class="exad-spin"></span> Загружаем…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Апелляции ── -->
+  <section class="adm-card exad-section" id="exrSecAppeals">
+    <div class="adm-cardhead">
+      <div>
+        <div class="adm-cardhead-title">Апелляции</div>
+        <div class="exad-muted">Только просмотр.</div>
+      </div>
+    </div>
+    <div class="exad-card-body" style="padding-bottom:0;">
+      <div class="exad-note exad-note--info">Апелляции пока не рассматриваются автоматически: поток апелляций ещё не подключён. Поданные апелляции остаются в статусе «Подана».</div>
+    </div>
+    <div class="exad-scroll">
+      <table class="adm-table">
+        <thead><tr><th>Номер</th><th>Сотрудник</th><th>Попытка</th><th class="adm-r">Заданий</th><th>Причина</th><th>Статус</th><th>Подана</th></tr></thead>
+        <tbody id="exrApBody"><tr><td colspan="7" class="exad-empty"><span class="exad-spin"></span> Загружаем…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Сертификаты ── -->
+  <section class="adm-card exad-section" id="exrSecCerts">
+    <div class="adm-cardhead">
+      <div>
+        <div class="adm-cardhead-title">Сертификаты</div>
+        <div class="exad-muted">Только просмотр. Сертификат выдаётся автоматически, когда итоговый результат сотрудника — «Сдано».</div>
+      </div>
+    </div>
+    <div class="exad-card-body" id="exrCertNotes" style="padding-bottom:0;"></div>
+    <div class="exad-scroll">
+      <table class="adm-table">
+        <thead><tr><th>Номер</th><th>Сотрудник</th><th>Выдан</th><th>Действует до</th><th>Статус</th><th>Причина отзыва</th></tr></thead>
+        <tbody id="exrCertBody"><tr><td colspan="6" class="exad-empty"><span class="exad-spin"></span> Загружаем…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Журнал ── -->
+  <section class="adm-card exad-section" id="exrSecLog">
+    <div class="adm-cardhead">
+      <div>
+        <div class="adm-cardhead-title">Журнал</div>
+        <div class="exad-muted">Что и когда происходило с экзаменом и попытками. Записи журнала никто не может изменить.</div>
+      </div>
+    </div>
+    <div class="adm-toolbar exr-filters">
+      <select class="adm-input" id="exrLogGroup" aria-label="Группа событий">
+        <option value="">Все события</option>
+        <option value="pub">Публикация</option>
+        <option value="att">Попытки и билеты</option>
+        <option value="res">Результаты</option>
+        <option value="cert">Сертификаты</option>
+        <option value="act">Действия</option>
+        <option value="bank">Банк и ИИ</option>
+        <option value="err">Сбои</option>
+      </select>
+      <input type="search" class="adm-input exr-search" id="exrLogSearch" placeholder="Поиск по событию, автору и подробностям" aria-label="Поиск по журналу">
+      <label class="exad-check"><input type="checkbox" id="exrFlowAll"> Сбои потоков по всем экзаменам</label>
+    </div>
+    <div class="exad-scroll">
+      <table class="adm-table">
+        <thead><tr><th>Время</th><th>Событие</th><th>Кто записал</th><th>Подробности</th></tr></thead>
+        <tbody id="exrLogBody"><tr><td colspan="4" class="exad-empty"><span class="exad-spin"></span> Загружаем…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="exad-card-body exad-actions" id="exrLogMore"></div>
+    <div id="exrFlowBox" hidden>
+      <div class="adm-cardhead" style="border-top:1px solid var(--adm-border-1);">
+        <div>
+          <div class="adm-cardhead-title">Сбои потоков по всем экзаменам</div>
+          <div class="exad-muted">Последние 50 записей. Сбои не привязаны к экзамену, поэтому здесь могут быть записи других экзаменов.</div>
+        </div>
+      </div>
+      <div class="exad-scroll">
+        <table class="adm-table">
+          <thead><tr><th>Время</th><th>Поток</th><th>Запуск</th><th>Подробности</th></tr></thead>
+          <tbody id="exrFlowBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var A = window.ExamAdm;
+  var page = document.getElementById('exrPage');
+  if (!A || !page) { return; }
+  var esc = A.esc, V = A.V;
+
+  var LOG_PAGE = 300;          // строк журнала за один заход (и в «Показать ещё»)
+  var ACTION_WAIT_MS = 180000; // сколько ждём поток действия, прежде чем сказать «ещё не ответил»
+  var ATT_PAGE = 100;          // строк попыток на экране до «Показать ещё»
+
+  var S = {
+    id: A.guidFromUrl('id'),
+    exam: null, P: null, bpTotal: 0,
+    attempts: [], attById: {}, names: {},
+    items: [], qIndex: {}, itemToQ: {}, qInfo: {},
+    certs: null, dupCount: null, actions: [], appeals: [],
+    log: [], logOldest: null, logMore: false, logBusy: false,
+    shown: ATT_PAGE, acting: false,
+    truncated: false,          // серверная выборка заданий упёрлась в 5000 строк
+    ack: '',                   // вопрос, для которого отмечено «понимаю последствия» (переживает перерисовку)
+    dupFailed: false, certsFailed: false,
+    actionsOk: false,          // история действий загружена: без неё не проверить, нет ли такого же невыполненного действия
+    firstSt: null,             // статусы попыток при первой загрузке: какие попытки страница застала и в каком виде
+    logResetPending: false     // обновление журнала, запрошенное во время другой загрузки
+  };
+
+  /* ── Мелочи ─────────────────────────────────────────────────────────────────────────── */
+  function $(id) { return document.getElementById(id); }
+  function lc(s) { return String(s == null ? '' : s).toLowerCase(); }
+  function trunc(s, n) { s = String(s == null ? '' : s); return s.length > n ? s.slice(0, n).replace(/\s+\S*$/, '') + '…' : s; }
+  function num(n) {
+    var x = Number(n);
+    if (n == null || n === '' || isNaN(x)) { return '—'; }
+    return String(Math.round(x * 100) / 100).replace('.', ',');
+  }
+  function note(kind, html) { return '<div class="exad-note exad-note--' + kind + '">' + html + '</div>'; }
+  function emptyRow(cols, text) { return '<tr><td colspan="' + cols + '" class="exad-empty">' + esc(text) + '</td></tr>'; }
+  function errRow(cols, e) { return '<tr><td colspan="' + cols + '" class="exad-empty" style="color:var(--adm-danger);">Не удалось загрузить: ' + esc(e && e.message ? e.message : e) + '</td></tr>'; }
+  function fmtDur(sec) {
+    if (sec == null || isNaN(sec)) { return '—'; }
+    sec = Math.round(sec);
+    if (sec < 60) { return sec + ' с'; }
+    return Math.floor(sec / 60) + ' мин ' + (sec % 60) + ' с';
+  }
+  function person(cid) { var p = S.names[lc(cid)]; return p ? p.name : '—'; }
+  function email(cid) { var p = S.names[lc(cid)]; return p ? p.email : ''; }
+  /* Длинный текст — первые n знаков, остальное раскрывается */
+  function moreText(s, n) {
+    s = String(s == null ? '' : s);
+    if (!s) { return '<span class="exad-muted">—</span>'; }
+    if (s.length <= n) { return '<div class="exr-text">' + esc(s) + '</div>'; }
+    return '<details class="exr-more"><summary>' + esc(trunc(s, n)) + '</summary><div class="exr-text">' + esc(s) + '</div></details>';
+  }
+  /* Запросы порциями, не больше n одновременно: сотни попыток — это сотни фильтров.
+     Возвращает массив результатов задач в исходном порядке (по одному на задачу). */
+  function runLimited(tasks, n) {
+    var i = 0, out = [];
+    function next() {
+      if (i >= tasks.length) { return Promise.resolve(out); }
+      var batch = tasks.slice(i, i + n); i += n;
+      return Promise.all(batch.map(function (t) { return t(); })).then(function (r) { out = out.concat(r); return next(); });
+    }
+    return next();
+  }
+  function orFilter(field, ids) { return ids.map(function (id) { return field + ' eq ' + id; }).join(' or '); }
+  function attBusy(st) { return st === V.ATT_PREPARING || st === V.ATT_RUNNING || st === V.ATT_SUBMITTED || st === V.ATT_GRADING; }
+  function blocksOf(a) { var b = A.parseJson(a && a.new_blockscores, []); return Array.isArray(b) ? b.filter(function (x) { return x && typeof x === 'object'; }) : []; }
+  function hasCases(a) { return blocksOf(a).some(function (b) { return b.type === 'case' && Number(b.max) > 0; }); }
+  function typeLabel(code) { return A.LABEL.type[code] || code || '—'; }
+  function attLabel(a) {
+    if (!a) { return 'попытка не найдена'; }
+    return person(a._new_contact_value) + ' — попытка №' + (a.new_attemptno == null ? '?' : a.new_attemptno);
+  }
+
+  /* ── Связка «задание → вопрос → попытка» из серверного запроса ────────────────────── */
+  function readItems() {
+    var box = $('exrItems'), out = [];
+    if (!box) { return out; }
+    var els = box.children;
+    for (var i = 0; i < els.length; i++) {
+      var e = els[i], q = lc(e.getAttribute('data-q')), att = lc(e.getAttribute('data-att'));
+      if (!A.isGuid(q) || !A.isGuid(att)) { continue; }
+      var st = parseInt(e.getAttribute('data-attst'), 10);
+      out.push({ item: lc(e.getAttribute('data-item')), q: q, qname: e.getAttribute('data-qname') || '', att: att,
+                 attst: isNaN(st) ? null : st, neu: lc(e.getAttribute('data-neu')) === 'true' });
+    }
+    return out;
+  }
+  function indexItems() {
+    S.qIndex = {}; S.itemToQ = {}; S.attHasItems = {}; S.attPartial = {};
+    S.items.forEach(function (r) {
+      var q = S.qIndex[r.q] || (S.qIndex[r.q] = { id: r.q, name: r.qname, atts: {}, total: 0, neu: 0 });
+      q.total++; if (r.neu) { q.neu++; }
+      if (!q.atts[r.att]) { q.atts[r.att] = r.attst; }
+      if (!q.name && r.qname) { q.name = r.qname; }
+      if (r.item) { S.itemToQ[r.item] = r.q; }
+      // Билет «Готовится» собирается параллельно: на момент открытия в выборке могла быть только часть заданий
+      if (r.attst === V.ATT_PREPARING) { S.attPartial[r.att] = true; } else { S.attHasItems[r.att] = true; }
+    });
+  }
+  /* Статус попытки: свежий из Web API, иначе — на момент открытия страницы */
+  function attStatus(att, fallback) { var a = S.attById[att]; return a ? a.new_status : (fallback == null ? null : fallback); }
+  /* Вопросы банка по номерам (название, формулировка, варианты) — с кешем */
+  function ensureQuestions(ids) {
+    var need = A.uniq(ids).filter(function (id) { return A.isGuid(id) && !S.qInfo[id]; });
+    return runLimited(A.chunk(need, 20).map(function (part) {
+      return function () {
+        return A.api('/_api/new_examquestions?$select=new_examquestionid,new_name,new_stem,new_status,new_type,new_optionsjson&$filter=' + orFilter('new_examquestionid', part) + '&$top=50')
+          .then(function (j) { (j.value || []).forEach(function (q) { S.qInfo[lc(q.new_examquestionid)] = q; }); });
+      };
+    }), 4);
+  }
+  function qTitle(qid) {
+    var q = S.qIndex[qid], info = S.qInfo[qid];
+    return (info && info.new_name) || (q && q.name) || 'вопрос банка';
+  }
+
+  /* ── Загрузка ───────────────────────────────────────────────────────────────────────── */
+  function fatal(html) { $('exrFatal').innerHTML = note('danger', html); }
+
+  function start() {
+    if (!S.id) {
+      A.examHeader($('exrHead'), null, 'results');
+      fatal('В адресе страницы нет номера экзамена. Откройте результаты из списка экзаменов. <a class="exad-link" href="/admin/exams">Все экзамены</a>');
+      return;
+    }
+    S.items = readItems();
+    indexItems();
+    var meta = $('exrItemsMeta');
+    S.truncated = !!(meta && (parseInt(meta.getAttribute('data-count'), 10) || 0) >= 5000);
+    if (S.truncated) {
+      // Отдельный блок: renderQInfo его не перерисовывает, предупреждение не пропадёт
+      $('exrQTrunc').innerHTML = note('warn', 'Заданий в билетах этого экзамена больше 5000 — страница видит только часть из них. Часть вопросов может отсутствовать в списке, а про попытки, которых страница не видит, нельзя сказать, есть ли в них выбранный вопрос. Поэтому любая идущая попытка блокирует нейтрализацию, а аннулированные считаются возможно затронутыми.');
+    }
+    fillFilterOptions();
+    renderKpi();
+    A.loadExam(S.id).then(function (ex) {
+      S.exam = ex;
+      S.P = A.normalizeParams(A.parseJson(ex.new_paramsjson, {}));
+      S.bpTotal = S.P.blueprint.reduce(function (s, c) { return s + c.count; }, 0);
+      A.examHeader($('exrHead'), ex, 'results', 'Попытки сотрудников, действия администратора, апелляции, сертификаты и журнал.');
+      return loadAttempts();
+    }).then(function () {
+      loadCerts(); loadActions(); loadAppeals(); loadDupCount(); loadLog(true);
+    }).catch(function (e) {
+      A.examHeader($('exrHead'), S.exam, 'results');
+      fatal('Не удалось загрузить экзамен: ' + esc(e.message || e) + '. Проверьте адрес или обновите страницу.');
+      $('exrAttBody').innerHTML = emptyRow(14, 'Нет данных');
+    });
+  }
+
+  function loadAttempts() {
+    return A.apiAll('/_api/new_examattempts?$select=new_examattemptid,new_name,new_attemptno,new_status,new_consentgiven,new_consentversion,new_ticketreadyon,new_startedon,new_deadline,new_submittedon,new_finalizedon,new_appealuntil,new_itemcount,new_percent,new_casepercent,new_passed,new_result,new_blockscores,new_isfinal,new_resultversion,new_errortext,createdon,_new_contact_value&$filter=_new_exam_value eq ' + S.id + '&$orderby=createdon desc&$top=2000', 2000)
+      .then(function (rows) {
+        S.attempts = rows; S.attById = {};
+        rows.forEach(function (a) { S.attById[lc(a.new_examattemptid)] = a; });
+        if (!S.firstSt) {
+          S.firstSt = {};
+          rows.forEach(function (a) { S.firstSt[lc(a.new_examattemptid)] = a.new_status; });
+        }
+        return addNames(rows.map(function (a) { return a._new_contact_value; }));
+      }).then(function () {
+        renderKpi(); renderAttempts(); fillPickers();
+      }, function (e) {
+        $('exrAttBody').innerHTML = errRow(14, e);
+        throw e;
+      });
+  }
+  function addNames(ids) {
+    var need = A.uniq(ids.map(lc)).filter(function (id) { return A.isGuid(id) && !S.names[id]; });
+    if (!need.length) { return Promise.resolve(); }
+    return A.contactNames(need).then(function (m) { Object.keys(m).forEach(function (k) { S.names[k] = m[k]; }); });
+  }
+
+  /* ── Сводка ─────────────────────────────────────────────────────────────────────────── */
+  /* Итоговая попытка сотрудника: отмечена итоговой и не аннулирована (у аннулированной флаг может остаться старым) */
+  function finalsByContact() {
+    var by = {};
+    S.attempts.forEach(function (a) {
+      var c = lc(a._new_contact_value);
+      // Итог дают только оценённые попытки — как в потоке финализации
+      if (a.new_isfinal === true && a.new_status === V.ATT_GRADED && !by[c]) { by[c] = a; }
+    });
+    return by;
+  }
+  function stat(label, icon, value, sub, mod) {
+    return '<div class="adm-card adm-stat' + (mod ? ' ' + mod : '') + '"><div class="adm-stat-top"><span class="adm-eyebrow">' + esc(label) + '</span>' +
+      '<i class="bi ' + icon + '" aria-hidden="true"></i></div><div class="adm-stat-val">' + esc(value) + '</div>' +
+      '<div class="adm-stat-foot"><span class="adm-stat-sub">' + esc(sub) + '</span></div></div>';
+  }
+  function renderKpi() {
+    var at = S.attempts, fin = finalsByContact(), passed = 0, failed = 0;
+    Object.keys(fin).forEach(function (c) {
+      if (fin[c].new_result === V.RES_PASSED) { passed++; } else if (fin[c].new_result === V.RES_FAILED) { failed++; }
+    });
+    var running = 0, grading = 0, graded = 0, errors = 0, sum = 0, cnt = 0, durs = [];
+    at.forEach(function (a) {
+      if (attBusy(a.new_status)) { running++; }
+      if (a.new_status === V.ATT_GRADING) { grading++; }
+      if (a.new_status === V.ATT_GRADED) {
+        graded++;
+        if (a.new_percent != null) { sum += Number(a.new_percent); cnt++; }
+      }
+      if (a.new_status === V.ATT_ERROR) { errors++; }
+      if (a.new_ticketreadyon && a.createdon) {
+        var d = (new Date(a.new_ticketreadyon).getTime() - new Date(a.createdon).getTime()) / 1000;
+        if (!isNaN(d) && d >= 0) { durs.push(d); }
+      }
+    });
+    durs.sort(function (x, y) { return x - y; });
+    var p95 = durs.length ? durs[Math.max(0, Math.ceil(durs.length * 0.95) - 1)] : null;
+    var certs = S.certs ? S.certs.filter(function (c) { return c.new_status === 100000000; }).length : null;
+    function pend(v, failed) { return v == null ? (failed ? '—' : '…') : A.fmtInt(v); }
+    var html =
+      stat('Попыток', 'bi-journal-text', A.fmtInt(at.length), 'всего по экзамену') +
+      stat('Идут сейчас', 'bi-hourglass-split', A.fmtInt(running), grading ? 'из них ждут проверки письменных: ' + grading : 'готовятся, идут, сданы или на проверке') +
+      stat('Оценено', 'bi-check2-square', A.fmtInt(graded), 'попыток с подсчитанным результатом') +
+      stat('Сдали', 'bi-patch-check', A.fmtInt(passed), 'сотрудников с итогом «Сдано»', passed ? 'exr-stat-ok' : '') +
+      stat('Не сдали', 'bi-x-octagon', A.fmtInt(failed), 'сотрудников с итогом «Не сдано»') +
+      stat('Ошибки', 'bi-exclamation-triangle', A.fmtInt(errors), errors ? 'мешают новым попыткам — см. действия' : 'попыток с ошибкой нет', errors ? 'exr-stat-bad' : '') +
+      stat('Средний процент', 'bi-percent', cnt ? A.fmt2(sum / cnt) : '—', 'по оценённым попыткам') +
+      stat('Действующих сертификатов', 'bi-award', pend(certs, S.certsFailed), S.certsFailed ? 'не удалось загрузить' : 'выдано и не отозвано') +
+      stat('Сборка билета, 95-й процентиль', 'bi-stopwatch', fmtDur(p95), 'цель — не дольше 3 мин', p95 != null && p95 > 180 ? 'exr-stat-bad' : '') +
+      stat('Одинаковых билетов', 'bi-files', pend(S.dupCount, S.dupFailed), S.dupFailed ? 'не удалось загрузить' : 'цель — 0', S.dupCount ? 'exr-stat-bad' : '');
+    $('exrKpi').innerHTML = html;
+  }
+  /* Совпавшие билеты пишутся в журнал без привязки к экзамену — берём все и оставляем свои попытки */
+  function loadDupCount() {
+    return A.apiAll("/_api/new_examlogs?$select=new_examlogid,_new_attempt_value&$filter=new_event eq 'TICKET_DUPLICATE_FINGERPRINT'&$orderby=createdon desc&$top=5000", 5000)
+      .then(function (rows) {
+        S.dupCount = rows.filter(function (r) { return S.attById[lc(r._new_attempt_value)]; }).length;
+        S.dupFailed = false;
+        renderKpi();
+      }, function () { S.dupCount = null; S.dupFailed = true; renderKpi(); });
+  }
+
+  /* ── Попытки ────────────────────────────────────────────────────────────────────────── */
+  function fillFilterOptions() {
+    var fs = $('exrFStatus'), fr = $('exrFResult'), h = '<option value="">Все статусы</option><option value="busy">Идут сейчас</option>';
+    Object.keys(A.ENUM.attemptStatus).forEach(function (k) { h += '<option value="' + k + '">' + esc(A.ENUM.attemptStatus[k]) + '</option>'; });
+    fs.innerHTML = h;
+    h = '<option value="">Все результаты</option>';
+    Object.keys(A.ENUM.attemptResult).forEach(function (k) { h += '<option value="' + k + '">' + esc(A.ENUM.attemptResult[k]) + '</option>'; });
+    fr.innerHTML = h + '<option value="none">Результата ещё нет</option>';
+  }
+  function filteredAttempts() {
+    var st = $('exrFStatus').value, rs = $('exrFResult').value, q = lc($('exrFSearch').value).trim();
+    return S.attempts.filter(function (a) {
+      if (st === 'busy' && !attBusy(a.new_status)) { return false; }
+      if (st && st !== 'busy' && String(a.new_status) !== st) { return false; }
+      if (rs === 'none' && a.new_result != null) { return false; }
+      if (rs && rs !== 'none' && String(a.new_result) !== rs) { return false; }
+      if (q) {
+        var hay = lc(person(a._new_contact_value) + ' ' + email(a._new_contact_value) + ' ' + (a.new_name || ''));
+        if (hay.indexOf(q) < 0) { return false; }
+      }
+      return true;
+    });
+  }
+  function isShort(a) { return S.bpTotal > 0 && a.new_itemcount != null && a.new_itemcount < S.bpTotal; }
+  function renderAttempts() {
+    var rows = filteredAttempts(), body = $('exrAttBody'), notes = [];
+    var shortCnt = S.attempts.filter(isShort).length;
+    var gradingCnt = S.attempts.filter(function (a) { return a.new_status === V.ATT_GRADING; }).length;
+    if (shortCnt) {
+      notes.push(note('warn', '<b>Короткие билеты: ' + shortCnt + '.</b> По раскладке в билете ' + S.bpTotal + ' заданий, но в банке не хватило вопросов, и эти сотрудники получили меньше. Такие строки отмечены красным в столбце «Заданий»; подробности — в журнале, событие «Ячейка билета добрана вопросами другого урока или уровня».'));
+    }
+    if (gradingCnt) {
+      notes.push(note('info', 'Попыток на проверке письменных ответов: ' + gradingCnt + '. Письменные ответы пока не оцениваются автоматически, поэтому такие попытки останутся в статусе «Проверяется».'));
+    }
+    $('exrAttNotes').innerHTML = notes.length ? '<div style="padding-top:12px;"></div>' + notes.join('') : '';
+    if (!rows.length) {
+      body.innerHTML = emptyRow(14, S.attempts.length ? 'Под фильтр не попала ни одна попытка' : 'Попыток по этому экзамену пока нет');
+      $('exrAttMore').innerHTML = '';
+      return;
+    }
+    var html = rows.slice(0, S.shown).map(function (a) {
+      var id = lc(a.new_examattemptid), c = a._new_contact_value, short = isShort(a);
+      var hasRes = a.new_result != null;
+      var fin = a.new_isfinal === true && a.new_status !== V.ATT_ANNULLED;
+      return '<tr class="exr-row" tabindex="0" data-att="' + esc(id) + '" title="Открыть подробности попытки">' +
+        '<td><div class="exr-name">' + esc(person(c)) + '</div><div class="exad-muted">' + esc(email(c)) + '</div></td>' +
+        '<td class="adm-r adm-num">' + esc(a.new_attemptno == null ? '—' : a.new_attemptno) + '</td>' +
+        '<td>' + A.pill('attemptStatus', a.new_status) + '</td>' +
+        '<td class="exr-nowrap">' + esc(A.dt(a.new_startedon)) + '</td>' +
+        '<td class="exr-nowrap">' + esc(A.dt(a.new_submittedon)) + '</td>' +
+        '<td class="exr-nowrap">' + esc(A.dt(a.new_finalizedon)) + '</td>' +
+        '<td class="adm-r adm-num' + (short ? ' exad-cell-short' : '') + '"' + (short ? ' title="Билет короче раскладки: ' + S.bpTotal + ' заданий"' : '') + '>' +
+          esc(a.new_itemcount == null ? '—' : a.new_itemcount) + (short ? ' из ' + S.bpTotal : '') + '</td>' +
+        '<td class="adm-r adm-num">' + (hasRes ? esc(A.fmt2(a.new_percent)) : '—') + '</td>' +
+        '<td class="adm-r adm-num">' + (hasRes && hasCases(a) ? esc(A.fmt2(a.new_casepercent)) : '—') + '</td>' +
+        '<td>' + (hasRes ? A.pill('attemptResult', a.new_result) : '<span class="exad-muted">—</span>') + '</td>' +
+        '<td>' + (fin ? '<span class="exr-ok" title="Эта попытка определяет итог сотрудника">✓</span>' : '') + '</td>' +
+        '<td class="adm-r adm-num">' + esc(a.new_resultversion == null ? '—' : a.new_resultversion) + '</td>' +
+        '<td class="exr-nowrap">' + esc(A.dt(a.new_appealuntil)) + '</td>' +
+        '<td><div class="exr-err" title="' + esc(a.new_errortext || '') + '">' + esc(trunc(a.new_errortext || '', 80)) + '</div></td>' +
+        '</tr>';
+    }).join('');
+    body.innerHTML = html;
+    var left = rows.length - Math.min(rows.length, S.shown);
+    $('exrAttMore').innerHTML = '<span class="exad-muted">Показано ' + Math.min(rows.length, S.shown) + ' из ' + rows.length + '.</span>' +
+      (left > 0 ? ' <button type="button" class="adm-btn adm-btn--ghost" data-exr-more-att>Показать ещё ' + Math.min(left, ATT_PAGE) + '</button>' : '') +
+      (S.attempts.length >= 2000 ? ' <span class="exad-muted">Загружены последние 2000 попыток.</span>' : '');
+  }
+
+  /* ── Подробности попытки ────────────────────────────────────────────────────────────── */
+  var detailSeq = 0;
+  function openDetail(att) {
+    var a = S.attById[att];
+    if (!a) { return; }
+    var seq = ++detailSeq;
+    A.modal({
+      title: 'Попытка ' + (a.new_name || '') + ' · ' + person(a._new_contact_value),
+      html: '<div id="exrDetail" data-seq="' + seq + '"><div class="exad-empty"><span class="exad-spin"></span> Загружаем билет и ответы…</div></div>',
+      wide: true, noCancel: true, okText: 'Закрыть'
+    });
+    // Окно общее для всей страницы: вставляем результат, только если открыто именно это окно
+    function put(html) {
+      var el = $('exrDetail');
+      if (el && el.getAttribute('data-seq') === String(seq)) { el.innerHTML = html; }
+    }
+    loadDetail(a).then(put, function (e) { put(note('danger', 'Не удалось загрузить подробности: ' + esc(e.message || e))); });
+  }
+
+  function loadDetail(a) {
+    var att = lc(a.new_examattemptid);
+    return Promise.all([
+      A.api('/_api/new_examticketitems?$select=new_examticketitemid,new_order,new_type,new_modulename,new_stem,new_optionsjson,new_points,new_status,new_earned,new_revealjson,new_neutralized&$filter=_new_attempt_value eq ' + att + '&$orderby=new_order asc&$top=200'),
+      A.api('/_api/new_examanswers?$select=new_selected,new_text,new_accepted,createdon,_new_ticketitem_value&$filter=_new_attempt_value eq ' + att + ' and new_accepted eq true&$top=2000'),
+      A.api('/_api/new_examgrades?$select=new_run,new_model,new_status,new_score,new_criteriajson,new_errortext,new_isfinal,createdon,_new_ticketitem_value&$filter=_new_attempt_value eq ' + att + '&$top=500')
+    ]).then(function (r) {
+      var items = r[0].value || [], answers = {}, grades = {};
+      // Последний принятый ответ по каждому заданию
+      (r[1].value || []).slice().sort(function (x, y) { return String(y.createdon).localeCompare(String(x.createdon)); })
+        .forEach(function (x) { var k = lc(x._new_ticketitem_value); if (!answers[k]) { answers[k] = x; } });
+      (r[2].value || []).forEach(function (g) { var k = lc(g._new_ticketitem_value); (grades[k] = grades[k] || []).push(g); });
+      // Правильный ответ скрыт в разборе (режим «только верно/неверно») или разбора ещё нет — берём из вопроса банка
+      var needQ = [];
+      items.forEach(function (it) {
+        if (!isChoice(it.new_type)) { return; }
+        var rv = A.parseJson(it.new_revealjson, null);
+        if (!rv || !Array.isArray(rv.correct)) { var q = S.itemToQ[lc(it.new_examticketitemid)]; if (q) { needQ.push(q); } }
+      });
+      return ensureQuestions(needQ).catch(function () { /* без подсказки ключа тоже можно показать */ })
+        .then(function () { return detailHtml(a, items, answers, grades, r[2].value || []); });
+    });
+  }
+  function isChoice(t) { return t === 100000000 || t === 100000001; }
+  function correctIds(it) {
+    var rv = A.parseJson(it.new_revealjson, null);
+    if (rv && Array.isArray(rv.correct)) { return { ids: rv.correct.map(function (o) { return o && o.id; }).filter(Boolean), from: 'reveal' }; }
+    var q = S.qInfo[S.itemToQ[lc(it.new_examticketitemid)]];
+    if (q) { return { ids: A.options(q).filter(function (o) { return o.correct; }).map(function (o) { return o.id; }), from: 'bank' }; }
+    return { ids: [], from: '' };
+  }
+  function detailHtml(a, items, answers, grades, allGrades) {
+    var h = '<div class="exr-sum">' +
+      sumCell('Статус', A.pill('attemptStatus', a.new_status)) +
+      sumCell('Результат', a.new_result != null ? A.pill('attemptResult', a.new_result) : '—') +
+      sumCell('Процент', esc(a.new_result != null ? A.fmt2(a.new_percent) : '—')) +
+      sumCell('По кейсам', esc(a.new_result != null && hasCases(a) ? A.fmt2(a.new_casepercent) : '—')) +
+      sumCell('Номер попытки', esc(a.new_attemptno == null ? '—' : a.new_attemptno)) +
+      sumCell('Итоговая', a.new_isfinal === true && a.new_status !== V.ATT_ANNULLED ? 'да' : 'нет') +
+      sumCell('Создана', esc(A.dt(a.createdon))) +
+      sumCell('Билет готов', esc(A.dt(a.new_ticketreadyon))) +
+      sumCell('Начата', esc(A.dt(a.new_startedon))) +
+      sumCell('Срок', esc(A.dt(a.new_deadline))) +
+      sumCell('Сдана', esc(A.dt(a.new_submittedon))) +
+      sumCell('Подсчитана', esc(A.dt(a.new_finalizedon))) +
+      sumCell('Апелляция до', esc(A.dt(a.new_appealuntil))) +
+      sumCell('Версия результата', esc(a.new_resultversion == null ? '—' : a.new_resultversion)) +
+      sumCell('Согласие', a.new_consentgiven ? 'дано' + (a.new_consentversion ? ' (версия ' + esc(a.new_consentversion) + ')' : '') : 'нет') +
+      '</div>';
+    if (a.new_errortext) { h += note('danger', '<b>Ошибка или отказ:</b><div class="exr-text">' + esc(a.new_errortext) + '</div>'); }
+
+    var bl = blocksOf(a);
+    h += '<div class="exr-h3">Баллы по блокам</div>';
+    if (!bl.length) {
+      h += '<div class="exad-muted">Результат ещё не подсчитан.</div>';
+    } else {
+      h += '<div class="exad-scroll"><table class="adm-table" style="min-width:420px;"><thead><tr><th>Блок</th><th class="adm-r">Вес</th><th class="adm-r">Набрано</th><th class="adm-r">Из</th><th class="adm-r">Доля</th></tr></thead><tbody>' +
+        bl.map(function (b) {
+          var mx = Number(b.max);
+          return '<tr><td>' + esc(typeLabel(b.type)) + '</td><td class="adm-r">' + esc(num(b.weight)) + '</td><td class="adm-r">' + esc(num(b.earned)) +
+            '</td><td class="adm-r">' + esc(num(b.max)) + '</td><td class="adm-r">' + (mx > 0 ? esc(A.fmt2(Number(b.earned) * 100 / mx)) + '%' : '<span class="exad-muted">не участвует</span>') + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+
+    h += '<div class="exr-h3">Задания билета (' + items.length + ')</div>';
+    var written = items.filter(function (it) { return !isChoice(it.new_type); });
+    if (written.length && !allGrades.length) {
+      h += note('info', 'Письменные ответы пока не оцениваются автоматически: за такие задания сейчас ставится 0 баллов.');
+    }
+    if (!items.length) {
+      h += '<div class="exad-muted">Заданий нет: билет не собран.</div>';
+      return h;
+    }
+    h += '<div class="exad-scroll"><table class="adm-table"><thead><tr><th class="adm-r">№</th><th>Тип</th><th>Урок</th><th>Формулировка и ответ</th><th class="adm-r">Баллы</th><th>Статус</th></tr></thead><tbody>' +
+      items.map(function (it) {
+        var id = lc(it.new_examticketitemid), ans = answers[id], cell = moreText(it.new_stem, 160);
+        if (isChoice(it.new_type)) {
+          var rv = A.parseJson(it.new_revealjson, null);
+          var picked = (rv && rv.selected) || (ans && ans.new_selected) || '';
+          var ci = correctIds(it), key = ci.ids.slice().sort().join('|');
+          var pk = String(picked).split('|').filter(Boolean).sort().join('|');
+          cell += '<div class="exr-ans">выбрано: <b>' + esc(pk || 'нет ответа') + '</b> · верно: <b>' + esc(key || 'неизвестно') + '</b>' +
+            (key && pk ? (pk === key ? ' <span class="exr-ok">совпало</span>' : ' <span style="color:var(--adm-danger);">не совпало</span>') : '') +
+            (ci.from === 'bank' ? ' <span class="exad-muted">(ключ из банка вопросов)</span>' : '') + '</div>';
+        } else {
+          cell += '<div class="exr-ans"><span class="exad-label">Ответ сотрудника</span>' + (ans && ans.new_text ? moreText(ans.new_text, 200) : ' <span class="exad-muted">нет принятого ответа</span>') + '</div>';
+          var gs = grades[id] || [];
+          if (gs.length) {
+            cell += gs.map(function (g) {
+              var cr = A.parseJson(g.new_criteriajson, []);
+              var crHtml = Array.isArray(cr) && cr.length ? '<dl class="exr-kv">' + cr.map(function (c) {
+                return '<dt>' + esc(c.code || '') + ': ' + esc(num(c.score)) + '</dt><dd>' + esc(c.justification_ru || c.justification || '') + '</dd>';
+              }).join('') + '</dl>' : '';
+              return '<div class="exr-grade">' + esc(A.label('gradeRun', g.new_run)) + ' · ' + A.pill('gradeStatus', g.new_status) +
+                ' · балл: <b>' + esc(num(g.new_score)) + '</b>' + (g.new_isfinal ? ' · <b>засчитана</b>' : '') +
+                (g.new_model ? ' <span class="exad-muted">(' + esc(g.new_model) + ', ' + esc(A.dt(g.createdon)) + ')</span>' : '') +
+                (g.new_errortext ? '<div style="color:var(--adm-danger);">' + esc(g.new_errortext) + '</div>' : '') + crHtml + '</div>';
+            }).join('');
+          }
+        }
+        return '<tr><td class="adm-r adm-num">' + esc(it.new_order == null ? '—' : it.new_order) + '</td>' +
+          '<td>' + esc(A.label('qType', it.new_type)) + '</td>' +
+          '<td>' + esc(it.new_modulename || '—') + '</td>' +
+          '<td style="min-width:260px;">' + cell + '</td>' +
+          '<td class="adm-r adm-num exr-nowrap">' + esc(num(it.new_earned)) + ' / ' + esc(num(it.new_points)) + '</td>' +
+          '<td>' + A.pill('itemStatus', it.new_status) + (it.new_neutralized ? '<div class="exad-muted">вопрос нейтрализован</div>' : '') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    return h;
+  }
+  function sumCell(label, valueHtml) { return '<div><span>' + esc(label) + '</span>' + valueHtml + '</div>'; }
+
+  /* ── Действия администратора ────────────────────────────────────────────────────────── */
+  function kindVal() { return parseInt($('exrKind').value, 10) || 0; }
+  function showPanels() {
+    var k = kindVal();
+    $('exrPanelN').hidden = k !== V.ACT_NEUTRALIZE;
+    $('exrPanelA').hidden = k !== V.ACT_ANNUL;
+    $('exrPanelE').hidden = k !== V.ACT_EXTRA;
+    $('exrPanelR').hidden = k !== V.ACT_REGRADE;
+    $('exrPanelReason').hidden = !(k === V.ACT_NEUTRALIZE || k === V.ACT_ANNUL || k === V.ACT_EXTRA);
+    $('exrActErr').textContent = '';
+    if (k === V.ACT_NEUTRALIZE) {
+      renderQOptions();
+      // Формулировки подгружаем только когда они нужны
+      var ids = Object.keys(S.qIndex);
+      if (ids.length && !S.qLoaded) {
+        S.qLoaded = true;
+        ensureQuestions(ids).then(function () { renderQOptions(); renderQInfo(); }, function () { S.qLoaded = false; });
+      }
+    }
+  }
+  function fillPickers() {
+    // Аннулирование: только «Оценён» и «Ошибка» (незавершённую попытку завершение сотрудника вернёт обратно)
+    var sel = $('exrAtt'), cur = sel.value;
+    var list = S.attempts.filter(function (a) { return a.new_status === V.ATT_GRADED || a.new_status === V.ATT_ERROR; })
+      .slice().sort(function (x, y) { return person(x._new_contact_value).localeCompare(person(y._new_contact_value), 'ru') || (x.new_attemptno || 0) - (y.new_attemptno || 0); });
+    sel.innerHTML = '<option value="">— выберите попытку —</option>' + list.map(function (a) {
+      var id = lc(a.new_examattemptid);
+      return '<option value="' + esc(id) + '"' + (id === cur ? ' selected' : '') + '>' + esc(attLabel(a) + ' · ' + A.label('attemptStatus', a.new_status) +
+        (a.new_result != null ? ' · ' + A.fmt2(a.new_percent) + '%' : '') + ' · ' + A.dt(a.createdon, false)) + '</option>';
+    }).join('');
+    if (!list.length) { sel.innerHTML = '<option value="">Нет попыток, которые можно аннулировать</option>'; }
+
+    // Дополнительная попытка: сотрудники, у которых уже есть попытки
+    var emp = $('exrEmp'), curE = emp.value, seen = {}, people = [];
+    S.attempts.forEach(function (a) { var c = lc(a._new_contact_value); if (A.isGuid(c) && !seen[c]) { seen[c] = 1; people.push(c); } });
+    people.sort(function (x, y) { return person(x).localeCompare(person(y), 'ru'); });
+    emp.innerHTML = '<option value="">— выберите сотрудника —</option>' + people.map(function (c) {
+      return '<option value="' + esc(c) + '"' + (c === curE ? ' selected' : '') + '>' + esc(person(c) + (email(c) ? ' · ' + email(c) : '')) + '</option>';
+    }).join('');
+    renderQOptions(); renderQInfo(); renderAttInfo(); renderEmpInfo();
+  }
+
+  /* Нейтрализация: вопросы, которые встречались в билетах этого экзамена */
+  function renderQOptions() {
+    var sel = $('exrQ'), cur = sel.value, f = lc($('exrQFilter').value).trim();
+    var list = Object.keys(S.qIndex).map(function (id) { return S.qIndex[id]; });
+    if (!list.length) { sel.innerHTML = '<option value="">В билетах этого экзамена пока нет вопросов</option>'; return; }
+    list = list.filter(function (q) {
+      if (!f) { return true; }
+      var info = S.qInfo[q.id];
+      return lc(qTitle(q.id) + ' ' + (info ? info.new_stem : '')).indexOf(f) >= 0;
+    }).sort(function (x, y) { return Object.keys(y.atts).length - Object.keys(x.atts).length || qTitle(x.id).localeCompare(qTitle(y.id), 'ru'); });
+    sel.innerHTML = '<option value="">— выберите вопрос (' + list.length + ') —</option>' + list.map(function (q) {
+      var info = S.qInfo[q.id], n = Object.keys(q.atts).length;
+      var txt = qTitle(q.id) + ' — в ' + n + ' ' + plural(n, 'билете', 'билетах', 'билетах') + (info && info.new_stem ? ' · ' + trunc(info.new_stem.replace(/\s+/g, ' '), 70) : '') +
+        (q.neu >= q.total ? ' (уже нейтрализован)' : '');
+      return '<option value="' + esc(q.id) + '"' + (q.id === cur ? ' selected' : '') + '>' + esc(txt) + '</option>';
+    }).join('');
+  }
+  function plural(n, one, few, many) {
+    var m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) { return one; }
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) { return few; }
+    return many;
+  }
+  /* Разбор попыток, которых касается нейтрализация */
+  function analyzeQuestion(qid) {
+    var q = S.qIndex[qid], res = { byStatus: {}, busy: 0, annulled: 0, unknown: 0, atts: 0, blind: 0, maybeAnnulled: 0, errors: [] };
+    if (!q) { return res; }
+    Object.keys(q.atts).forEach(function (att) {
+      res.atts++;
+      var st = attStatus(att, q.atts[att]);
+      if (st == null) { res.unknown++; return; }
+      res.byStatus[st] = (res.byStatus[st] || 0) + 1;
+      if (attBusy(st)) { res.busy++; }
+      if (st === V.ATT_ANNULLED) { res.annulled++; }
+      if (st === V.ATT_ERROR) { res.errors.push(att); }
+    });
+    // Попытки, начатые после открытия страницы: их билетов здесь нет, а вопрос мог попасть и в них.
+    // Если выборка обрезана, билет любой попытки мог попасть в неё не целиком — не доверяем ни одной.
+    res.blind = S.attempts.filter(function (a) {
+      var id = lc(a.new_examattemptid);
+      if (!attBusy(a.new_status) || q.atts.hasOwnProperty(id)) { return false; }
+      return S.truncated || !S.attHasItems[id];
+    }).length;
+    // Попытки с ошибкой и аннулированные, билет которых страница могла видеть не целиком: он собирался
+    // при открытии страницы, попытка появилась после него или выборка обрезана — вопрос мог попасть
+    // в них незаметно. Безопасны только два случая: билет виден целиком, или попытка при первой
+    // загрузке уже была в конечном состоянии без единого задания (так выглядят частые отказы при
+    // допуске — блокировать нейтрализацию из-за них незачем: задания создаются только до «Идёт»).
+    function unseen(id) {
+      if (S.truncated || S.attPartial[id]) { return true; }
+      if (S.attHasItems[id]) { return false; }
+      var first = S.firstSt ? S.firstSt[id] : undefined;
+      return first === undefined || first === V.ATT_PREPARING || attBusy(first);
+    }
+    S.attempts.forEach(function (a) {
+      var id = lc(a.new_examattemptid);
+      if (q.atts.hasOwnProperty(id) || !unseen(id)) { return; }
+      if (a.new_status === V.ATT_ERROR) { res.errors.push(id); }
+      else if (a.new_status === V.ATT_ANNULLED) { res.maybeAnnulled++; }
+    });
+    return res;
+  }
+  function neutralRuleText() {
+    return S.P && S.P.neutralizeRule === 'creditAll'
+      ? 'вопрос будет засчитан всем как выполненный на полный балл'
+      : 'вопрос перестанет учитываться при подсчёте: ни в набранных баллах, ни в максимуме';
+  }
+  function renderQInfo() {
+    var box = $('exrQInfo'), qid = $('exrQ').value;
+    if (!qid || !S.qIndex[qid]) { box.innerHTML = ''; return; }
+    var q = S.qIndex[qid], info = S.qInfo[qid], r = analyzeQuestion(qid), h = '';
+    if (info && info.new_stem) { h += '<div class="exad-label">Формулировка</div>' + moreText(info.new_stem, 300); }
+    h += '<div class="exr-h3">Каких попыток касается</div><div class="exad-actions">' +
+      Object.keys(r.byStatus).map(function (st) { return A.pill('attemptStatus', parseInt(st, 10), A.label('attemptStatus', parseInt(st, 10)) + ': ' + r.byStatus[st]); }).join(' ') +
+      (r.unknown ? ' <span class="adm-pill adm-pill--neutral">статус неизвестен: ' + r.unknown + '</span>' : '') + '</div>';
+    if (q.neu >= q.total) {
+      h += note('info', 'Этот вопрос уже нейтрализован во всех билетах. Повторная нейтрализация ещё раз пересчитала бы все эти попытки без пользы.');
+    }
+    /*
+      Поток нейтрализации (F-A7) пересчитывает только оценённые попытки. В незавершённых он лишь
+      помечает задание — оно не будет учитываться, когда попытка завершится обычным путём, и ответы
+      не раскрываются раньше времени. Аннулированные попытки и попытки с ошибкой он не трогает.
+      Поэтому ничего не блокируем, а говорим, что произойдёт с какими попытками.
+    */
+    var graded = r.byStatus[V.ATT_GRADED] || 0, running = r.busy + r.blind, skipped = r.annulled + r.errors.length;
+    h += note('info', '<b>Что будет с попытками.</b><ul>' +
+      '<li>Оценённые' + (graded ? ' (' + graded + ')' : '') + ' — пересчитаются сразу, у части сотрудников может измениться итог и сертификат.</li>' +
+      '<li>Незавершённые' + (running ? ' (' + running + ')' : '') + ' — вопрос будет помечен и не будет учитываться, когда попытка завершится; сейчас их никто не прерывает.</li>' +
+      '<li>Аннулированные и попытки с ошибкой' + (skipped ? ' (' + skipped + ')' : '') + ' — не затрагиваются.</li></ul>');
+    if (r.unknown) {
+      h += note('warn', 'Статус ' + r.unknown + ' ' + plural(r.unknown, 'попытки', 'попыток', 'попыток') + ' не удалось проверить — обновите страницу перед нейтрализацией.');
+    }
+    h += note('info', 'Итог: ' + neutralRuleText() + '; вопрос будет выведен из банка и больше не попадёт в новые билеты. Ответы сотрудников и исходные оценки сохранятся.');
+    box.innerHTML = h;
+  }
+
+  function renderAttInfo() {
+    var box = $('exrAttInfo'), a = S.attById[$('exrAtt').value];
+    if (!a) { box.innerHTML = ''; return; }
+    var h = '<div class="exad-actions">' + A.pill('attemptStatus', a.new_status) + (a.new_result != null ? ' ' + A.pill('attemptResult', a.new_result) + ' <span class="adm-num">' + esc(A.fmt2(a.new_percent)) + '%</span>' : '') + '</div>';
+    if (a.new_status === V.ATT_ERROR) {
+      h += note('info', 'Попытка с ошибкой не состоялась: она не считается в лимит и не мешает сотруднику начать новую. Аннулировать её нужно, только если хотите явно отметить это в истории.' +
+        (a.new_errortext ? '<div class="exr-text" style="margin-top:6px;">Текст ошибки: ' + esc(a.new_errortext) + '</div>' : ''));
+    }
+    if (a.new_isfinal === true && a.new_result === V.RES_PASSED) {
+      h += note('warn', 'Это итоговая попытка сотрудника с результатом «Сдано». После аннулирования итог пересчитается по остальным попыткам; если среди них нет сданной, сертификат будет отозван.');
+    }
+    box.innerHTML = h;
+  }
+
+  /* Дополнительная попытка: подсказка по правилам пересдачи (их проверяет поток при создании попытки) */
+  function empFacts(c) {
+    var mine = S.attempts.filter(function (a) { return lc(a._new_contact_value) === c; });
+    // Как в потоке сборки билета (F-A3): аннулированные и попытки с ошибкой не состоялись — не в счёт
+    var active = mine.filter(function (a) { return a.new_status !== V.ATT_ANNULLED && a.new_status !== V.ATT_ERROR; });
+    var extra = S.actions.filter(function (x) { return x.new_kind === V.ACT_EXTRA && x.new_status === V.ACTST_DONE && lc(x._new_contact_value) === c; }).length;
+    var pending = S.actions.filter(function (x) { return x.new_kind === V.ACT_EXTRA && x.new_status === V.ACTST_CREATED && lc(x._new_contact_value) === c; }).length;
+    var fin = finalsByContact()[c];
+    return { mine: mine, active: active, last: active[0] || null, extra: extra, pending: pending, passed: !!(fin && fin.new_result === V.RES_PASSED) };
+  }
+  function renderEmpInfo() {
+    var box = $('exrEmpInfo'), c = $('exrEmp').value;
+    if (!c || !S.P) { box.innerHTML = ''; return; }
+    var f = empFacts(c), limit = S.P.maxAttempts + f.extra, h = '';
+    h += '<div class="exr-sum">' +
+      sumCell('Попыток засчитано в лимит', esc(f.active.length) + ' из ' + esc(limit)) +
+      sumCell('Выдано дополнительных', esc(f.extra)) +
+      sumCell('Последний результат', f.last ? (f.last.new_result != null ? A.pill('attemptResult', f.last.new_result) : A.pill('attemptStatus', f.last.new_status)) : '—') +
+      sumCell('Апелляция до', esc(f.last ? A.dt(f.last.new_appealuntil) : '—')) + '</div>';
+    var warn = [];
+    if (f.passed) { warn.push('Сотрудник уже сдал экзамен — дополнительная попытка ничего не изменит.'); }
+    if (f.pending) { warn.push('По этому сотруднику уже отправлена дополнительная попытка, которую поток ещё не выполнил. Новую можно будет выдать только после её результата.'); }
+    if (f.last && attBusy(f.last.new_status)) { warn.push('У сотрудника есть незавершённая попытка — новая начнётся только после неё.'); }
+    if (f.last && f.last.new_result === V.RES_FAILED) {
+      var t = 0;
+      if (f.last.new_appealuntil) { t = Math.max(t, new Date(f.last.new_appealuntil).getTime()); }
+      if (f.last.new_finalizedon) { t = Math.max(t, new Date(f.last.new_finalizedon).getTime() + S.P.minIntervalDays * 86400000); }
+      if (t > A.now()) { h += note('info', 'Пересдать можно будет не раньше ' + esc(A.dt(new Date(t).toISOString())) + ' — дополнительная попытка этот срок не сокращает.'); }
+    }
+    if (warn.length) { h += note('warn', '<ul>' + warn.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>'); }
+    h += note('info', 'Дополнительная попытка увеличивает лимит на одну. Правила пересдачи остаются в силе: последний результат должен быть «Не сдано», срок апелляции должен закончиться и должна пройти пауза ' +
+      esc(S.P.minIntervalDays) + ' ' + plural(S.P.minIntervalDays, 'день', 'дня', 'дней') + ' после подсчёта результата. Если сотрудник уже сдал, ничего не произойдёт.');
+    box.innerHTML = h;
+  }
+
+  function renderCounter() {
+    var n = $('exrReason').value.trim().length, el = $('exrReasonCount');
+    el.textContent = n + ' ' + plural(n, 'знак', 'знака', 'знаков') + (n < 20 ? ', нужно не меньше 20' : '');
+    el.className = 'exr-count' + (n > 0 && n < 20 ? ' is-bad' : '');
+  }
+
+  /* Такое же действие, которое поток ещё не выполнил: повтор пересчитал бы результаты дважды */
+  function pendingAction(kind, field, id) {
+    return S.actions.filter(function (x) { return x.new_kind === kind && x.new_status === V.ACTST_CREATED && lc(x[field]) === id; })[0] || null;
+  }
+  function pendingMsg(x, what) {
+    return 'По ' + what + ' уже есть действие «' + A.label('actionKind', x.new_kind) + '» от ' + A.dt(x.createdon) + ', которое поток ещё не выполнил. Дождитесь его результата в истории ниже (кнопка «Обновить»). ' +
+      'Если оно висит в статусе «Создано» больше 10 минут, поток его, скорее всего, не получил — сообщите ответственному за потоки, а не создавайте действие заново.';
+  }
+
+  /* Проверка формы: { msg } — ошибка; иначе { target, confirm } */
+  var REASON_MSG = 'Обоснование должно быть не короче 20 знаков: действие затрагивает результаты сотрудников и должно быть объяснимо при разборе.';
+  function checkForm() {
+    var k = kindVal(), reason = $('exrReason').value.trim();
+    if (!S.P) { return { msg: 'Экзамен не загрузился — обновите страницу.' }; }
+    if (!A.isGuid(A.cfg.contact)) { return { msg: 'Не удалось определить вашу учётную запись. Обновите страницу и войдите заново.' }; }
+    if (!S.actionsOk) { return { msg: 'Не удалось загрузить историю действий, поэтому нельзя проверить, нет ли такого же невыполненного действия. Обновите страницу.' }; }
+    if (k === V.ACT_NEUTRALIZE) {
+      var qid = $('exrQ').value;
+      if (!S.qIndex[qid]) { return { msg: 'Выберите вопрос.' }; }
+      var r = analyzeQuestion(qid), q = S.qIndex[qid], pq = pendingAction(V.ACT_NEUTRALIZE, '_new_question_value', qid);
+      if (pq) { return { msg: pendingMsg(pq, 'этому вопросу') }; }
+      if (r.unknown) { return { msg: 'Статус части попыток не удалось проверить — обновите страницу.' }; }
+      if (q.neu >= q.total) { return { msg: 'Этот вопрос уже нейтрализован во всех билетах.' }; }
+      if (reason.length < 20) { return { msg: REASON_MSG }; }
+      return { target: qid, reason: reason, title: 'Нейтрализовать вопрос?', html:
+        '<p>Вопрос: <b>' + esc(qTitle(qid)) + '</b> — в ' + r.atts + ' ' + plural(r.atts, 'попытке', 'попытках', 'попытках') + '.</p>' +
+        change(['В оценённых попытках ' + neutralRuleText() + ', результаты пересчитаются — у части сотрудников может измениться итог и сертификат.',
+                'В незавершённых попытках вопрос будет помечен и не будет учитываться при их завершении.',
+                'Вопрос будет выведен из банка и больше не попадёт в новые билеты.'],
+               ['Аннулированные попытки и попытки с ошибкой.', 'Ответы сотрудников и исходные оценки.']) + reasonBox(reason) };
+    }
+    if (k === V.ACT_ANNUL) {
+      var a = S.attById[$('exrAtt').value];
+      if (!a) { return { msg: 'Выберите попытку.' }; }
+      var pa = pendingAction(V.ACT_ANNUL, '_new_attempt_value', lc(a.new_examattemptid));
+      if (pa) { return { msg: pendingMsg(pa, 'этой попытке') }; }
+      if (a.new_status !== V.ATT_GRADED && a.new_status !== V.ATT_ERROR) { return { msg: 'Аннулировать можно только оценённую попытку или попытку с ошибкой. Статус этой попытки изменился — обновите страницу.' }; }
+      if (reason.length < 20) { return { msg: REASON_MSG }; }
+      return { target: lc(a.new_examattemptid), contact: lc(a._new_contact_value), reason: reason, title: 'Аннулировать попытку?', html:
+        '<p>Попытка: <b>' + esc(attLabel(a)) + '</b> (' + esc(a.new_name || '') + ').</p>' +
+        change(['Попытка станет «Аннулирован» с результатом «Аннулировано» и перестанет учитываться в итоге и в лимите попыток.',
+                'Итог сотрудника пересчитается по остальным попыткам; если среди них нет сданной, сертификат будет отозван.'],
+               ['Ответы и оценки этой попытки — их можно посмотреть в подробностях.']) + reasonBox(reason) };
+    }
+    if (k === V.ACT_EXTRA) {
+      var c = $('exrEmp').value;
+      if (!A.isGuid(c)) { return { msg: 'Выберите сотрудника.' }; }
+      var pe = pendingAction(V.ACT_EXTRA, '_new_contact_value', c);
+      if (pe) { return { msg: pendingMsg(pe, 'этому сотруднику') }; }
+      if (reason.length < 20) { return { msg: REASON_MSG }; }
+      var f = empFacts(c);
+      return { target: c, reason: reason, title: 'Выдать дополнительную попытку?', html:
+        '<p>Сотрудник: <b>' + esc(person(c)) + '</b>.</p>' +
+        (f.passed ? note('warn', 'Сотрудник уже сдал экзамен — действие ничего не изменит.') : '') +
+        change(['Лимит попыток сотрудника по этому экзамену увеличится на одну (станет ' + (S.P.maxAttempts + f.extra + 1) + ').'],
+               ['Правила пересдачи: последний результат «Не сдано», срок апелляции закончился, прошла пауза после подсчёта.', 'Все прежние попытки и результаты.']) + reasonBox(reason) };
+    }
+    return { msg: 'Выберите действие.' };
+  }
+  function change(changes, stays) {
+    function ul(a) { return '<ul>' + a.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>'; }
+    return note('warn', '<b>Что изменится</b>' + ul(changes)) + note('success', '<b>Что останется</b>' + ul(stays)) +
+      '<p class="exad-muted">Действие выполняется сразу и не отменяется.</p>';
+  }
+  function reasonBox(r) { return '<div class="exad-label">Обоснование</div><div class="exr-text exad-small">' + esc(r) + '</div>'; }
+
+  /* Запись действия. Поля — строго из списка Web API; статус «Создано» обязателен: без него поток молча выходит */
+  function createAction(k, chk) {
+    var reason = chk.reason, exam = '/new_exams(' + S.id + ')', me = '/contacts(' + A.cfg.contact + ')';
+    if (k === V.ACT_NEUTRALIZE) {
+      return A.post('new_examadminactions', { new_kind: V.ACT_NEUTRALIZE, new_status: V.ACTST_CREATED, new_reason: reason, 'new_exam@odata.bind': exam, 'new_requestedby@odata.bind': me, 'new_question@odata.bind': '/new_examquestions(' + chk.target + ')' });
+    }
+    if (k === V.ACT_ANNUL) {
+      return A.post('new_examadminactions', { new_kind: V.ACT_ANNUL, new_status: V.ACTST_CREATED, new_reason: reason, 'new_exam@odata.bind': exam, 'new_requestedby@odata.bind': me, 'new_attempt@odata.bind': '/new_examattempts(' + chk.target + ')', 'new_contact@odata.bind': '/contacts(' + chk.contact + ')' });
+    }
+    return A.post('new_examadminactions', { new_kind: V.ACT_EXTRA, new_status: V.ACTST_CREATED, new_reason: reason, 'new_exam@odata.bind': exam, 'new_requestedby@odata.bind': me, 'new_contact@odata.bind': '/contacts(' + chk.target + ')' });
+  }
+  /* Если портал не вернул номер записи — ищем своё последнее действие по экзамену */
+  function findMyAction(since) {
+    return A.api('/_api/new_examadminactions?$select=new_examadminactionid,createdon&$filter=_new_exam_value eq ' + S.id + ' and _new_requestedby_value eq ' + A.cfg.contact + '&$orderby=createdon desc&$top=1')
+      .then(function (j) {
+        var r = (j.value || [])[0];
+        return r && new Date(r.createdon).getTime() >= since - 120000 ? lc(r.new_examadminactionid) : '';
+      });
+  }
+
+  function submitAction() {
+    var btn = $('exrSubmit'), err = $('exrActErr'), k = kindVal();
+    if (S.acting) { return; }
+    err.textContent = '';
+    S.acting = true;
+    A.busy(btn, true, 'Проверяем…');
+    function release() { S.acting = false; A.busy(btn, false); }
+    // Перед проверкой — свежие статусы попыток и история действий: за время на странице они могли измениться
+    Promise.all([loadAttempts(), loadActions()]).then(function () {
+      var chk = checkForm();
+      if (chk.msg) { err.textContent = chk.msg; release(); return null; }
+      return A.modal({ title: chk.title, html: chk.html, okText: 'Выполнить', danger: k !== V.ACT_EXTRA }).then(function (ok) {
+        if (!ok) { release(); return null; }
+        A.busy(btn, false); A.busy(btn, true, 'Выполняется…');
+        var since = A.now();
+        return createAction(k, chk).then(function (res) {
+          // Запись создана: дальше любые сбои — только сбои проверки статуса, повторять действие нельзя
+          $('exrReason').value = ''; renderCounter(); S.ack = '';
+          loadActions();
+          return (res.id ? Promise.resolve(res.id) : findMyAction(since)).then(function (actId) {
+            return waitAction(actId, k, chk);
+          }).then(release, function (e) {
+            release();
+            $('exrActProgress').innerHTML = note('warn', 'Действие записано, но проверить его статус не удалось (' + esc(e.message || e) + '). Посмотрите историю ниже (кнопка «Обновить») и не создавайте действие повторно.');
+          });
+        }, function (e) {
+          release();
+          $('exrActProgress').innerHTML = note('danger', 'Действие не записано: ' + esc(e.message || e) + '. Можно попробовать ещё раз.');
+        });
+      });
+    }).catch(function (e) {
+      release();
+      err.textContent = 'Не удалось проверить попытки: ' + (e.message || e);
+    });
+  }
+
+  /* Ждём, пока поток выполнит действие: Выполнено или Ошибка, не дольше ~3 минут */
+  function waitAction(actId, k, chk) {
+    var box = $('exrActProgress'), started = Date.now(), last = null;
+    if (!actId) {
+      box.innerHTML = note('warn', 'Действие записано, но его номер не удалось получить. Проверьте его статус в истории ниже через минуту. Не создавайте действие повторно.');
+      return Promise.resolve();
+    }
+    function paint() {
+      box.innerHTML = note('info', '<span class="exad-spin"></span> Действие отправлено, поток выполняет его… прошло ' + fmtDur((Date.now() - started) / 1000) + '. Не закрывайте страницу и не отправляйте действие повторно.');
+    }
+    paint();
+    var timer = setInterval(paint, 1000);
+    var interval = A.cfg.pollMs || 3000;
+    return A.poll(function () {
+      return A.api('/_api/new_examadminactions(' + actId + ')?$select=new_status,new_result').then(function (r) {
+        last = r;
+        return r.new_status === V.ACTST_DONE || r.new_status === V.ACTST_ERROR;
+      });
+    }, { interval: interval, maxTries: Math.ceil(ACTION_WAIT_MS / interval) }).then(function (done) {
+      clearInterval(timer);
+      if (!done) {
+        box.innerHTML = note('warn', 'Поток ещё не ответил за 3 минуты. Не создавайте действие повторно: проверьте его статус в истории ниже чуть позже (кнопка «Обновить»).');
+      } else if (last.new_status === V.ACTST_DONE) {
+        box.innerHTML = note('success', '<b>Выполнено.</b> ' + esc(last.new_result || ''));
+        A.toast('Действие выполнено', 'ok');
+        // Связка из серверного запроса не обновится до перезагрузки — отмечаем вопрос сами
+        if (k === V.ACT_NEUTRALIZE && S.qIndex[chk.target]) { S.qIndex[chk.target].neu = S.qIndex[chk.target].total; renderQOptions(); renderQInfo(); }
+      } else {
+        box.innerHTML = note('danger', '<b>Ошибка.</b> ' + esc(last.new_result || 'Поток не смог выполнить действие. Подробности — в журнале.'));
+        A.toast('Действие не выполнено', 'err');
+      }
+      return refreshAfterAction();
+    });
+  }
+  function refreshAfterAction() {
+    return loadAttempts().catch(function () { /* ошибка уже показана в таблице */ }).then(function () {
+      loadActions(); loadCerts(); loadLog(true);
+    });
+  }
+
+  /* История действий */
+  function loadActions() {
+    return A.api('/_api/new_examadminactions?$select=new_examadminactionid,new_name,new_kind,_new_attempt_value,_new_question_value,_new_contact_value,_new_requestedby_value,new_reason,new_status,new_result,createdon&$filter=_new_exam_value eq ' + S.id + '&$orderby=createdon desc&$top=500')
+      .then(function (j) {
+        S.actions = j.value || []; S.actionsOk = true;
+        var ids = [];
+        S.actions.forEach(function (x) { ids.push(x._new_contact_value, x._new_requestedby_value); });
+        return addNames(ids).catch(function () { /* без имён тоже покажем */ });
+      }).then(function () {
+        renderActions(); renderEmpInfo();
+      }, function (e) { S.actionsOk = false; $('exrActBody').innerHTML = errRow(7, e); });
+  }
+  function renderActions() {
+    var body = $('exrActBody');
+    if (!S.actions.length) { body.innerHTML = emptyRow(7, 'Действий по этому экзамену ещё не было'); return; }
+    body.innerHTML = S.actions.map(function (x) {
+      var who = [];
+      if (x._new_contact_value) { who.push(esc(person(x._new_contact_value))); }
+      if (x._new_attempt_value) { var a = S.attById[lc(x._new_attempt_value)]; who.push('<span class="exad-muted">попытка ' + esc(a ? (a.new_name || '') + ' №' + a.new_attemptno : '') + '</span>'); }
+      if (x._new_question_value) { who.push('<span class="exad-muted">вопрос</span> ' + esc(qTitle(lc(x._new_question_value)))); }
+      var stale = x.new_status === V.ACTST_CREATED && (A.now() - new Date(x.createdon).getTime()) > 10 * 60000;
+      return '<tr><td class="exr-nowrap">' + esc(A.dt(x.createdon)) + '<span class="exr-code">' + esc(x.new_name || '') + '</span></td>' +
+        '<td>' + esc(A.label('actionKind', x.new_kind)) + '</td>' +
+        '<td>' + (who.join('<br>') || '—') + '</td>' +
+        '<td style="min-width:200px;">' + moreText(x.new_reason, 120) + '</td>' +
+        '<td>' + esc(person(x._new_requestedby_value)) + '</td>' +
+        '<td>' + A.pill('actionStatus', x.new_status) + (stale ? '<div class="exad-muted">поток не ответил больше 10 минут</div>' : '') + '</td>' +
+        '<td style="min-width:200px;">' + moreText(x.new_result, 160) + '</td></tr>';
+    }).join('');
+  }
+
+  /* ── Апелляции: у апелляции нет ссылки на экзамен — ищем по попыткам ──────────────── */
+  function loadAppeals() {
+    var ids = S.attempts.map(function (a) { return lc(a.new_examattemptid); });
+    if (!ids.length) { $('exrApBody').innerHTML = emptyRow(7, 'Апелляций нет'); return Promise.resolve(); }
+    return runLimited(A.chunk(ids, 15).map(function (part) {
+      return function () {
+        return A.api('/_api/new_examappeals?$select=new_examappealid,new_name,new_items,new_reason,new_status,createdon,_new_attempt_value,_new_contact_value&$filter=' + orFilter('_new_attempt_value', part) + '&$top=500')
+          .then(function (j) { return j.value || []; });
+      };
+    }), 4).then(function (lists) {
+      var rows = [];
+      lists.forEach(function (l) { rows = rows.concat(l); });
+      S.appeals = rows.sort(function (x, y) { return String(y.createdon).localeCompare(String(x.createdon)); });
+      return addNames(rows.map(function (r) { return r._new_contact_value; })).catch(function () { /* без имён */ });
+    }).then(function () {
+      var body = $('exrApBody');
+      if (!S.appeals.length) { body.innerHTML = emptyRow(7, 'Апелляций нет'); return; }
+      body.innerHTML = S.appeals.map(function (p) {
+        var a = S.attById[lc(p._new_attempt_value)];
+        var n = String(p.new_items || '').split('|').filter(function (s) { return s.trim(); }).length;
+        return '<tr><td class="exr-nowrap">' + esc(p.new_name || '—') + '</td>' +
+          '<td>' + esc(person(p._new_contact_value || (a && a._new_contact_value))) + '</td>' +
+          '<td>' + esc(a ? (a.new_name || '') + ' · №' + a.new_attemptno : '—') + '</td>' +
+          '<td class="adm-r adm-num">' + n + '</td>' +
+          '<td style="min-width:220px;">' + moreText(p.new_reason, 160) + '</td>' +
+          '<td>' + A.pill('appealStatus', p.new_status) + '</td>' +
+          '<td class="exr-nowrap">' + esc(A.dt(p.createdon)) + '</td></tr>';
+      }).join('');
+    }, function (e) { $('exrApBody').innerHTML = errRow(7, e); });
+  }
+
+  /* ── Сертификаты ────────────────────────────────────────────────────────────────────── */
+  function loadCerts() {
+    return A.api('/_api/new_certifications?$select=new_certificationid,new_name,new_issuedon,new_validuntil,new_status,new_revokereason,_new_contact_value,_new_attempt_value&$filter=_new_exam_value eq ' + S.id + '&$top=2000')
+      .then(function (j) {
+        S.certs = j.value || [];
+        return addNames(S.certs.map(function (c) { return c._new_contact_value; })).catch(function () { /* без имён */ });
+      }).then(function () { S.certsFailed = false; renderCerts(); renderKpi(); }, function (e) {
+        $('exrCertBody').innerHTML = errRow(6, e);
+        // Сводка не должна вечно показывать «…»: помечаем, что загрузка не удалась
+        if (!S.certs) { S.certsFailed = true; renderKpi(); }
+      });
+  }
+  function renderCerts() {
+    var body = $('exrCertBody'), fin = finalsByContact(), byC = {};
+    S.certs.forEach(function (c) { var k = lc(c._new_contact_value); (byC[k] = byC[k] || []).push(c); });
+    // Итог «Сдано», а сертификат отозван: поток не выдаёт сертификат повторно, если по экзамену уже есть любой
+    var revoked = [], missing = [];
+    Object.keys(fin).forEach(function (c) {
+      if (fin[c].new_result !== V.RES_PASSED) { return; }
+      var list = byC[c] || [];
+      var valid = list.some(function (x) { return x.new_status === 100000000 || x.new_status === 100000001; });
+      if (!list.length) { missing.push(c); } else if (!valid) { revoked.push(c); }
+    });
+    var notes = '';
+    if (revoked.length) {
+      notes += note('danger', '<b>Итог «Сдано», но сертификат отозван: ' + revoked.length + '.</b> Сертификат повторно автоматически не выдаётся. Сотрудники: ' +
+        revoked.map(function (c) { return esc(person(c)); }).join(', ') + '. Решите вопрос вручную с ответственным за сертификаты.');
+    }
+    if (missing.length) {
+      notes += note('warn', '<b>Итог «Сдано», но сертификата нет: ' + missing.length + '.</b> Возможно, выдача не сработала — проверьте журнал, раздел «Сбои». Сотрудники: ' +
+        missing.map(function (c) { return esc(person(c)); }).join(', ') + '.');
+    }
+    $('exrCertNotes').innerHTML = notes;
+    if (!S.certs.length) { body.innerHTML = emptyRow(6, 'Сертификатов по этому экзамену пока нет'); return; }
+    var rows = S.certs.slice().sort(function (x, y) { return String(y.new_issuedon || '').localeCompare(String(x.new_issuedon || '')); });
+    body.innerHTML = rows.map(function (c) {
+      var k = lc(c._new_contact_value), flag = revoked.indexOf(k) >= 0 && c.new_status === 100000002;
+      return '<tr><td class="exr-nowrap">' + esc(c.new_name || '—') + '</td>' +
+        '<td><div class="exr-name">' + esc(person(k)) + '</div><div class="exad-muted">' + esc(email(k)) + '</div></td>' +
+        '<td class="exr-nowrap">' + esc(A.day(c.new_issuedon)) + '</td>' +
+        '<td class="exr-nowrap">' + esc(A.day(c.new_validuntil)) + '</td>' +
+        '<td>' + A.pill('certStatus', c.new_status) + (flag ? '<div style="color:var(--adm-danger);font-size:12px;">итог сотрудника — «Сдано»</div>' : '') + '</td>' +
+        '<td style="min-width:200px;">' + moreText(c.new_revokereason, 140) + '</td></tr>';
+    }).join('');
+  }
+
+  /* ── Журнал ─────────────────────────────────────────────────────────────────────────── */
+  var GROUPS = {
+    pub: ['EXAM_PUBLISHED', 'EXAM_PUBLISH_FAILED', 'EXAM_CLOSED'],
+    att: ['ATTEMPT_CREATED', 'ATTEMPT_TICKET_READY', 'TICKET_CELL_SUBSTITUTED', 'TICKET_DUPLICATE_FINGERPRINT', 'ATTEMPT_PREPARE_TIMEOUT', 'ATTEMPT_TAMPERED', 'ATTEMPT_SUBMITTED', 'ATTEMPT_EXPIRED', 'ANSWER_REJECTED_LATE'],
+    res: ['RESULT_FINAL'],
+    cert: ['CERT_ISSUED', 'CERT_REVOKED', 'CERT_EXPIRED'],
+    act: ['ACTION_EXECUTED'],
+    bank: ['QUESTION_RETIRED', 'BANK_SHORTAGE', 'AI_JOB_DONE', 'QUESTION_APPROVED', 'QUESTION_REJECTED', 'AI_CALL', 'AI_CALL_FAILED'],
+    err: ['FLOW_ERROR', 'AI_CALL_FAILED', 'EXAM_PUBLISH_FAILED', 'ATTEMPT_PREPARE_TIMEOUT', 'ATTEMPT_TAMPERED']
+  };
+  /* Понятные подписи частых ключей в подробностях (остальные показываем как есть) */
+  var KEY_RU = {
+    percent: 'Процент', casePercent: 'По кейсам', passed: 'Сдано', version: 'Версия результата', blocks: 'Блоки',
+    purpose: 'Назначение', prompt: 'Промпт', model: 'Модель', stopReason: 'Причина остановки', inputTokens: 'Токенов на входе',
+    outputTokens: 'Токенов на выходе', costUsd: 'Стоимость, $', latencyMs: 'Время ответа, мс',
+    /* Русские ключи, которые пишут сами потоки (F-A3, F-A4, F-A7, F-B3) */
+    'заданий': 'Заданий', 'письменныхНаПроверку': 'Письменных на проверку', 'сдано': 'Сдана',
+    'секунд': 'Секунд на сборку', 'попытка': 'Номер попытки', 'вид': 'Действие', 'причина': 'Обоснование',
+    'инициатор': 'Кто запросил', 'сотрудник': 'Сотрудник', 'вопрос': 'Вопрос', 'результат': 'Результат',
+    'тип': 'Тип', 'сложность': 'Сложность', 'урок': 'Урок', 'нужно': 'Нужно', 'вЯчейке': 'Было в ячейке',
+    'добрано': 'Добрано', 'вызовов': 'Вызовов модели', 'создано': 'Создано', 'одобрено': 'Одобрено',
+    'отклонено': 'Отклонено', 'стоимость': 'Стоимость, $'
+  };
+  function valText(v) {
+    if (v === true) { return 'да'; }
+    if (v === false) { return 'нет'; }
+    if (v == null) { return '—'; }
+    // Время из потоков приходит в UTC ISO — показываем в поясе портала, как и остальные даты
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) { return A.dt(v); }
+    return typeof v === 'object' ? JSON.stringify(v) : String(v);
+  }
+  function payloadHtml(p) {
+    if (p == null || p === '') { return '<span class="exad-muted">—</span>'; }
+    var s = String(p), j = A.parseJson(s, null), inner;
+    if (j && typeof j === 'object' && !Array.isArray(j)) {
+      inner = '<dl class="exr-kv">' + Object.keys(j).map(function (k) {
+        return '<dt>' + esc(KEY_RU[k] || k) + '</dt><dd>' + esc(valText(j[k])) + '</dd>';
+      }).join('') + '</dl>';
+    } else if (Array.isArray(j)) {
+      inner = '<pre class="exad-pre">' + esc(JSON.stringify(j, null, 2)) + '</pre>';
+    } else {
+      inner = '<div class="exr-text">' + esc(s) + '</div>';
+    }
+    if (s.length > 300) { return '<details class="exr-more"><summary>' + esc(trunc(s.replace(/\s+/g, ' '), 120)) + '</summary>' + inner + '</details>'; }
+    return inner;
+  }
+  function eventCell(ev) {
+    return esc(A.LOG_EVENTS[ev] || 'Событие') + '<span class="exr-code">' + esc(ev || '') + '</span>';
+  }
+
+  /*
+    Журнал экзамена = записи с привязкой к экзамену + записи, привязанные только к попытке
+    (подмена ячейки, совпавший билет, таймаут сборки, отзыв сертификата). Берём из каждого
+    источника по странице, сливаем, убираем дубли и оставляем верхние LOG_PAGE строк:
+    всё, что новее последней оставленной, гарантированно попало в выборку.
+  */
+  function loadLog(reset) {
+    // Идёт другая загрузка: полное обновление не теряем, а выполняем сразу после неё
+    if (S.logBusy) { if (reset) { S.logResetPending = true; } return Promise.resolve(); }
+    S.logBusy = true;
+    if (reset) { S.log = []; S.logOldest = null; S.logMore = false; $('exrLogBody').innerHTML = emptyRow(4, 'Загружаем…'); }
+    var before = S.logOldest || '2999-01-01T00:00:00Z';
+    var tasks = [function () {
+      return A.api('/_api/new_examlogs?$select=new_examlogid,new_name,new_event,new_actor,new_subjectid,new_payload,_new_attempt_value,createdon&$filter=_new_exam_value eq ' + S.id + ' and createdon lt ' + before + '&$orderby=createdon desc&$top=300')
+        .then(function (j) { return j.value || []; });
+    }];
+    A.chunk(S.attempts.map(function (a) { return lc(a.new_examattemptid); }), 20).forEach(function (part) {
+      var f = orFilter('_new_attempt_value', part);
+      tasks.push(function () {
+        return A.api('/_api/new_examlogs?$select=new_examlogid,new_name,new_event,new_actor,new_subjectid,new_payload,_new_attempt_value,createdon&$filter=_new_exam_value eq null and createdon lt ' + before + ' and (' + f + ')&$orderby=createdon desc&$top=300')
+          .then(function (j) { return j.value || []; });
+      });
+    });
+    return runLimited(tasks, 4).then(function (lists) {
+      var seen = {}, all = [], full = false;
+      S.log.forEach(function (r) { seen[lc(r.new_examlogid)] = 1; });
+      lists.forEach(function (l) {
+        if (l.length >= LOG_PAGE) { full = true; }
+        l.forEach(function (r) { var k = lc(r.new_examlogid); if (!seen[k]) { seen[k] = 1; all.push(r); } });
+      });
+      all.sort(function (x, y) { return String(y.createdon).localeCompare(String(x.createdon)); });
+      var keep = all.slice(0, LOG_PAGE);
+      S.logMore = full || all.length > LOG_PAGE;
+      if (keep.length) { S.logOldest = keep[keep.length - 1].createdon; }
+      S.log = S.log.concat(keep);
+      S.logBusy = false;
+      renderLog();
+      afterLog();
+    }, function (e) {
+      S.logBusy = false;
+      if (reset || !S.log.length) {
+        $('exrLogBody').innerHTML = errRow(4, e);
+      } else {
+        // «Показать ещё» не удалось: уже загруженные строки оставляем, ошибку — рядом с кнопкой
+        renderLog();
+        $('exrLogMore').insertAdjacentHTML('beforeend', ' <span style="color:var(--adm-danger);font-size:12px;">Не удалось загрузить ещё: ' + esc(e && e.message ? e.message : e) + '</span>');
+      }
+      afterLog();
+    });
+  }
+  function afterLog() {
+    if (S.logResetPending) { S.logResetPending = false; loadLog(true); }
+  }
+  function renderLog() {
+    var g = $('exrLogGroup').value, q = lc($('exrLogSearch').value).trim(), body = $('exrLogBody');
+    var rows = S.log.filter(function (r) {
+      if (g && (GROUPS[g] || []).indexOf(r.new_event) < 0) { return false; }
+      if (q) {
+        var hay = lc([A.LOG_EVENTS[r.new_event] || '', r.new_event, r.new_actor, r.new_payload, r.new_subjectid].join(' '));
+        if (hay.indexOf(q) < 0) { return false; }
+      }
+      return true;
+    });
+    // Ночные повторы (вывод по износу, нехватка в банке) сворачиваем в одну строку
+    var folded = [], idx = {};
+    rows.forEach(function (r) {
+      if (r.new_event === 'QUESTION_RETIRED' || r.new_event === 'BANK_SHORTAGE') {
+        // Цифры в тексте (счётчики «показан N раз») меняются каждую ночь — не различаем по ним
+        var k = r.new_event + '|' + (r.new_subjectid || '') + '|' + String(r.new_payload || '').replace(/\d+([.,]\d+)?/g, '#');
+        if (idx[k] != null) { folded[idx[k]].repeat++; folded[idx[k]].first = r.createdon; return; }
+        idx[k] = folded.length;
+      }
+      folded.push({ r: r, repeat: 1, first: r.createdon });
+    });
+    if (!folded.length) {
+      body.innerHTML = emptyRow(4, S.log.length ? 'Под фильтр не попала ни одна запись' : 'Записей в журнале пока нет');
+    } else {
+      body.innerHTML = folded.map(function (x) {
+        var r = x.r, a = S.attById[lc(r._new_attempt_value)];
+        return '<tr><td class="exr-nowrap">' + esc(A.dt(r.createdon)) +
+          (x.repeat > 1 ? '<span class="exr-code">повторялось ' + x.repeat + ' ' + plural(x.repeat, 'раз', 'раза', 'раз') + ', с ' + esc(A.dt(x.first)) + '</span>' : '') + '</td>' +
+          '<td style="min-width:180px;">' + eventCell(r.new_event) + (a ? '<span class="exr-code">' + esc(attLabel(a)) + '</span>' : '') + '</td>' +
+          '<td>' + esc(r.new_actor || '—') + '</td>' +
+          '<td style="min-width:240px;">' + payloadHtml(r.new_payload) + '</td></tr>';
+      }).join('');
+    }
+    $('exrLogMore').innerHTML = '<span class="exad-muted">Загружено записей: ' + S.log.length + '.</span>' +
+      (S.logMore ? ' <button type="button" class="adm-btn adm-btn--ghost" data-exr-more-log>Показать ещё</button>' : '');
+  }
+  function loadFlowErrors() {
+    var body = $('exrFlowBody');
+    body.innerHTML = emptyRow(4, 'Загружаем…');
+    A.api("/_api/new_examlogs?$select=new_examlogid,new_name,new_event,new_actor,new_subjectid,new_payload,_new_attempt_value,createdon&$filter=new_event eq 'FLOW_ERROR'&$orderby=createdon desc&$top=50")
+      .then(function (j) {
+        var rows = j.value || [];
+        body.innerHTML = rows.length ? rows.map(function (r) {
+          return '<tr><td class="exr-nowrap">' + esc(A.dt(r.createdon)) + '</td><td>' + esc(r.new_actor || '—') + '</td>' +
+            '<td class="adm-mono exad-small">' + esc(r.new_subjectid || '—') + '</td><td style="min-width:240px;">' + payloadHtml(r.new_payload) + '</td></tr>';
+        }).join('') : emptyRow(4, 'Сбоев потоков нет');
+      }, function (e) { body.innerHTML = errRow(4, e); });
+  }
+
+  /* ── Выгрузка CSV (попытки по текущим фильтрам) ────────────────────────────────────── */
+  function exportCsv() {
+    var rows = filteredAttempts();
+    if (!rows.length) { A.toast('Нет попыток для выгрузки', 'err'); return; }
+    var present = {};
+    rows.forEach(function (a) { blocksOf(a).forEach(function (b) { present[b.type] = 1; }); });
+    (S.P ? S.P.blocks : []).forEach(function (b) { if (b.count > 0) { present[b.type] = 1; } });
+    var types = A.TYPES.filter(function (t) { return present[t]; });
+    var header = ['Попытка', 'Сотрудник', 'Email', '№', 'Статус', 'Создана', 'Начата', 'Сдана', 'Подсчитана', 'Заданий', 'Процент',
+      'По кейсам', 'Результат', 'Итоговая', 'Версия результата'];
+    types.forEach(function (t) { header.push(typeLabel(t) + ': баллы', typeLabel(t) + ': из'); });
+    var data = rows.map(function (a) {
+      var c = a._new_contact_value, hasRes = a.new_result != null, by = {};
+      blocksOf(a).forEach(function (b) { by[b.type] = b; });
+      var line = [a.new_name || '', person(c), email(c), a.new_attemptno == null ? '' : a.new_attemptno, A.label('attemptStatus', a.new_status),
+        A.dt(a.createdon), A.dt(a.new_startedon), A.dt(a.new_submittedon), A.dt(a.new_finalizedon),
+        a.new_itemcount == null ? '' : a.new_itemcount, hasRes ? A.fmt2(a.new_percent) : '', hasRes && hasCases(a) ? A.fmt2(a.new_casepercent) : '',
+        hasRes ? A.label('attemptResult', a.new_result) : '', a.new_isfinal === true && a.new_status !== V.ATT_ANNULLED ? 'да' : 'нет',
+        a.new_resultversion == null ? '' : a.new_resultversion];
+      types.forEach(function (t) { var b = by[t]; line.push(b ? num(b.earned) : '', b ? num(b.max) : ''); });
+      return line;
+    });
+    var name = String((S.exam && S.exam.new_name) || 'exam').replace(/[\\\/:*?"<>|]+/g, '').replace(/\s+/g, '-').slice(0, 60);
+    var d = new Date(A.now() + 5 * 3600000).toISOString().slice(0, 10);
+    A.csv('attestation-' + name + '-' + d + '.csv', header, data);
+    // Выгружается то, что видно под фильтрами — говорим об этом прямо
+    // Страница загружает не больше 2000 попыток: при упоре в предел «все» было бы неправдой
+    var all = rows.length === S.attempts.length, capped = S.attempts.length >= 2000;
+    A.toast(all ? (capped ? 'Выгружены последние 2000 попыток — более ранние страница не загружает' : 'Выгружены все попытки: ' + rows.length)
+      : 'Выгружены попытки по текущим фильтрам: ' + rows.length + ' из ' + S.attempts.length + (capped ? ' загруженных (загружены последние 2000)' : ''), 'ok');
+  }
+
+  /* ── События ────────────────────────────────────────────────────────────────────────── */
+  $('exrFStatus').addEventListener('change', function () { S.shown = ATT_PAGE; renderAttempts(); });
+  $('exrFResult').addEventListener('change', function () { S.shown = ATT_PAGE; renderAttempts(); });
+  $('exrFSearch').addEventListener('input', function () { S.shown = ATT_PAGE; renderAttempts(); });
+  $('exrCsv').addEventListener('click', exportCsv);
+  $('exrAttMore').addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('[data-exr-more-att]')) { S.shown += ATT_PAGE; renderAttempts(); }
+  });
+  var attBody = $('exrAttBody');
+  attBody.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('a, button, details')) { return; }
+    var tr = e.target.closest ? e.target.closest('tr[data-att]') : null;
+    if (tr) { openDetail(tr.getAttribute('data-att')); }
+  });
+  attBody.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') { return; }
+    var tr = e.target.closest ? e.target.closest('tr[data-att]') : null;
+    if (tr && tr === e.target) { e.preventDefault(); openDetail(tr.getAttribute('data-att')); }
+  });
+
+  $('exrKind').addEventListener('change', showPanels);
+  $('exrQFilter').addEventListener('input', renderQOptions);
+  $('exrQ').addEventListener('change', function () { S.ack = ''; renderQInfo(); });
+  $('exrQInfo').addEventListener('change', function (e) {
+    var t = e.target;
+    if (t && t.id === 'exrAck') { S.ack = t.checked ? (t.getAttribute('data-qid') || '') : ''; }
+  });
+  $('exrAtt').addEventListener('change', renderAttInfo);
+  $('exrEmp').addEventListener('change', renderEmpInfo);
+  $('exrReason').addEventListener('input', renderCounter);
+  $('exrSubmit').addEventListener('click', submitAction);
+  $('exrActRefresh').addEventListener('click', function () {
+    var b = $('exrActRefresh');
+    A.busy(b, true, 'Обновляем…');
+    Promise.all([loadActions(), loadAttempts().catch(function () { /* показано в таблице */ })]).then(function () { A.busy(b, false); }, function () { A.busy(b, false); });
+  });
+
+  $('exrLogGroup').addEventListener('change', renderLog);
+  $('exrLogSearch').addEventListener('input', renderLog);
+  $('exrLogMore').addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-exr-more-log]') : null;
+    if (b) { A.busy(b, true, 'Загружаем…'); loadLog(false); }
+  });
+  $('exrFlowAll').addEventListener('change', function () {
+    $('exrFlowBox').hidden = !this.checked;
+    if (this.checked) { loadFlowErrors(); }
+  });
+
+  start();
+})();
+</script>
+{% endunless %}

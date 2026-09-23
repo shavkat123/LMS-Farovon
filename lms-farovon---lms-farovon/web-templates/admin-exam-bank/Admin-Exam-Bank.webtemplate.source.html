@@ -1,0 +1,1509 @@
+{% comment %}
+  Admin Exam Bank — банк вопросов экзамена (/admin/exam-bank?id=<экзамен>).
+  Только роль «Аттестация: администратор»: наставники сами сдают этот экзамен, поэтому общий
+  админский гейт (HR, Наставник, Руководитель) здесь не подходит.
+
+  Все данные читаются на клиенте через Web API портала (общий include Exam Admin Common):
+  страница обновляет статусы после действий, которые выполняют потоки, без перезагрузки.
+  Серверных выборок здесь нет — закрытые для Web API столбцы этой странице не нужны.
+
+  Что умеет страница:
+  - сводка по статусам и доля «одобрено с первой проверки» (критерий 8.1 методички);
+  - покрытие раскладки билета: урок × тип × сложность, «есть / нужно» с тем же порогом, что у публикации;
+  - список вопросов с фильтрами и карточкой: варианты с ключом, критерии, цитата, отзыв рецензента;
+  - действия: вывести из банка, отправить на повторную проверку (только вопросы без задания ИИ),
+    создать новую версию. Одобрить вопрос вручную нельзя — это делает только рецензент (потоки F-B5 и F-B4).
+    Пока вопрос «На проверке», вывести его и создать версию нельзя: решение рецензента перезаписало бы статус.
+  - показаны только активные уроки и вопросы (statecode 0) — так же их считают потоки.
+{% endcomment %}
+{% assign ex_is_admin = false %}
+{% if user and user.roles contains 'Аттестация: администратор' %}{% assign ex_is_admin = true %}{% endif %}
+{% unless ex_is_admin %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только роли «Аттестация: администратор».</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+
+<style>
+  .exb-kpi { text-align: left; font: inherit; cursor: pointer; width: 100%; }
+  .exb-kpi:hover { border-color: var(--adm-primary-100); }
+  .exb-kpi.is-active { border-color: var(--adm-primary); box-shadow: 0 0 0 1px var(--adm-primary) inset; }
+  .exb-kpi--static { cursor: default; }
+  .exb-kpi--static:hover { border-color: var(--adm-border-1); }
+  .exb-kpi .exb-kpi-lines { font-size: 12px; color: var(--adm-fg-2); margin-top: 8px; line-height: 1.5; }
+  .exb-cardhead { flex-wrap: wrap; gap: 8px 12px; }
+  .exb-cov { width: 100%; border-collapse: collapse; }
+  .exb-cov th, .exb-cov td { text-align: center; font-size: 12px; padding: 6px 6px; border-bottom: 1px solid var(--adm-border-1); white-space: nowrap; }
+  .exb-cov th { color: var(--adm-fg-2); font-weight: 600; background: var(--adm-bg-muted); }
+  .exb-cov th.exb-cov-type { border-left: 1px solid var(--adm-border-2); }
+  .exb-cov td.exb-cov-first { border-left: 1px solid var(--adm-border-2); }
+  .exb-cov th:first-child, .exb-cov td:first-child { text-align: left; white-space: normal; min-width: 160px; max-width: 280px; }
+  .exb-cov td.exb-cov-total { font-weight: 700; }
+  .exb-cellbtn { background: none; border: 0; padding: 2px 4px; font: inherit; color: inherit; cursor: pointer; border-radius: 4px; font-variant-numeric: tabular-nums; }
+  .exb-cellbtn:hover { text-decoration: underline; }
+  .exb-cov .exb-zero { color: var(--adm-fg-3); }
+  .exb-cov-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; padding: 10px 16px; font-size: 12px; color: var(--adm-fg-2); }
+  .exb-sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; border: 1px solid var(--adm-border-2); }
+  .exb-filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; align-items: end; border-bottom: 1px solid var(--adm-border-1); }
+  .exb-filters .exb-search { grid-column: span 2; }
+  .exb-filterfoot { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; padding: 8px 16px; font-size: 12px; color: var(--adm-fg-2); border-bottom: 1px solid var(--adm-border-1); }
+  .exb-item { border-bottom: 1px solid var(--adm-border-1); }
+  .exb-row { padding: 10px 16px; cursor: pointer; display: flex; gap: 10px; align-items: flex-start; }
+  .exb-row:hover { background: var(--adm-bg-muted); }
+  .exb-row:focus { outline: 2px solid var(--adm-primary-100); outline-offset: -2px; }
+  .exb-row-main { flex: 1 1 auto; min-width: 0; }
+  .exb-row-top { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .exb-row-sub { font-size: 12px; color: var(--adm-fg-2); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .exb-row-sub b { color: var(--adm-fg-1); font-weight: 600; }
+  .exb-chev { color: var(--adm-fg-3); font-size: 14px; margin-top: 2px; transition: transform .15s; }
+  .exb-item.is-open .exb-chev { transform: rotate(180deg); }
+  .exb-item.is-open .exb-row { background: var(--adm-primary-50); }
+  .exb-qn { font-weight: 700; font-size: 13px; color: var(--adm-fg-1); font-variant-numeric: tabular-nums; }
+  .exb-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: var(--adm-bg-muted); color: var(--adm-fg-2); white-space: nowrap; }
+  .exb-tag--ok { background: var(--adm-success-50); color: var(--adm-success); }
+  .exb-tag--bad { background: var(--adm-danger-50); color: var(--adm-danger); }
+  .exb-tag--warn { background: var(--adm-warn-50); color: #7C4A03; }
+  .exb-detail { padding: 16px; background: #FBFCFD; border-top: 1px solid var(--adm-border-1); }
+  .exb-block { margin-bottom: 16px; }
+  .exb-block:last-child { margin-bottom: 0; }
+  .exb-block h4 { font-size: 12px; font-weight: 700; color: var(--adm-fg-2); text-transform: uppercase; letter-spacing: .04em; margin: 0 0 6px; }
+  .exb-text { white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.5; color: var(--adm-fg-1); margin: 0; }
+  .exb-quote { border-left: 3px solid var(--adm-border-2); padding: 4px 0 4px 10px; }
+  .exb-ok { color: var(--adm-success); font-weight: 700; }
+  .exb-bad { color: var(--adm-danger); font-weight: 700; }
+  .exb-na { color: var(--adm-fg-3); }
+  .exb-checks { list-style: none; margin: 0; padding: 0; }
+  .exb-checks li { display: flex; gap: 8px; align-items: flex-start; padding: 5px 0; border-bottom: 1px dashed var(--adm-border-1); font-size: 13px; }
+  .exb-checks li:last-child { border-bottom: 0; }
+  .exb-checks .exb-mark { width: 16px; flex: 0 0 16px; text-align: center; }
+  .exb-checks .exb-cmt { display: block; font-size: 12px; color: var(--adm-fg-2); margin-top: 2px; }
+  .exb-meta { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px 16px; font-size: 13px; }
+  .exb-meta span.exad-label { display: block; }
+  .exb-rub { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .exb-rub td, .exb-rub th { padding: 5px 8px; border-bottom: 1px solid var(--adm-border-1); text-align: left; vertical-align: top; }
+  .exb-rub th { font-size: 11px; color: var(--adm-fg-2); font-weight: 600; }
+  .exb-actions { padding-top: 12px; border-top: 1px solid var(--adm-border-1); }
+  .exb-linkbtn { background: none; border: 0; padding: 0; font: inherit; color: var(--adm-primary); font-weight: 600; cursor: pointer; }
+  .exb-linkbtn:hover { text-decoration: underline; }
+  .exb-more { padding: 12px 16px; text-align: center; }
+  .exb-ver .exb-optrow { display: grid; grid-template-columns: 22px minmax(0, 2fr) auto minmax(0, 1.5fr) auto;
+                         grid-template-areas: "id text ok mis del"; gap: 8px; align-items: start; padding: 8px 0; border-bottom: 1px dashed var(--adm-border-1); }
+  .exb-ver .exb-optid { grid-area: id; font-weight: 700; color: var(--adm-fg-2); padding-top: 8px; text-align: center; }
+  .exb-ver [data-f="text"] { grid-area: text; }
+  .exb-ver .exb-optok { grid-area: ok; padding-top: 8px; white-space: nowrap; }
+  .exb-ver [data-f="mis"] { grid-area: mis; }
+  .exb-ver .exb-optdel { grid-area: del; padding: 6px 10px; }
+  .exad .exb-ver .exb-optrow textarea.adm-input, .exb-ver .exb-optrow textarea.adm-input { min-height: 40px; width: 100%; }
+  .exb-ver textarea.adm-input { width: 100%; min-height: 84px; resize: vertical; font-family: inherit; line-height: 1.45; padding-top: 8px; padding-bottom: 8px; }
+  .exb-ver select.adm-input { width: 100%; }
+  .exb-ver .exb-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+  .exb-ver .exb-f { margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
+  .exb-ver .exb-f > label { font-size: 12px; font-weight: 600; color: var(--adm-fg-2); }
+  .exb-ver .exb-hint { font-size: 11px; color: var(--adm-fg-3); }
+  .exb-ver details { margin-top: 6px; }
+  .exb-ver summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--adm-primary); }
+  @media (max-width: 640px) {
+    .exb-filters .exb-search { grid-column: 1 / -1; }
+    .exb-row { padding: 10px 12px; }
+    .exb-detail { padding: 12px; }
+    .exb-ver .exb-optrow { grid-template-columns: 22px minmax(0, 1fr) auto; grid-template-areas: "id text del" ". ok ok" ". mis mis"; }
+    .exb-ver .exb-optok { padding-top: 0; }
+  }
+</style>
+
+<div class="container adm-scope exad" id="exbPage">
+  {% include 'Exam Admin Common' %}
+  <div id="exbHead"></div>
+  <div id="exbMsg"></div>
+  <div id="exbLoading" class="exad-empty"><span class="exad-spin"></span> Загружаем банк вопросов…</div>
+
+  <div id="exbBody" hidden>
+    <div id="exbPubNote"></div>
+    <div class="exad-stats" id="exbKpi"></div>
+
+    <section class="adm-card exad-section">
+      <div class="adm-cardhead exb-cardhead">
+        <div>
+          <div class="adm-cardhead-title">Покрытие банка</div>
+          <div class="exad-muted">Одобренные вопросы по урокам, типам и уровням сложности. Нажмите на число, чтобы увидеть эти вопросы в списке.</div>
+        </div>
+        <a class="adm-btn adm-btn--ghost" id="exbSetupLink" href="/admin/exams"><i class="bi bi-sliders" aria-hidden="true"></i> Настроить раскладку</a>
+      </div>
+      <div id="exbCover"></div>
+    </section>
+
+    <section class="adm-card exad-section" id="exbListCard">
+      <div class="adm-cardhead exb-cardhead">
+        <div class="adm-cardhead-title">Вопросы</div>
+      </div>
+      <div class="adm-toolbar exb-filters" id="exbFilters">
+        <div class="exad-field"><label for="exbFLesson">Урок</label><select class="adm-input" id="exbFLesson" data-filter="lesson"></select></div>
+        <div class="exad-field"><label for="exbFType">Тип</label><select class="adm-input" id="exbFType" data-filter="type"></select></div>
+        <div class="exad-field"><label for="exbFDiff">Сложность</label><select class="adm-input" id="exbFDiff" data-filter="diff"></select></div>
+        <div class="exad-field"><label for="exbFStatus">Статус</label><select class="adm-input" id="exbFStatus" data-filter="status"></select></div>
+        <div class="exad-field"><label for="exbFSource">Источник</label><select class="adm-input" id="exbFSource" data-filter="source"></select></div>
+        <div class="exad-field" id="exbFJobWrap" hidden><label for="exbFJob">Задание ИИ</label><select class="adm-input" id="exbFJob" data-filter="job"></select></div>
+        <div class="exad-field exb-search"><label for="exbFQ">Поиск по тексту вопроса</label><input type="search" class="adm-input" id="exbFQ" placeholder="Слово из формулировки или номер Q-…" autocomplete="off"></div>
+      </div>
+      <div class="exb-filterfoot">
+        <span id="exbCount" aria-live="polite"></span>
+        <button type="button" class="adm-btn adm-btn--ghost" id="exbReset"><i class="bi bi-x-circle" aria-hidden="true"></i> Сбросить фильтры</button>
+      </div>
+      <div id="exbList"></div>
+      <div id="exbMore" class="exb-more" hidden></div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var X = window.ExamAdm;
+  var root = document.getElementById('exbPage');
+  if (!X || !root) { return; }
+  var V = X.V, esc = X.esc;
+  var EXAM_ID = X.guidFromUrl('id');
+  var PAGE = 150;                 // сколько строк рисовать за раз: сотни вопросов без подвисаний
+  var STUCK_MIN = 30;             // после стольких минут «На проверке» считаем, что проверка прервалась
+  var REVIEW_WAIT_MS = 120000;    // сколько ждать решения рецензента после действия
+  var RECHECK_MS = 60000;         // через сколько перечитать статус после вывода «зависшего» вопроса
+
+  var S = {
+    exam: null, params: null, hasParams: false, published: false, everPublished: false,
+    lessons: [], lessonById: {}, lessonIdx: {},
+    questions: [], byId: {}, children: {},
+    jobs: [], jobById: {},
+    blueprint: null, bpKind: '', bpNote: '',
+    filtered: [], shown: PAGE,
+    open: {}, pending: {}, working: {},
+    retireFailed: {},   // старая версия не выведена после создания новой — держим предупреждение в карточке
+    sentAt: {},         // когда с этой страницы вопрос отправлен на повторную проверку (для «проверка прервалась»)
+    lateReview: {}      // рецензент ответил уже после вывода и перезаписал «Выведен»: 'retire' | 'version'
+  };
+  var F = { lesson: '', type: '', diff: '', status: '', source: '', job: '', q: '' };
+
+  var el = function (id) { return document.getElementById(id); };
+
+  /* ── Мелочи ────────────────────────────────────────────────────────────────────────── */
+  function typeCode(q) { return X.CODE.type[q.new_type] || ''; }
+  function diffCode(q) { return X.CODE.difficulty[q.new_difficulty] || ''; }
+  function isChoice(t) { return t === 'single' || t === 'multi'; }
+  function lid(v) { return v ? String(v).toLowerCase() : ''; }
+  function lessonName(id) {
+    var l = S.lessonById[lid(id)];
+    return l ? (l.new_name || 'Урок без названия') : 'Урок не найден';
+  }
+  function squash(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim(); }
+  function isTrue(v) { return v === true || v === 'true' || v === 'True'; }
+  function versionOf(q) { return X.toInt(q.new_version, 1) || 1; }
+  /*
+    Отпечаток формулировки по формуле потока создания вопросов (F-B3): первые 400 знаков, без крайних
+    пробелов, в нижнем регистре. Сохраняем в новой версии именно его, иначе проверка потока на дубли
+    не узнает вопрос, созданный вручную (общий ExamAdm.contentHash ещё и схлопывает пробелы).
+  */
+  function flowHash(stem) { return String(stem || '').substring(0, 400).trim().toLowerCase(); }
+
+  /*
+    Сколько минут вопрос ждёт рецензента: от отправки с этой страницы, иначе от создания.
+    null — время неизвестно.
+  */
+  function reviewAgeMin(q) {
+    var id = q.new_examquestionid;
+    if (S.sentAt[id]) { return (Date.now() - S.sentAt[id]) / 60000; }
+    if (!q.createdon) { return null; }
+    var t = new Date(q.createdon).getTime();
+    return isNaN(t) ? null : (X.now() - t) / 60000;
+  }
+  /*
+    Можно ли трогать статус вопроса. Проверка F-B4 в конце пишет «Одобрен» или «Отклонён», не глядя на
+    текущий статус, — если вывести вопрос, пока она идёт, её решение вернёт вопрос в банк.
+    '' — не на проверке; 'wait' — проверка может ещё идти; 'stuck' — дольше порога, проверка, видимо, прервалась.
+  */
+  function reviewLock(q) {
+    if (q.new_status !== V.Q_REVIEW) { return ''; }
+    var age = reviewAgeMin(q);
+    return age != null && age > STUCK_MIN ? 'stuck' : 'wait';
+  }
+  /*
+    Вопрос выведен по износу: ночное обслуживание (F-A8) выводит его снова каждую ночь, пока число
+    показов не ниже предела, — повторная проверка его не вернёт. Считаем только для экзаменов,
+    которые публиковались: у остальных показов не бывает.
+  */
+  function wornOut(q) {
+    // Ночное обслуживание (F-A8) выводит вопросы по износу только у опубликованных экзаменов:
+    // у закрытого или снятого с публикации повторно одобренный вопрос никто не выведет.
+    return !!S.exam && S.exam.new_status === X.V.EXAM_PUBLISHED && !!S.params && X.toInt(q.new_exposures, 0) >= S.params.maxExposures;
+  }
+
+  /*
+    Цитата в тексте урока. Поток создания вопросов сверяет дословно; здесь дословное совпадение —
+    «найдена», а совпадение с точностью до пробелов и переносов строк тоже засчитываем: при
+    копировании из браузера переносы строк меняются, а смысл проверки (цитата взята из урока) тот же.
+  */
+  function quoteCheck(quote, lesson) {
+    var qt = String(quote || '').trim();
+    if (!qt) { return 'empty'; }
+    if (!lesson) { return 'nolesson'; }
+    var narr = String(lesson.new_narration || ''), text = String(lesson.new_text || '');
+    if (!narr && !text) { return 'notext'; }
+    if (narr.indexOf(qt) >= 0 || text.indexOf(qt) >= 0) { return 'exact'; }
+    var sq = squash(qt);
+    if (squash(narr).indexOf(sq) >= 0 || squash(text).indexOf(sq) >= 0) { return 'spaces'; }
+    return 'missing';
+  }
+  function reEsc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  /*
+    Точный отрывок урока, совпавший с цитатой (сначала текст для озвучки — его сверяет рецензент,
+    потом текст урока). Нужен, чтобы при совпадении «с точностью до пробелов» сохранить цитату
+    дословно, как в уроке. Возвращает { src: 'narr' | 'text', text } или null.
+  */
+  function quotePassage(quote, lesson) {
+    var qt = String(quote || '').trim();
+    if (!qt || !lesson) { return null; }
+    var srcs = [['narr', String(lesson.new_narration || '')], ['text', String(lesson.new_text || '')]];
+    var i, m, re = new RegExp(squash(qt).split(' ').map(reEsc).join('\\s+'));
+    for (i = 0; i < srcs.length; i++) { if (srcs[i][1] && srcs[i][1].indexOf(qt) >= 0) { return { src: srcs[i][0], text: qt }; } }
+    for (i = 0; i < srcs.length; i++) { m = srcs[i][1] ? re.exec(srcs[i][1]) : null; if (m) { return { src: srcs[i][0], text: m[0] }; } }
+    return null;
+  }
+  function quoteCheckHtml(state) {
+    switch (state) {
+      case 'exact': return '<span class="exb-ok">✓</span> Цитата найдена в тексте урока.';
+      case 'spaces': return '<span class="exb-ok">✓</span> Цитата найдена в тексте урока (с точностью до пробелов и переносов строк).';
+      case 'empty': return '<span class="exb-bad">✗</span> Цитата из урока не указана.';
+      case 'nolesson': return '<span class="exb-bad">✗</span> Вопрос не привязан к уроку этого экзамена — цитату не с чем сверить.';
+      case 'notext': return '<span class="exb-bad">✗</span> У урока нет текста — цитату не с чем сверить.';
+      default: return '<span class="exb-bad">✗</span> Цитата не найдена в тексте урока: возможно, текст урока меняли после создания вопроса или цитата пересказана своими словами.';
+    }
+  }
+
+  /* ── Загрузка ──────────────────────────────────────────────────────────────────────── */
+  function showFatal(html) {
+    el('exbLoading').hidden = true;
+    el('exbBody').hidden = true;
+    el('exbMsg').innerHTML = '<div class="exad-note exad-note--danger">' + html + '</div>';
+  }
+
+  function load() {
+    if (!EXAM_ID) {
+      X.examHeader(el('exbHead'), null, 'bank');
+      // Параметр есть, но не похож на номер экзамена — ссылку обрезали или исказили при копировании
+      var hasParam = /[?&]id=/.test(location.search);
+      showFatal((hasParam ? 'Ссылка на экзамен повреждена.' : 'В адресе страницы не указан экзамен.') + ' Откройте банк вопросов из <a class="exad-link" href="/admin/exams">списка экзаменов</a>.');
+      return;
+    }
+    X.loadExam(EXAM_ID).then(function (exam) {
+      S.exam = exam;
+      var raw = X.parseJson(exam.new_paramsjson, null);
+      S.hasParams = !!(raw && typeof raw === 'object');
+      S.params = X.normalizeParams(raw);
+      S.published = exam.new_status === V.EXAM_PUBLISHED || exam.new_status === V.EXAM_CLOSED;
+      S.everPublished = !!exam.new_publishedon;
+      X.examHeader(el('exbHead'), exam, 'bank', 'Вопросы экзамена, решения рецензента и покрытие раскладки билета.');
+      el('exbSetupLink').href = '/admin/exam-setup?id=' + encodeURIComponent(EXAM_ID);
+      // Только активные записи (statecode 0): потоки публикации и обслуживания считают так же
+      return Promise.all([
+        X.apiAll('/_api/new_exammodules?$select=new_exammoduleid,new_name,new_order,new_section,new_weight,new_narration,new_text' +
+          '&$filter=_new_exam_value eq ' + EXAM_ID + ' and statecode eq 0&$orderby=new_order asc&$top=500', 500),
+        X.apiAll('/_api/new_examquestions?$select=new_examquestionid,new_name,_new_module_value,new_type,new_difficulty,new_stem,new_optionsjson,' +
+          'new_explanation,new_reference,new_rubricjson,new_points,new_slides,new_sourcequote,new_status,new_reviewjson,new_reviewfirstpass,' +
+          'new_source,_new_job_value,new_contenthash,new_exposures,new_version,_new_parentquestion_value,createdon' +
+          '&$filter=_new_exam_value eq ' + EXAM_ID + ' and statecode eq 0&$orderby=new_name asc&$top=5000', 5000),
+        X.apiAll('/_api/new_aijobs?$select=new_aijobid,new_name,new_status,new_approved,new_rejected,new_created,_new_module_value' +
+          '&$filter=_new_exam_value eq ' + EXAM_ID + '&$top=500', 500)
+      ]);
+    }).then(function (res) {
+      if (!res) { return; }
+      S.lessons = res[0] || [];
+      S.lessonById = {}; S.lessonIdx = {};
+      S.lessons.forEach(function (l, i) { S.lessonById[lid(l.new_exammoduleid)] = l; S.lessonIdx[lid(l.new_exammoduleid)] = i; });
+      S.questions = res[1] || [];
+      S.jobs = res[2] || [];
+      S.jobById = {};
+      S.jobs.forEach(function (j) { S.jobById[lid(j.new_aijobid)] = j; });
+      reindex();
+      computeBlueprint();
+      fillFilterOptions();
+      el('exbLoading').hidden = true;
+      el('exbBody').hidden = false;
+      renderAll();
+    }).catch(function (e) {
+      if (!S.exam) { X.examHeader(el('exbHead'), null, 'bank'); }
+      showFatal('Не удалось загрузить банк вопросов. ' + esc(e && e.message ? e.message : '') +
+        (e && e.status === 404 ? '<br>Экзамен не найден — возможно, ссылка устарела. Вернитесь к <a class="exad-link" href="/admin/exams">списку экзаменов</a>.' : ''));
+    });
+  }
+
+  /* Индексы и порядок списка: урок (по порядку в экзамене) → тип → номер вопроса */
+  function reindex() {
+    S.byId = {}; S.children = {};
+    S.questions.forEach(function (q) {
+      q.new_examquestionid = lid(q.new_examquestionid);
+      S.byId[q.new_examquestionid] = q;
+      var p = lid(q._new_parentquestion_value);
+      if (p) { (S.children[p] = S.children[p] || []).push(q.new_examquestionid); }
+      q._search = (String(q.new_name || '') + ' ' + String(q.new_stem || '')).toLowerCase();
+    });
+    S.questions.sort(function (a, b) {
+      var la = S.lessonIdx[lid(a._new_module_value)], lb = S.lessonIdx[lid(b._new_module_value)];
+      la = la == null ? 99999 : la; lb = lb == null ? 99999 : lb;
+      if (la !== lb) { return la - lb; }
+      if ((a.new_type || 0) !== (b.new_type || 0)) { return (a.new_type || 0) - (b.new_type || 0); }
+      return String(a.new_name || '').localeCompare(String(b.new_name || ''));
+    });
+  }
+  /* Самая новая версия, созданная из этого вопроса (если есть) */
+  function newestChild(id) {
+    var list = S.children[id] || [], best = null;
+    list.forEach(function (cid) { var c = S.byId[cid]; if (c && (!best || versionOf(c) > versionOf(best))) { best = c; } });
+    return best;
+  }
+
+  /*
+    Раскладка для «есть / нужно». Сохранённая на странице настройки — главная. Если параметры
+    сохранены без раскладки, считаем её той же функцией, что и страница настройки, и честно
+    подписываем, что это предварительный расчёт. Без параметров — только числа.
+  */
+  function computeBlueprint() {
+    S.blueprint = null; S.bpKind = ''; S.bpNote = '';
+    if (!S.hasParams) {
+      S.bpNote = 'Раскладка билета ещё не сохранена, поэтому показано только число одобренных вопросов. Сколько нужно в каждой ячейке, станет видно после настройки раскладки.';
+      return;
+    }
+    var p = S.params;
+    if (p.blueprint.length) {
+      S.blueprint = p.blueprint.filter(function (c) { return !!S.lessonById[c.module]; });
+      S.bpKind = 'saved';
+      if (S.blueprint.length < p.blueprint.length) {
+        S.bpNote = 'В сохранённой раскладке есть уроки, которых больше нет в экзамене. Пересохраните раскладку на странице настройки.';
+      }
+      return;
+    }
+    var mods = p.modules.filter(function (m) { return !!S.lessonById[m.id]; });
+    if (!mods.length) {
+      mods = S.lessons.map(function (l) { return { id: lid(l.new_exammoduleid), weight: Math.max(0, X.toNum(l.new_weight, 1)) }; });
+    }
+    // Все веса нулевые — раскладка по урокам не определена (и расчёт зациклился бы): считаем уроки равными
+    var sum = mods.reduce(function (s, m) { return s + m.weight; }, 0);
+    if (sum <= 0) { mods = mods.map(function (m) { return { id: m.id, weight: 1 }; }); }
+    if (!mods.length) { return; }
+    try {
+      S.blueprint = X.buildBlueprint({ blocks: p.blocks, difficulty: p.difficulty, modules: mods });
+      S.bpKind = 'calc';
+      S.bpNote = 'Раскладка ещё не сохранена: «нужно» рассчитано по текущим параметрам экзамена и может измениться после настройки.';
+    } catch (e) {
+      S.blueprint = null;
+    }
+  }
+
+  /* ── Отрисовка ─────────────────────────────────────────────────────────────────────── */
+  function renderAll() {
+    renderPubNote();
+    renderKpi();
+    renderCoverage();
+    applyFilters(true);
+  }
+
+  function renderPubNote() {
+    var box = el('exbPubNote');
+    if (!S.published) { box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="exad-note exad-note--info"><i class="bi bi-info-circle" aria-hidden="true"></i> ' +
+      'Экзамен опубликован: билеты собираются из снимка, сделанного при публикации. Новые вопросы и новые версии в них не попадут, ' +
+      'а выведенные из банка больше не выпадают в новых билетах. Чтобы убрать ошибочный вопрос и из уже выданных билетов, нейтрализуйте его на странице ' +
+      '<a class="exad-link" href="/admin/exam-results?id=' + esc(encodeURIComponent(EXAM_ID)) + '">«Результаты»</a>.</div>';
+  }
+
+  function renderKpi() {
+    var c = {}, total = S.questions.length;
+    c[V.Q_REVIEW] = 0; c[V.Q_APPROVED] = 0; c[V.Q_REJECTED] = 0; c[V.Q_RETIRED] = 0;
+    S.questions.forEach(function (q) { if (c[q.new_status] != null) { c[q.new_status]++; } });
+
+    // Доля «с первой проверки»: по заданиям ИИ — из итогов задания (туда входят и отсеянные
+    // автоматической проверкой); по вопросам без задания — по отметке последней проверки.
+    var jA = 0, jR = 0;
+    S.jobs.forEach(function (j) {
+      if (j.new_approved == null && j.new_rejected == null) { return; }   // задание ещё идёт — итогов нет
+      jA += X.toInt(j.new_approved, 0); jR += X.toInt(j.new_rejected, 0);
+    });
+    var mT = 0, mP = 0;
+    S.questions.forEach(function (q) {
+      if (q._new_job_value || !q.new_reviewjson) { return; }
+      // «Рецензент не ответил» — по существу вопрос никто не оценивал, в долю не входит
+      var rv = X.parseJson(q.new_reviewjson, null);
+      if (rv && typeof rv === 'object' && rv.error) { return; }
+      mT++; if (isTrue(q.new_reviewfirstpass)) { mP++; }
+    });
+    var allT = jA + jR + mT, allP = jA + mP;
+
+    function card(status, label, icon, value, sub) {
+      var active = status !== null && F.status === String(status);
+      return '<button type="button" class="adm-card adm-stat exb-kpi' + (active ? ' is-active' : '') + '" data-kstatus="' + (status === null ? '' : status) + '">' +
+        '<div class="adm-stat-top"><span class="adm-eyebrow">' + esc(label) + '</span><i class="bi ' + icon + '" aria-hidden="true"></i></div>' +
+        '<div class="adm-stat-val">' + X.fmtInt(value) + '</div>' +
+        '<div class="adm-stat-foot"><span class="adm-stat-sub">' + esc(sub) + '</span></div></button>';
+    }
+    var fp = '<div class="adm-card adm-stat exb-kpi exb-kpi--static">' +
+      '<div class="adm-stat-top"><span class="adm-eyebrow">Одобрено с первой проверки</span><i class="bi bi-bullseye" aria-hidden="true"></i></div>' +
+      '<div class="adm-stat-val">' + X.pct(allP, allT) + '</div>' +
+      '<div class="exb-kpi-lines">' +
+        'Задания ИИ: ' + (jA + jR ? X.fmtInt(jA) + ' из ' + X.fmtInt(jA + jR) + ' (' + X.pct(jA, jA + jR) + ')' : 'нет завершённых') + '<br>' +
+        'Без задания: ' + (mT ? X.fmtInt(mP) + ' из ' + X.fmtInt(mT) + ' (' + X.pct(mP, mT) + ')*' : 'нет проверенных') +
+      '</div>' +
+      '<div class="adm-stat-foot"><span class="adm-stat-sub">Цель — не ниже 90%.' + (mT ? ' * По отметке «одобрен при последней проверке»: после повторной проверки она ставится, даже если первая была неудачной.' : '') + '</span></div></div>';
+
+    el('exbKpi').innerHTML =
+      card(null, 'Всего вопросов', 'bi-collection', total, 'в банке экзамена') +
+      card(V.Q_APPROVED, 'Одобрено', 'bi-check-circle', c[V.Q_APPROVED], 'могут попасть в билеты') +
+      card(V.Q_REVIEW, 'На проверке', 'bi-hourglass-split', c[V.Q_REVIEW], 'ждут решения рецензента') +
+      card(V.Q_REJECTED, 'Отклонено', 'bi-x-circle', c[V.Q_REJECTED], 'рецензент нашёл ошибки') +
+      card(V.Q_RETIRED, 'Выведено', 'bi-archive', c[V.Q_RETIRED], 'больше не используются') +
+      fp;
+  }
+
+  function renderCoverage() {
+    var box = el('exbCover');
+    if (!S.lessons.length) {
+      box.innerHTML = '<div class="exad-empty">В экзамене пока нет уроков. Добавьте их на странице настройки.</div>';
+      return;
+    }
+    // Считаем по фактической сложности вопроса: модель может вернуть не тот уровень, что заказан
+    var have = {}, noLesson = 0;
+    S.questions.forEach(function (q) {
+      if (q.new_status !== V.Q_APPROVED) { return; }
+      var m = lid(q._new_module_value);
+      if (!m || !S.lessonById[m]) { noLesson++; return; }
+      var k = X.cellKey(typeCode(q), m, diffCode(q));
+      have[k] = (have[k] || 0) + 1;
+    });
+    var bp = {}, usedTypes = {};
+    (S.blueprint || []).forEach(function (c) { bp[X.cellKey(c.type, c.module, c.difficulty)] = c; usedTypes[c.type] = 1; });
+    S.questions.forEach(function (q) { var t = typeCode(q); if (t) { usedTypes[t] = 1; } });
+    var types = X.TYPES.filter(function (t) { return usedTypes[t]; });
+    if (!types.length) { types = ['single', 'multi']; }
+
+    var short = 0, missing = 0, cells = 0;
+    var h = '<div class="exad-scroll"><table class="adm-table exb-cov"><thead><tr><th rowspan="2">Урок</th>';
+    types.forEach(function (t) { h += '<th colspan="3" class="exb-cov-type">' + esc(X.LABEL.type[t]) + '</th>'; });
+    h += '<th rowspan="2" class="exb-cov-type">Всего одобрено</th></tr><tr>';
+    types.forEach(function (t) {
+      X.DIFFS.forEach(function (d, i) {
+        h += '<th' + (i === 0 ? ' class="exb-cov-type"' : '') + ' title="' + esc(X.LABEL.difficulty[d]) + '">' + esc(X.LABEL.difficultyShort[d]) + '</th>';
+      });
+    });
+    h += '</tr></thead><tbody>';
+    S.lessons.forEach(function (l, li) {
+      var m = lid(l.new_exammoduleid), rowTotal = 0;
+      h += '<tr><td><b>' + esc((l.new_order != null ? l.new_order + '. ' : '') + (l.new_name || 'Урок без названия')) + '</b>' +
+        (l.new_section ? '<div class="exad-muted">' + esc(l.new_section) + '</div>' : '') + '</td>';
+      types.forEach(function (t) {
+        X.DIFFS.forEach(function (d, i) {
+          var k = X.cellKey(t, m, d), n = have[k] || 0, cell = bp[k], cls = i === 0 ? 'exb-cov-first' : '', txt;
+          rowTotal += n;
+          if (cell) {
+            var need = X.requiredFor(cell.count, S.params);
+            cells++;
+            if (n < need) { short++; missing += need - n; }
+            cls += n >= need ? ' exad-cell-ok' : ' exad-cell-short';
+            txt = X.fmtInt(n) + ' / ' + X.fmtInt(need);
+          } else {
+            txt = n ? X.fmtInt(n) : '<span class="exb-zero">0</span>';
+          }
+          var title = esc(X.LABEL.type[t] + ', ' + X.LABEL.difficulty[d].toLowerCase() + (cell ? ': одобрено ' + n + ', нужно ' + X.requiredFor(cell.count, S.params) : ': одобрено ' + n));
+          h += '<td class="' + cls + '"><button type="button" class="exb-cellbtn" data-cov="' + esc(m + '|' + t + '|' + d) + '" title="' + title + '">' + txt + '</button></td>';
+        });
+      });
+      h += '<td class="exb-cov-first exb-cov-total">' + X.fmtInt(rowTotal) + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+
+    var foot = '';
+    if (S.blueprint && S.blueprint.length) {
+      foot += '<div class="exb-cov-legend">' +
+        '<span><span class="exb-sw exad-cell-ok"></span>хватает</span>' +
+        '<span><span class="exb-sw exad-cell-short"></span>не хватает</span>' +
+        '<span>В ячейке: «есть / нужно». Нужно = вопросов в билете × (попыток + 1) × запас банка (' +
+          X.fmtInt(S.params.maxAttempts) + ' попыт., запас ×' + X.fmtInt(S.params.bankFactor) + ') — тот же порог проверяет публикация.</span>' +
+        '</div>';
+      foot += short
+        ? '<div class="exad-note exad-note--warn" style="margin:0 16px 12px;">Не хватает вопросов в ' + X.fmtInt(short) + ' из ' + X.fmtInt(cells) +
+          ' ячеек раскладки (всего недостаёт ' + X.fmtInt(missing) + '). ' + (S.published ? '' : 'Пока нехватка есть, экзамен не опубликуется. ') +
+          'Недостающие вопросы можно заказать у ИИ на странице настройки.</div>'
+        : '<div class="exad-note exad-note--success" style="margin:0 16px 12px;">Во всех ' + X.fmtInt(cells) + ' ячейках раскладки одобренных вопросов достаточно.</div>';
+    }
+    if (S.bpNote) { foot += '<div class="exad-note exad-note--info" style="margin:0 16px 12px;">' + esc(S.bpNote) + '</div>'; }
+    if (noLesson) {
+      foot += '<div class="exad-note exad-note--warn" style="margin:0 16px 12px;">Одобренных вопросов без урока этого экзамена: ' + X.fmtInt(noLesson) +
+        '. Они не попадут ни в одну ячейку билета.</div>';
+    }
+    box.innerHTML = h + foot;
+  }
+
+  /* ── Фильтры ───────────────────────────────────────────────────────────────────────── */
+  function opt(value, text) { return '<option value="' + esc(value) + '">' + esc(text) + '</option>'; }
+  function fillFilterOptions() {
+    var h = opt('', 'Все уроки');
+    S.lessons.forEach(function (l) { h += opt(lid(l.new_exammoduleid), (l.new_order != null ? l.new_order + '. ' : '') + (l.new_name || 'Урок без названия')); });
+    h += opt('none', 'Без урока');
+    el('exbFLesson').innerHTML = h;
+    h = opt('', 'Все типы'); X.TYPES.forEach(function (t) { h += opt(t, X.LABEL.type[t]); });
+    el('exbFType').innerHTML = h;
+    h = opt('', 'Любая'); X.DIFFS.forEach(function (d) { h += opt(d, X.LABEL.difficulty[d]); });
+    el('exbFDiff').innerHTML = h;
+    h = opt('', 'Все статусы');
+    [V.Q_REVIEW, V.Q_APPROVED, V.Q_REJECTED, V.Q_RETIRED].forEach(function (s) { h += opt(String(s), X.label('qStatus', s)); });
+    el('exbFStatus').innerHTML = h;
+    el('exbFSource').innerHTML = opt('', 'Любой') + opt(String(V.SRC_AI), 'ИИ') + opt(String(V.SRC_MANUAL), 'Вручную');
+    if (S.jobs.length) {
+      h = opt('', 'Все') + opt('none', 'Без задания');
+      S.jobs.slice().sort(function (a, b) { return String(b.new_name || '').localeCompare(String(a.new_name || '')); })
+        .forEach(function (j) { h += opt(lid(j.new_aijobid), (j.new_name || 'Задание') + ' — ' + lessonName(j._new_module_value)); });
+      el('exbFJob').innerHTML = h;
+      el('exbFJobWrap').hidden = false;
+    }
+  }
+  function syncFilterInputs() {
+    el('exbFLesson').value = F.lesson; el('exbFType').value = F.type; el('exbFDiff').value = F.diff;
+    el('exbFStatus').value = F.status; el('exbFSource').value = F.source; el('exbFJob').value = F.job; el('exbFQ').value = F.q;
+  }
+  function matches(q) {
+    if (F.lesson) {
+      var m = lid(q._new_module_value);
+      if (F.lesson === 'none' ? (m && S.lessonById[m]) : m !== F.lesson) { return false; }
+    }
+    if (F.type && typeCode(q) !== F.type) { return false; }
+    if (F.diff && diffCode(q) !== F.diff) { return false; }
+    if (F.status && String(q.new_status) !== F.status) { return false; }
+    if (F.source && String(q.new_source) !== F.source) { return false; }
+    if (F.job) {
+      var j = lid(q._new_job_value);
+      if (F.job === 'none' ? !!j : j !== F.job) { return false; }
+    }
+    if (F.q && q._search.indexOf(F.q.toLowerCase()) < 0) { return false; }
+    return true;
+  }
+  function applyFilters(keepShown) {
+    S.filtered = S.questions.filter(matches);
+    if (!keepShown) { S.shown = PAGE; }
+    el('exbCount').textContent = 'Показано ' + X.fmtInt(S.filtered.length) + ' из ' + X.fmtInt(S.questions.length);
+    renderList();
+    // подсветка активной карточки статуса в сводке
+    Array.prototype.forEach.call(el('exbKpi').querySelectorAll('[data-kstatus]'), function (b) {
+      var s = b.getAttribute('data-kstatus');
+      b.classList.toggle('is-active', !!s && s === F.status);
+    });
+  }
+
+  /* ── Список ────────────────────────────────────────────────────────────────────────── */
+  function renderList() {
+    var list = el('exbList'), more = el('exbMore');
+    if (!S.questions.length) {
+      list.innerHTML = '<div class="exad-empty">В банке этого экзамена пока нет вопросов. Их создаёт ИИ по урокам — на странице настройки.</div>';
+      more.hidden = true; return;
+    }
+    if (!S.filtered.length) {
+      list.innerHTML = '<div class="exad-empty">Под выбранные фильтры не подходит ни один вопрос.</div>';
+      more.hidden = true; return;
+    }
+    var part = S.filtered.slice(0, S.shown), h = '';
+    for (var i = 0; i < part.length; i++) { h += itemHtml(part[i]); }
+    list.innerHTML = h;
+    var rest = S.filtered.length - part.length;
+    more.hidden = rest <= 0;
+    more.innerHTML = rest > 0 ? '<button type="button" class="adm-btn adm-btn--ghost" id="exbMoreBtn">Показать ещё ' + X.fmtInt(Math.min(PAGE, rest)) + ' (осталось ' + X.fmtInt(rest) + ')</button>' : '';
+  }
+  function rerenderItem(id) {
+    var node = el('exbList').querySelector('[data-item="' + id + '"]');
+    var q = S.byId[id];
+    if (node && q) { node.outerHTML = itemHtml(q); }
+  }
+
+  function reviewBadge(q) {
+    if (!isChoice(typeCode(q))) { return ''; }
+    var bm = X.blindMatch(q);
+    if (bm.match === true) { return '<span class="exb-tag exb-tag--ok" title="Рецензент, не видя ключа, выбрал те же ответы">✓ рецензент совпал с ключом</span>'; }
+    if (bm.match === false) { return '<span class="exb-tag exb-tag--bad" title="Рецензент, не видя ключа, выбрал другие ответы">✗ рецензент не совпал с ключом</span>'; }
+    return '';
+  }
+
+  function itemHtml(q) {
+    var id = q.new_examquestionid, t = typeCode(q), d = diffCode(q), open = !!S.open[id];
+    var stem = squash(q.new_stem);
+    var exp = S.everPublished && q.new_exposures != null && q.new_exposures !== ''
+      ? '<span class="exb-tag" title="Сколько раз вопрос показан участникам в разборе ответов">показов: ' + X.fmtInt(q.new_exposures) + '</span>' : '';
+    var pend = S.pending[id] ? '<span class="exb-tag exb-tag--warn"><span class="exad-spin" style="width:10px;height:10px;"></span> идёт проверка</span>' : '';
+    return '<div class="exb-item' + (open ? ' is-open' : '') + '" data-item="' + esc(id) + '">' +
+      '<div class="exb-row" role="button" tabindex="0" aria-expanded="' + (open ? 'true' : 'false') + '" data-toggle="' + esc(id) + '">' +
+        '<div class="exb-row-main">' +
+          '<div class="exb-row-top">' +
+            '<span class="exb-qn">' + esc(q.new_name || 'Без номера') + '</span>' +
+            X.pill('qStatus', q.new_status) +
+            '<span class="exb-tag">' + esc(X.LABEL.typeShort[t] || '—') + '</span>' +
+            '<span class="exb-tag">' + esc(X.LABEL.difficulty[d] || '—') + '</span>' +
+            '<span class="exb-tag">' + esc(X.label('qSource', q.new_source)) + '</span>' +
+            '<span class="exb-tag" title="Версия вопроса">v' + versionOf(q) + '</span>' +
+            reviewBadge(q) + exp + pend +
+          '</div>' +
+          '<div class="exb-row-sub"><b>' + esc(lessonName(q._new_module_value)) + '</b> · ' + esc(stem.slice(0, 160)) + '</div>' +
+        '</div>' +
+        '<i class="bi bi-chevron-down exb-chev" aria-hidden="true"></i>' +
+      '</div>' +
+      (open ? detailHtml(q) : '') +
+    '</div>';
+  }
+
+  /* ── Карточка вопроса ──────────────────────────────────────────────────────────────── */
+  function optionsHtml(q) {
+    var opts = X.options(q);
+    if (!opts.length) { return '<div class="exad-note exad-note--warn">У вопроса нет вариантов ответа.</div>'; }
+    return opts.map(function (o) {
+      var ok = o.correct === true || o.correct === 'true';
+      return '<div class="exad-opt' + (ok ? ' exad-opt--ok' : '') + '">' +
+        '<span class="exad-opt-id">' + esc(o.id) + '</span>' +
+        '<span style="flex:1;min-width:0;">' + (ok ? '<span class="exb-ok" title="Верный ответ">✓</span> ' : '') + esc(o.text) +
+          (!ok && o.misconception ? '<span class="exad-opt-mis">Заблуждение: ' + esc(o.misconception) + '</span>' : '') +
+          (!ok && !o.misconception ? '<span class="exad-opt-mis">Заблуждение не указано</span>' : '') +
+        '</span></div>';
+    }).join('');
+  }
+
+  /* Критерии письменного вопроса: поток пишет {criteria, key_elements}, методичка — массив. Читаем оба. */
+  function rubricParts(raw) {
+    var r = X.parseJson(raw, null);
+    if (r == null || typeof r !== 'object') { return null; }
+    return {
+      criteria: Array.isArray(r) ? r : (Array.isArray(r.criteria) ? r.criteria : []),
+      keys: (!Array.isArray(r) && Array.isArray(r.key_elements)) ? r.key_elements : []
+    };
+  }
+  function critFields(c) {
+    if (c && typeof c === 'object') {
+      return { code: c.code || c.id || '', name: c.name || c.title || '', weight: c.weight, desc: c.description || '' };
+    }
+    var m = /^\s*([^:]+)\s*:\s*([\d.,]+)\s*$/.exec(String(c));     // вид «K1:25»
+    return m ? { code: m[1], name: '', weight: m[2], desc: '' } : { code: '', name: String(c), weight: '', desc: '' };
+  }
+  function rubricHtml(raw) {
+    if (!raw) { return '<span class="exad-muted">Критерии оценки не заданы.</span>'; }
+    var r = rubricParts(raw);
+    if (!r) { return '<pre class="exad-pre">' + esc(raw) + '</pre>'; }
+    var h = '';
+    if (r.criteria.length) {
+      h += '<div class="exad-scroll"><table class="exb-rub"><thead><tr><th>Код</th><th>Критерий</th><th>Вес</th></tr></thead><tbody>';
+      r.criteria.forEach(function (c) {
+        var f = critFields(c);
+        h += '<tr><td><b>' + esc(f.code || '—') + '</b></td><td>' + esc(f.name || '—') +
+          (f.desc ? '<div class="exad-muted">' + esc(f.desc) + '</div>' : '') + '</td><td class="adm-num">' + esc(f.weight == null || f.weight === '' ? '—' : f.weight) + '</td></tr>';
+      });
+      h += '</tbody></table></div>';
+    } else {
+      h += '<span class="exad-muted">Список критериев пуст.</span>';
+    }
+    if (r.keys.length) {
+      h += '<div class="exad-label" style="margin-top:8px;">Ключевые элементы ответа</div><ul class="exad-small" style="margin:4px 0 0;padding-left:18px;">';
+      r.keys.forEach(function (k) { h += '<li>' + esc(k && typeof k === 'object' ? (k.text || k.name || JSON.stringify(k)) : k) + '</li>'; });
+      h += '</ul>';
+    }
+    return h;
+  }
+
+  function reviewHtml(q) {
+    var raw = q.new_reviewjson, rv = X.parseJson(raw, null), st = q.new_status, h = '';
+    var noJob = !q._new_job_value;
+    if (st === V.Q_REVIEW) {
+      h += '<div class="exad-note exad-note--info">Вопрос на проверке у рецензента' + (raw ? '. Ниже — отзыв предыдущей проверки.' : '. Отзыв появится здесь после решения.') + '</div>';
+    }
+    if (!raw) {
+      if (st !== V.Q_REVIEW) {
+        h += '<div class="exad-muted">Отзыва рецензента нет: вопрос не проходил проверку (например, его загрузили в банк напрямую или вывели до проверки).</div>';
+      }
+      return h;
+    }
+    if (!rv || typeof rv !== 'object') {
+      return h + '<div class="exad-note exad-note--warn">Отзыв рецензента не удалось разобрать. Исходный текст:</div><pre class="exad-pre">' + esc(raw) + '</pre>';
+    }
+    if (rv.error) {
+      return h + '<div class="exad-note exad-note--danger"><b>Рецензент не ответил</b>' + (rv.code ? ' (код ошибки: ' + esc(rv.code) + ')' : '') +
+        '. Вопрос отклонён автоматически, по существу его никто не оценивал. ' +
+        (noJob ? 'Отправьте его на повторную проверку.' : 'Создайте новую версию (можно без изменений) — она уйдёт рецензенту заново.') + '</div>';
+    }
+    var verdict = rv.verdict === 'accept' ? '<span class="adm-pill adm-pill--success adm-pill--dot">одобрить</span>'
+      : rv.verdict === 'reject' ? '<span class="adm-pill adm-pill--danger adm-pill--dot">отклонить</span>'
+      : '<span class="adm-pill adm-pill--neutral">' + esc(rv.verdict || 'нет решения') + '</span>';
+    h += '<div class="exad-actions" style="margin-bottom:6px;"><span class="exad-label">Решение рецензента:</span> ' + verdict + '</div>';
+    if (rv.comment) { h += '<p class="exb-text" style="margin-bottom:10px;">' + esc(rv.comment) + '</p>'; }
+
+    var checks = rv.checks && typeof rv.checks === 'object' ? rv.checks : {};
+    var known = {};
+    var rows = X.REVIEW_CHECKS.map(function (c) { known[c[0]] = 1; return [c[0], c[1]]; });
+    Object.keys(checks).forEach(function (k) { if (!known[k]) { rows.push([k, k]); } });
+    h += '<ul class="exb-checks">';
+    rows.forEach(function (r) {
+      var c = checks[r[0]], mark, cmt = '';
+      if (!c || typeof c !== 'object') {
+        mark = '<span class="exb-na">—</span>'; cmt = '<span class="exb-cmt">нет данных</span>';
+      } else {
+        var na = /^\s*(n\/?a|н\/?п|не применимо)\s*\.?\s*$/i.test(String(c.comment || ''));
+        if (isTrue(c.pass) && na) {
+          mark = '<span class="exb-na">—</span>'; cmt = '<span class="exb-cmt exb-na">не применимо</span>';
+        } else {
+          mark = isTrue(c.pass) ? '<span class="exb-ok" title="пройдена">✓</span>' : '<span class="exb-bad" title="не пройдена">✗</span>';
+          cmt = c.comment ? '<span class="exb-cmt">' + esc(c.comment) + '</span>' : '';
+        }
+      }
+      h += '<li><span class="exb-mark">' + mark + '</span><span style="min-width:0;">' + esc(r[1]) + cmt + '</span></li>';
+    });
+    h += '</ul>';
+
+    if (isChoice(typeCode(q))) {
+      var bm = X.blindMatch(q);
+      var pick = Array.isArray(rv.answer_option_ids) ? rv.answer_option_ids.join(', ') : '';
+      h += '<div class="exad-small" style="margin-top:8px;">Ответ рецензента (он не видел ключа): <b>' + esc(pick || 'не выбран') + '</b> · Ключ: <b>' +
+        esc(bm.key ? bm.key.split('|').join(', ') : '—') + '</b> ' +
+        (bm.match === true ? '<span class="exb-ok">✓ совпало</span>' : bm.match === false ? '<span class="exb-bad">✗ не совпало</span>' : '') + '</div>';
+    }
+    h += '<div class="exad-small" style="margin-top:6px;">Одобрен при последней проверке: <b>' + (isTrue(q.new_reviewfirstpass) ? 'да' : 'нет') + '</b>' +
+      ' <span class="exad-muted">(отметка обновляется при каждой проверке)</span></div>';
+    return h;
+  }
+
+  function stuckNote(q) {
+    var id = q.new_examquestionid;
+    if (q.new_status !== V.Q_REVIEW || S.pending[id]) { return ''; }
+    // Отправлен на повторную проверку с этой страницы — отсчёт от момента отправки, а не от создания
+    var age = reviewAgeMin(q);
+    if (age == null || !(age > STUCK_MIN)) { return ''; }
+    var sup = X.cfg.support ? ' Если не поможет, напишите в поддержку: ' + esc(X.cfg.support) + '.' : '';
+    if (q._new_job_value) {
+      return '<div class="exad-note exad-note--warn">Проверка этого вопроса, похоже, прервалась сбоем: он создан заданием ИИ больше ' + STUCK_MIN +
+        ' минут назад и до сих пор без решения. Сам он повторно не проверится. Создайте новую версию (можно без изменений) — она уйдёт рецензенту.' + sup + '</div>';
+    }
+    if (S.sentAt[id] || !q.new_reviewjson) {
+      // Вопрос ещё ни разу не проверялся: дата создания = момент отправки рецензенту
+      return '<div class="exad-note exad-note--warn">Вопрос ждёт рецензента дольше ' + STUCK_MIN +
+        ' минут — вероятно, поток проверки дал сбой. Создайте новую версию (можно без изменений) — она уйдёт рецензенту заново.' + sup + '</div>';
+    }
+    // Вопрос повторно отправлен на проверку раньше (время отправки неизвестно) — говорим осторожно
+    return '<div class="exad-note exad-note--warn">Вопрос давно ждёт рецензента. Если решения нет больше получаса после отправки на проверку, ' +
+      'вероятно, поток проверки дал сбой — создайте новую версию (можно без изменений), она уйдёт рецензенту заново.' + sup + '</div>';
+  }
+
+  function detailHtml(q) {
+    var id = q.new_examquestionid, t = typeCode(q), lesson = S.lessonById[lid(q._new_module_value)];
+    var job = q._new_job_value ? S.jobById[lid(q._new_job_value)] : null;
+    var parent = q._new_parentquestion_value ? S.byId[lid(q._new_parentquestion_value)] : null;
+    var child = newestChild(id);
+    var h = '<div class="exb-detail">';
+
+    if (S.pending[id]) {
+      h += '<div class="exad-note exad-note--info"><span class="exad-spin"></span> <span data-pending="' + esc(id) + '">' + esc(S.pending[id].text || 'Рецензент проверяет вопрос…') + '</span></div>';
+    }
+    h += stuckNote(q);
+    if (S.retireFailed[id] && q.new_status !== V.Q_RETIRED) {
+      h += '<div class="exad-note exad-note--danger">Для этого вопроса создана новая версия, но саму эту версию вывести из банка не удалось — ' +
+        'сейчас в банке два варианта одного вопроса. Нажмите «Вывести из банка» ниже.</div>';
+    }
+    if (S.lateReview[id] && q.new_status !== V.Q_RETIRED) {
+      h += '<div class="exad-note exad-note--danger">Рецензент закончил проверку уже после вывода вопроса и поставил статус «' +
+        esc(X.label('qStatus', q.new_status)) + '».' + (S.lateReview[id] === 'version' && q.new_status === V.Q_APPROVED ? ' Сейчас в банке два варианта одного вопроса.' : '') +
+        ' Нажмите «Вывести из банка» ниже ещё раз.</div>';
+    }
+
+    h += '<div class="exb-block"><h4>Формулировка</h4><p class="exb-text">' + esc(q.new_stem || '—') + '</p></div>';
+    if (isChoice(t)) {
+      h += '<div class="exb-block"><h4>Варианты ответа</h4>' + optionsHtml(q) + '</div>';
+    }
+    if (q.new_explanation) { h += '<div class="exb-block"><h4>Пояснение к ответу</h4><p class="exb-text">' + esc(q.new_explanation) + '</p></div>'; }
+    if (!isChoice(t)) {
+      h += '<div class="exb-block"><h4>Эталонный ответ</h4><p class="exb-text">' + esc(q.new_reference || '—') + '</p></div>';
+      h += '<div class="exb-block"><h4>Критерии оценки</h4>' + rubricHtml(q.new_rubricjson) + '</div>';
+    }
+    h += '<div class="exb-block"><h4>Цитата из урока</h4>' +
+      (q.new_sourcequote ? '<p class="exb-text exb-quote">' + esc(q.new_sourcequote) + '</p>' : '') +
+      '<div class="exad-small" style="margin-top:6px;">' + quoteCheckHtml(quoteCheck(q.new_sourcequote, lesson)) + '</div></div>';
+    if (q.new_slides) { h += '<div class="exb-block"><h4>Слайды</h4><p class="exb-text">' + esc(q.new_slides) + '</p></div>'; }
+
+    h += '<div class="exb-block"><h4>Рецензент</h4>' + reviewHtml(q) + '</div>';
+
+    var maxExp = S.params ? S.params.maxExposures : 25;
+    h += '<div class="exb-block"><h4>Сведения</h4><div class="exb-meta">' +
+      '<div><span class="exad-label">Урок</span>' + esc(lessonName(q._new_module_value)) + '</div>' +
+      '<div><span class="exad-label">Баллы</span>' + esc(q.new_points == null ? '—' : q.new_points) + '</div>' +
+      '<div><span class="exad-label">Создан</span>' + esc(X.dt(q.createdon)) + '</div>' +
+      '<div><span class="exad-label">Источник</span>' + esc(X.label('qSource', q.new_source)) +
+        (q._new_job_value ? ' · ' + esc(job && job.new_name ? job.new_name : 'задание ИИ') : '') + '</div>' +
+      '<div><span class="exad-label">Версия</span>v' + versionOf(q) +
+        (q._new_parentquestion_value ? ' · из ' + (parent
+          ? '<button type="button" class="exb-linkbtn" data-goto="' + esc(parent.new_examquestionid) + '">' + esc(parent.new_name || 'предыдущей') + ' (v' + versionOf(parent) + ')</button>'
+          : 'предыдущей версии (не найдена в этом экзамене)') : '') + '</div>' +
+      (child ? '<div><span class="exad-label">Новая версия</span><button type="button" class="exb-linkbtn" data-goto="' + esc(child.new_examquestionid) + '">' +
+        esc(child.new_name || 'открыть') + ' (v' + versionOf(child) + ')</button></div>' : '') +
+      '<div><span class="exad-label">Показан в разборе</span>' +
+        (S.everPublished
+          ? X.fmtInt(q.new_exposures || 0) + ' из ' + X.fmtInt(maxExp) + ' <span class="exad-muted">(считается раз в сутки; на пределе вопрос выводится)</span>'
+          : '<span class="exad-muted">экзамен ещё не публиковался</span>') + '</div>' +
+    '</div></div>';
+
+    h += actionsHtml(q, child);
+    h += '</div>';
+    return h;
+  }
+
+  function actionsHtml(q, child) {
+    var st = q.new_status, busyNow = !!(S.pending[q.new_examquestionid] || S.working[q.new_examquestionid]);
+    var dis = busyNow ? ' disabled' : '';
+    var btns = '', notes = [];
+    // Пока проверка может идти, статус не трогаем: её решение перезапишет «Выведен»
+    var lock = reviewLock(q);
+    if (lock === 'wait') {
+      notes.push('Дождитесь решения рецензента. Пока идёт проверка, вывести вопрос или создать новую версию нельзя: решение рецензента перезапишет статус.');
+    } else if (lock === 'stuck') {
+      notes.push('Проверка, похоже, прервалась, поэтому вывести вопрос или создать новую версию можно. Но если рецензент всё же ответит позже, его решение перезапишет статус «Выведен».');
+    }
+    if (child) {
+      notes.push('У вопроса уже есть более новая версия (v' + versionOf(child) + '). Правьте и проверяйте её, а не эту.');
+    } else if (lock !== 'wait') {
+      btns += '<button type="button" class="adm-btn adm-btn--primary" data-act="version"' + dis + '><i class="bi bi-pencil-square" aria-hidden="true"></i> Создать новую версию</button>';
+    }
+    var hasLesson = !!(q._new_module_value && S.lessonById[lid(q._new_module_value)]);
+    var canRereview = !q._new_job_value && (st === V.Q_REJECTED || st === V.Q_RETIRED) && !child;
+    if (canRereview && !hasLesson) {
+      notes.push('Вопрос не привязан к уроку этого экзамена, поэтому рецензент не сможет его проверить. Обратитесь в поддержку.');
+    } else if (canRereview && wornOut(q)) {
+      notes.push('Вопрос показан в разборе ' + X.fmtInt(X.toInt(q.new_exposures, 0)) + ' раз при пределе ' + X.fmtInt(S.params.maxExposures) +
+        '. Повторная проверка его не вернёт: ночное обслуживание снова выведет его по износу. Чтобы вернуть вопрос в банк, создайте новую версию — её счётчик показов начнётся с нуля.');
+    } else if (canRereview) {
+      btns += '<button type="button" class="adm-btn adm-btn--ghost" data-act="rereview"' + dis + '><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Отправить на повторную проверку</button>';
+    }
+    if (st !== V.Q_RETIRED && lock !== 'wait') {
+      btns += '<button type="button" class="adm-btn adm-btn--danger-ghost" data-act="retire"' + dis + '><i class="bi bi-archive" aria-hidden="true"></i> Вывести из банка</button>';
+    }
+    if (q._new_job_value && (st === V.Q_REJECTED || st === V.Q_RETIRED) && !child) {
+      notes.push('Вопрос создан заданием ИИ: повторная проверка для таких вопросов не запускается. Чтобы исправить его или проверить заново, создайте новую версию — она уйдёт рецензенту автоматически.');
+    }
+    if (!btns && !notes.length) { return ''; }
+    return '<div class="exb-actions">' +
+      (btns ? '<div class="exad-actions">' + btns + '</div>' : '') +
+      notes.map(function (n) { return '<div class="exad-muted" style="margin-top:8px;">' + esc(n) + '</div>'; }).join('') +
+    '</div>';
+  }
+
+  /* ── Переход к вопросу (ссылки на версии) ──────────────────────────────────────────── */
+  function focusQuestion(id) {
+    if (!S.byId[id]) { X.toast('Этот вопрос не найден в банке экзамена.', 'err'); return; }
+    var idx = S.filtered.indexOf(S.byId[id]);
+    if (idx < 0) {
+      F = { lesson: '', type: '', diff: '', status: '', source: '', job: '', q: '' };
+      syncFilterInputs();
+      applyFilters();
+      idx = S.filtered.indexOf(S.byId[id]);
+    }
+    if (idx >= S.shown) { S.shown = idx + 1; }
+    S.open[id] = true;
+    renderList();
+    var node = el('exbList').querySelector('[data-item="' + id + '"]');
+    if (node) { node.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  }
+
+  /* ── Обновление после действий ─────────────────────────────────────────────────────── */
+  function fetchQuestion(id) {
+    return X.api('/_api/new_examquestions(' + id + ')?$select=new_examquestionid,new_name,_new_module_value,new_type,new_difficulty,new_stem,new_optionsjson,' +
+      'new_explanation,new_reference,new_rubricjson,new_points,new_slides,new_sourcequote,new_status,new_reviewjson,new_reviewfirstpass,' +
+      'new_source,_new_job_value,new_contenthash,new_exposures,new_version,_new_parentquestion_value,createdon');
+  }
+  function upsertQuestion(q) {
+    q.new_examquestionid = lid(q.new_examquestionid);
+    var found = false;
+    for (var i = 0; i < S.questions.length; i++) {
+      if (S.questions[i].new_examquestionid === q.new_examquestionid) { S.questions[i] = q; found = true; break; }
+    }
+    if (!found) { S.questions.push(q); }
+    reindex();
+  }
+  function refreshViews() {
+    renderKpi();
+    renderCoverage();
+    applyFilters(true);
+  }
+
+  /*
+    Ждём решения рецензента: поток F-B5 замечает вопрос «На проверке» без задания ИИ и вызывает
+    проверку F-B4, которая ставит «Одобрен» или «Отклонён». Ограничено ~2 минутами — дальше
+    просто сообщаем, что результат появится позже.
+  */
+  function waitForReview(id) {
+    var started = Date.now();
+    S.pending[id] = { text: 'Рецензент проверяет вопрос… Обычно это занимает до минуты.' };
+    var last = null;
+    var interval = X.cfg.pollMs || 3000;
+    return X.poll(function () {
+      return X.api('/_api/new_examquestions(' + id + ')?$select=new_examquestionid,new_status').then(function (r) {
+        var sec = Math.round((Date.now() - started) / 1000);
+        S.pending[id].text = 'Рецензент проверяет вопрос… прошло ' + sec + ' с. Можно работать с другими вопросами.';
+        var span = el('exbList').querySelector('[data-pending="' + id + '"]');
+        if (span) { span.textContent = S.pending[id].text; }
+        last = r;
+        return r.new_status !== V.Q_REVIEW;
+      });
+    }, { interval: interval, maxTries: Math.ceil(REVIEW_WAIT_MS / interval) }).then(function (done) {
+      if (!done) {
+        delete S.pending[id];
+        rerenderItem(id);
+        X.toast('Рецензент пока не ответил. Решение появится позже — обновите страницу через несколько минут.');
+        return;
+      }
+      return fetchQuestion(id).then(function (q) {
+        delete S.pending[id];
+        upsertQuestion(q);
+        refreshViews();
+        if (q.new_status === V.Q_APPROVED) {
+          X.toast('Рецензент одобрил вопрос ' + (q.new_name || '') + '. Он учитывается в банке.', 'ok');
+        } else if (q.new_status === V.Q_REJECTED) {
+          X.toast('Рецензент отклонил вопрос ' + (q.new_name || '') + '. Замечания — в карточке вопроса.', 'err');
+        } else {
+          X.toast('Статус вопроса изменился: ' + X.label('qStatus', q.new_status) + '.');
+        }
+      }, function () {
+        delete S.pending[id];
+        if (last && S.byId[id]) { S.byId[id].new_status = last.new_status; }
+        refreshViews();
+        X.toast('Решение рецензента получено, но карточку обновить не удалось. Обновите страницу.', 'err');
+      });
+    });
+  }
+
+  /* ── Действие: вывести из банка ────────────────────────────────────────────────────── */
+  function doRetire(q, btn) {
+    var id = q.new_examquestionid;
+    if (S.working[id]) { return; }
+    var lock = reviewLock(q);
+    if (lock === 'wait') { X.toast('Дождитесь решения рецензента: пока идёт проверка, вывести вопрос нельзя.', 'err'); return; }
+    var html = '<p>Вопрос <b>' + esc(q.new_name || '') + '</b> перестанет учитываться в покрытии банка и больше не попадёт в новые билеты.</p>' +
+      (lock === 'stuck' ? '<div class="exad-note exad-note--warn">Вопрос давно на проверке — похоже, она прервалась. Если рецензент всё же ответит позже, его решение перезапишет статус «Выведен». Через минуту страница перепроверит статус и предупредит, если он изменился.</div>' : '') +
+      (S.published ? '<div class="exad-note exad-note--warn">Экзамен уже опубликован: в новые билеты вопрос больше не попадёт, но в уже выданных останется и будет учитываться. Чтобы убрать его из подсчёта и там, нейтрализуйте вопрос на странице «Результаты».</div>' : '') +
+      '<p class="exad-muted">Вернуть вопрос в банк можно ' + (q._new_job_value ? 'только новой версией.' : 'повторной проверкой или новой версией.') + '</p>';
+    X.confirmBox('Вывести вопрос из банка?', html, 'Вывести', true).then(function (ok) {
+      if (!ok || S.working[id]) { return; }
+      S.working[id] = true;
+      X.busy(btn, true, 'Выводим…');
+      return X.patch('new_examquestions', id, { new_status: V.Q_RETIRED }).then(function () {
+        q.new_status = V.Q_RETIRED;
+        delete S.retireFailed[id];
+        delete S.lateReview[id];
+        if (lock === 'stuck') { recheckRetired(id, 'retire'); }
+        X.toast('Вопрос ' + (q.new_name || '') + ' выведен из банка.', 'ok');
+      }, function (e) {
+        X.toast('Не удалось вывести вопрос. ' + (e && e.message ? e.message : ''), 'err');
+      }).then(function () {
+        delete S.working[id];
+        X.busy(btn, false);
+        refreshViews();
+      });
+    });
+  }
+
+  /*
+    Вывели «зависший» вопрос: если проверка всё же шла, её решение перезапишет «Выведен».
+    Перечитываем статус один раз через минуту и предупреждаем, если он изменился.
+  */
+  function recheckRetired(id, kind) {
+    setTimeout(function () {
+      X.api('/_api/new_examquestions(' + id + ')?$select=new_examquestionid,new_status').then(function (r) {
+        if (!r || r.new_status === V.Q_RETIRED) { return; }
+        var q = S.byId[id];
+        if (q) { q.new_status = r.new_status; }
+        S.lateReview[id] = kind;
+        S.open[id] = true;
+        refreshViews();
+        X.toast('Рецензент ответил уже после вывода вопроса ' + (q && q.new_name ? q.new_name : '') + ' и поставил статус «' +
+          X.label('qStatus', r.new_status) + '». Откройте его карточку и выведите вопрос ещё раз.', 'err');
+      }, function () {
+        X.toast('Не удалось перепроверить статус выведенного вопроса. Обновите страницу через пару минут и убедитесь, что он по-прежнему «Выведен».', 'err');
+      });
+    }, RECHECK_MS);
+  }
+
+  /* ── Действие: повторная проверка (только вопросы без задания ИИ) ──────────────────── */
+  function doRereview(q, btn) {
+    var id = q.new_examquestionid;
+    if (S.working[id] || S.pending[id]) { return; }
+    if (q._new_job_value) { X.toast('Вопросы из задания ИИ повторно не проверяются — создайте новую версию.', 'err'); return; }
+    // Выведен по износу: ночное обслуживание снова выведет его, одобрение не удержится
+    if (wornOut(q)) { X.toast('Вопрос выведен по износу — повторная проверка его не вернёт. Создайте новую версию.', 'err'); return; }
+    // Без урока проверка падает и вопрос навсегда остаётся «На проверке» — не отправляем
+    if (!q._new_module_value || !S.lessonById[lid(q._new_module_value)]) {
+      X.toast('Вопрос не привязан к уроку этого экзамена — рецензент не сможет его проверить. Обратитесь в поддержку.', 'err');
+      return;
+    }
+    var html = '<p>Вопрос <b>' + esc(q.new_name || '') + '</b> уйдёт рецензенту (ИИ) заново. Обычно проверка занимает до минуты.</p>' +
+      '<p>Если рецензент его одобрит, вопрос снова будет учитываться в банке' + (q.new_status === V.Q_RETIRED ? ' (он был выведен — убедитесь, что это нужно).' : '.') + '</p>' +
+      (S.published ? '<div class="exad-note exad-note--info">На уже опубликованный экзамен это не влияет.</div>' : '');
+    X.confirmBox('Отправить на повторную проверку?', html, 'Отправить').then(function (ok) {
+      if (!ok || S.working[id] || S.pending[id]) { return; }
+      S.working[id] = true;
+      X.busy(btn, true, 'Отправляем…');
+      return X.patch('new_examquestions', id, { new_status: V.Q_REVIEW }).then(function () {
+        q.new_status = V.Q_REVIEW;
+        S.sentAt[id] = Date.now();
+        delete S.working[id];
+        S.open[id] = true;
+        var p = waitForReview(id);
+        refreshViews();
+        return p;
+      }, function (e) {
+        delete S.working[id];
+        X.busy(btn, false);
+        X.toast('Не удалось отправить вопрос на проверку. ' + (e && e.message ? e.message : ''), 'err');
+      });
+    });
+  }
+
+  /* ── Действие: новая версия ────────────────────────────────────────────────────────── */
+  var LETTERS = 'abcdefghijklmnopqrstuvwxyz';
+  var STD_RUBRIC = { 'case': 'K1:25|K2:25|K3:20|K4:15|K5:15', control: 'K1:60|K2:40' };
+  // «всё/ничего из (выше)перечисленного», «всё вышеуказанное», «ни один из …»
+  var BANNED = /(вс[её]|ничего)\s+(из\s+)?((выше\s*)?перечисленн|выше\s*указанн)|(^|[^а-яё])ни\s+(один|одна|одно)\s+из\s/i;
+
+  function optRowHtml(o) {
+    return '<div class="exb-optrow" data-optrow>' +
+      '<span class="exb-optid" data-optid></span>' +
+      '<textarea class="adm-input" data-f="text" rows="2" placeholder="Текст варианта" aria-label="Текст варианта">' + esc(o.text || '') + '</textarea>' +
+      '<label class="exad-check exb-optok"><input type="checkbox" data-f="correct"' + (o.correct === true || o.correct === 'true' ? ' checked' : '') + '> верный</label>' +
+      '<textarea class="adm-input" data-f="mis" rows="2" placeholder="Заблуждение: почему участник мог выбрать этот неверный ответ" aria-label="Заблуждение">' + esc(o.misconception || '') + '</textarea>' +
+      '<button type="button" class="adm-btn adm-btn--ghost exb-optdel" data-optdel aria-label="Удалить вариант" title="Удалить вариант">&times;</button>' +
+    '</div>';
+  }
+  function renumber(form) {
+    Array.prototype.forEach.call(form.querySelectorAll('[data-optrow]'), function (row, i) {
+      row.querySelector('[data-optid]').textContent = LETTERS.charAt(i) || '?';
+    });
+  }
+
+  function versionFormHtml(q) {
+    var t = typeCode(q), lesson = S.lessonById[lid(q._new_module_value)], next = versionOf(q) + 1;
+    var h = '<div id="exbVer" class="exb-ver">';
+    h += '<div class="exad-note exad-note--info">Будет создана версия <b>v' + next + '</b> (источник «Вручную»). Текущая версия сразу станет «Выведен». ' +
+      'Новая версия уйдёт рецензенту (ИИ) автоматически: одобрить её вручную нельзя, в банке она будет учитываться только после одобрения рецензентом.</div>';
+    if (reviewLock(q) === 'stuck') {
+      h += '<div class="exad-note exad-note--warn">Текущая версия давно на проверке — похоже, она прервалась. Если рецензент всё же ответит позже, его решение перезапишет статус «Выведен» у текущей версии. Через минуту после сохранения страница перепроверит статус и предупредит, если он изменился.</div>';
+    }
+    if (S.published) {
+      h += '<div class="exad-note exad-note--warn">Экзамен уже опубликован: новая версия в его билеты не попадёт — они собираются из снимка, сделанного при публикации, а старая версия после вывода перестанет выпадать. В ячейке раскладки станет на один вопрос меньше.</div>';
+    }
+    h += '<div class="exad-grid" style="margin-bottom:12px;">' +
+      '<div class="exad-field"><span class="exad-label">Тип</span><div>' + esc(X.LABEL.type[t] || '—') + ' <span class="exad-muted">(не меняется)</span></div></div>' +
+      '<div class="exad-field"><span class="exad-label">Урок</span><div>' + esc(lessonName(q._new_module_value)) + '</div></div>' +
+      '<div class="exad-field"><label for="exbVDiff">Сложность</label><select class="adm-input" id="exbVDiff" data-v="diff">' +
+        X.DIFFS.map(function (d) { return '<option value="' + d + '"' + (d === diffCode(q) ? ' selected' : '') + '>' + esc(X.LABEL.difficulty[d]) + '</option>'; }).join('') +
+      '</select></div></div>';
+    h += '<div class="exb-f"><label for="exbVStem">Формулировка</label><textarea class="adm-input" id="exbVStem" data-v="stem" rows="5">' + esc(q.new_stem || '') + '</textarea>' +
+      '<span class="exb-hint" data-stemcount></span></div>';
+    if (isChoice(t)) {
+      var opts = X.options(q);
+      if (!opts.length) { opts = t === 'multi' ? [{}, {}, {}, {}, {}] : [{}, {}, {}, {}]; }
+      h += '<div class="exb-f"><label>Варианты ответа</label>' +
+        '<span class="exb-hint">' + (t === 'single' ? 'Одиночный выбор: 4–5 вариантов, верный ровно один.' : 'Множественный выбор: 5–7 вариантов, верных от 2 до 4.') +
+        ' У каждого неверного варианта укажите заблуждение. Буквы a, b, c… присваиваются по порядку при сохранении.</span>' +
+        '<div data-opts>' + opts.map(optRowHtml).join('') + '</div>' +
+        '<div><button type="button" class="adm-btn adm-btn--ghost" data-optadd style="margin-top:8px;"><i class="bi bi-plus-lg" aria-hidden="true"></i> Добавить вариант</button></div></div>';
+    }
+    h += '<div class="exb-f"><label for="exbVExpl">Пояснение к ответу</label><textarea class="adm-input" id="exbVExpl" data-v="expl" rows="3">' + esc(q.new_explanation || '') + '</textarea>' +
+      '<span class="exb-hint">Участник увидит его в разборе после экзамена.</span></div>';
+    if (!isChoice(t)) {
+      var rub = q.new_rubricjson || '';
+      var parsed = X.parseJson(rub, null);
+      if (parsed && typeof parsed === 'object') { rub = JSON.stringify(parsed, null, 2); }
+      h += '<div class="exb-f"><label for="exbVRef">Эталонный ответ</label><textarea class="adm-input" id="exbVRef" data-v="ref" rows="5">' + esc(q.new_reference || '') + '</textarea></div>';
+      h += '<div class="exb-f"><label for="exbVRub">Критерии оценки</label><textarea class="adm-input exb-mono" id="exbVRub" data-v="rub" rows="10" spellcheck="false">' + esc(rub) + '</textarea>' +
+        '<span class="exb-hint">Техническая запись (формат JSON): {"criteria": [{"code": "K1", "name": "…", "weight": 25}, …], "key_elements": ["…"]}. ' +
+        'Сумма весов — 100. Обычный набор: ' + esc(STD_RUBRIC[t] ? STD_RUBRIC[t].split('|').join(', ') : '—') + '.</span></div>';
+    }
+    h += '<div class="exb-f"><label for="exbVQuote">Цитата из урока</label><textarea class="adm-input" id="exbVQuote" data-v="quote" rows="3">' + esc(q.new_sourcequote || '') + '</textarea>' +
+      '<span class="exb-hint">10–2000 знаков, дословно из текста урока: так рецензент и участник разбора видят, на чём основан вопрос.</span>' +
+      '<span class="exad-small" data-quotestate></span>';
+    var ltext = lesson ? (lesson.new_narration || lesson.new_text || '') : '';
+    if (ltext) {
+      h += '<details><summary>Показать текст урока (чтобы скопировать цитату)</summary><pre class="exad-pre" style="margin-top:6px;">' + esc(ltext) + '</pre></details>';
+    }
+    h += '</div></div>';
+    return h;
+  }
+
+  /* Считывает форму. Возвращает { error } | { warnings, data }. */
+  function collectVersion(form, q) {
+    var t = typeCode(q), lesson = S.lessonById[lid(q._new_module_value)];
+    function v(name) { var x = form.querySelector('[data-v="' + name + '"]'); return x ? String(x.value || '') : ''; }
+    var errors = [], warnings = [];
+    var stem = v('stem').trim(), diff = v('diff'), expl = v('expl').trim(), quote = v('quote').trim();
+    var ref = v('ref').trim(), rubRaw = v('rub').trim();
+    var optionsJson = '', rubricJson = '';
+
+    if (!stem) { errors.push('Заполните формулировку вопроса.'); }
+    if (stem.length > 10000) { errors.push('Формулировка длиннее 10 000 знаков (сейчас ' + stem.length + ').'); }
+    if (X.DIFFS.indexOf(diff) < 0) { errors.push('Выберите сложность.'); }
+
+    if (isChoice(t)) {
+      var opts = [];
+      Array.prototype.forEach.call(form.querySelectorAll('[data-optrow]'), function (row) {
+        var text = String(row.querySelector('[data-f="text"]').value || '').trim();
+        var mis = String(row.querySelector('[data-f="mis"]').value || '').trim();
+        var ok = row.querySelector('[data-f="correct"]').checked;
+        if (!text && !mis && !ok) { return; }                 // пустую строку просто пропускаем
+        opts.push({ text: text, correct: ok, misconception: mis });
+      });
+      opts.forEach(function (o, i) { o.id = LETTERS.charAt(i); });
+      var n = opts.length, nc = opts.filter(function (o) { return o.correct; }).length;
+      opts.forEach(function (o) { if (!o.text) { errors.push('У варианта «' + o.id + '» нет текста.'); } });
+      if (t === 'single') {
+        if (n < 4 || n > 5) { errors.push('Для одиночного выбора нужно 4–5 вариантов, сейчас ' + n + '.'); }
+        if (nc !== 1) { errors.push('Для одиночного выбора верным должен быть ровно один вариант, отмечено ' + nc + '.'); }
+      } else {
+        if (n < 5 || n > 7) { errors.push('Для множественного выбора нужно 5–7 вариантов, сейчас ' + n + '.'); }
+        if (nc < 2 || nc > 4) { errors.push('Для множественного выбора верных должно быть от 2 до 4, отмечено ' + nc + '.'); }
+      }
+      opts.forEach(function (o) {
+        if (!o.correct && o.text && !o.misconception) { errors.push('У неверного варианта «' + o.id + '» не указано заблуждение — напишите, какую ошибку в понимании выдаёт этот ответ.'); }
+        if (BANNED.test(o.text)) { errors.push('Варианты вида «всё / ничего из перечисленного» не допускаются (вариант «' + o.id + '»).'); }
+      });
+      if (t === 'multi' && stem && !/все\s+верн/i.test(stem)) {
+        warnings.push('В формулировке нет подсказки «выберите все верные варианты» — участник может решить, что ответ один.');
+      }
+      var right = opts.filter(function (o) { return o.correct && o.text; }), wrong = opts.filter(function (o) { return !o.correct && o.text; });
+      if (right.length && wrong.length) {
+        var avgW = wrong.reduce(function (s, o) { return s + o.text.length; }, 0) / wrong.length;
+        var longest = right.reduce(function (m, o) { return Math.max(m, o.text.length); }, 0);
+        // Длинный верный вариант — частая подсказка для угадывания
+        if (longest > avgW * 1.3 && longest - avgW > 12) {
+          warnings.push('Верный вариант заметно длиннее неверных (' + longest + ' знаков против ~' + Math.round(avgW) + ') — это подсказывает ответ.');
+        }
+      }
+      optionsJson = JSON.stringify(opts.map(function (o) { return { id: o.id, text: o.text, correct: o.correct, misconception: o.misconception }; }));
+    } else {
+      if (!ref) { errors.push('Заполните эталонный ответ — по нему оценивается письменный ответ.'); }
+      var rub = null;
+      if (!rubRaw) { errors.push('Заполните критерии оценки.'); }
+      else {
+        try { rub = JSON.parse(rubRaw); } catch (e) { errors.push('Критерии оценки записаны с ошибкой — проверьте кавычки, запятые и скобки.'); }
+      }
+      if (rub) {
+        // Храним в том виде, что пишет поток создания вопросов: { criteria, key_elements }
+        if (Array.isArray(rub)) { rub = { criteria: rub, key_elements: [] }; }
+        if (typeof rub !== 'object' || !Array.isArray(rub.criteria) || !rub.criteria.length) {
+          errors.push('В критериях нет списка критериев (criteria).');
+        } else {
+          if (!Array.isArray(rub.key_elements)) { rub.key_elements = []; }
+          var sum = 0, codes = [], bad = false;
+          rub.criteria.forEach(function (c) {
+            var f = critFields(c), w = X.toNum(f.weight, NaN);
+            if (!f.code || isNaN(w)) { bad = true; } else { sum += w; codes.push(f.code + ':' + w); }
+          });
+          if (bad) { errors.push('У каждого критерия должны быть код (code) и вес (weight).'); }
+          else if (Math.abs(sum - 100) > 0.01) { errors.push('Сумма весов критериев должна быть 100, сейчас ' + sum + '.'); }
+          else if (STD_RUBRIC[t] && codes.join('|') !== STD_RUBRIC[t]) {
+            warnings.push('Критерии отличаются от обычного набора (' + STD_RUBRIC[t].split('|').join(', ') + ').');
+          }
+          rubricJson = JSON.stringify(rub);
+        }
+      }
+    }
+
+    if (quote.length < 10 || quote.length > 2000) {
+      errors.push('Цитата из урока должна быть длиной 10–2000 знаков (сейчас ' + quote.length + ').');
+    } else {
+      var qs = quoteCheck(quote, lesson);
+      if (qs !== 'exact' && qs !== 'spaces') { errors.push(quoteCheckHtmlText(qs)); }
+      else {
+        var pass = quotePassage(quote, lesson);
+        // Совпало с точностью до пробелов — сохраняем отрывок дословно, как в уроке
+        if (pass) { quote = pass.text; }
+        if (pass && pass.src === 'text' && String(lesson.new_narration || '').trim()) {
+          warnings.push('Цитата найдена только в тексте урока, а рецензент сверяет вопрос с текстом для озвучки — проверка «Соответствие материалу урока» может не пройти.');
+        }
+      }
+    }
+
+    // Ограничения длины полей в базе: иначе сохранение упадёт уже после закрытия окна
+    if (expl.length > 4000) { errors.push('Пояснение длиннее 4 000 знаков (сейчас ' + expl.length + ').'); }
+    if (ref.length > 10000) { errors.push('Эталонный ответ длиннее 10 000 знаков (сейчас ' + ref.length + ').'); }
+    if (optionsJson.length > 20000) { errors.push('Варианты ответа слишком длинные: сократите их тексты или заблуждения.'); }
+    if (rubricJson.length > 20000) { errors.push('Критерии оценки слишком длинные: сократите описания.'); }
+
+    // Дубль: другой действующий вопрос этого урока с той же формулировкой (кроме правимого)
+    if (stem) {
+      // Сравниваем и сами формулировки (без учёта пробелов), и сохранённые отпечатки обоих видов
+      var h = X.contentHash(stem), fh = flowHash(stem), m = lid(q._new_module_value);
+      var dup = S.questions.filter(function (o) {
+        if (o.new_examquestionid === q.new_examquestionid || lid(o._new_module_value) !== m) { return false; }
+        if (o.new_status !== V.Q_REVIEW && o.new_status !== V.Q_APPROVED) { return false; }
+        return X.contentHash(o.new_stem) === h || (o.new_contenthash && (o.new_contenthash === h || o.new_contenthash === fh));
+      })[0];
+      if (dup) { errors.push('В этом уроке уже есть действующий вопрос с такой же формулировкой: ' + (dup.new_name || '') + '.'); }
+    }
+
+    if (errors.length) { return { error: errors.slice(0, 3).join(' ') + (errors.length > 3 ? ' (и ещё ' + (errors.length - 3) + ')' : '') }; }
+
+    var same = stem === String(q.new_stem || '').trim() && diff === diffCode(q) && expl === String(q.new_explanation || '').trim() &&
+      quote === String(q.new_sourcequote || '').trim() &&
+      (isChoice(t) ? optionsJson === JSON.stringify(X.options(q)) : (ref === String(q.new_reference || '').trim() && rubricJson === JSON.stringify(X.parseJson(q.new_rubricjson, null))));
+    if (same) { warnings.push('Вы ничего не изменили — новая версия просто уйдёт на повторную проверку.'); }
+
+    return {
+      warnings: warnings,
+      data: { type: t, diff: diff, stem: stem, expl: expl, quote: quote, ref: isChoice(t) ? '' : ref, optionsJson: optionsJson, rubricJson: rubricJson }
+    };
+  }
+  function quoteCheckHtmlText(state) {
+    var d = document.createElement('div'); d.innerHTML = quoteCheckHtml(state);
+    return (d.textContent || '').replace(/^[✓✗]\s*/, '');
+  }
+
+  /*
+    Черновик несохранённой версии в виде «вопроса»: форма строится из него, чтобы после ошибки
+    сохранения вернуть администратору всё, что он ввёл. Сравнение «ничего не изменили» идёт с исходным q.
+  */
+  function draftAsQuestion(q, d) {
+    var c = {}, k;
+    for (k in q) { if (Object.prototype.hasOwnProperty.call(q, k)) { c[k] = q[k]; } }
+    c.new_stem = d.stem;
+    c.new_difficulty = X.CODE.difficultyValue[d.diff];
+    c.new_explanation = d.expl;
+    c.new_sourcequote = d.quote;
+    c.new_reference = d.ref;
+    c.new_optionsjson = d.optionsJson;
+    c.new_rubricjson = d.rubricJson;
+    return c;
+  }
+
+  function openVersion(q, btn, draft) {
+    var id = q.new_examquestionid;
+    if (S.working[id] || S.pending[id]) { return; }
+    if (reviewLock(q) === 'wait') { X.toast('Дождитесь решения рецензента: пока идёт проверка, новую версию создать нельзя.', 'err'); return; }
+    if (!q._new_module_value || !S.lessonById[lid(q._new_module_value)]) {
+      X.toast('Вопрос не привязан к уроку этого экзамена — новую версию не с чем сверить. Обратитесь в поддержку.', 'err');
+      return;
+    }
+    var collected = null, warnSig = '';
+    X.modal({
+      title: 'Новая версия вопроса ' + (q.new_name || ''),
+      html: versionFormHtml(draft ? draftAsQuestion(q, draft.data) : q),
+      okText: 'Сохранить версию',
+      wide: true,
+      onOpen: function (body) {
+        var form = body.querySelector('#exbVer');
+        if (!form) { return; }
+        renumber(form);
+        if (draft && draft.error) {
+          // Повторное открытие после неудачного сохранения: причина — сразу в строке ошибок окна
+          var errBox = document.getElementById('exadModalErr');
+          if (errBox) { errBox.textContent = draft.error; }
+        }
+        var lesson = S.lessonById[lid(q._new_module_value)];
+        function updQuote() {
+          var ta = form.querySelector('[data-v="quote"]'), out = form.querySelector('[data-quotestate]');
+          if (ta && out) { out.innerHTML = String(ta.value || '').trim() ? quoteCheckHtml(quoteCheck(ta.value, lesson)) : ''; }
+        }
+        function updStem() {
+          var ta = form.querySelector('[data-v="stem"]'), out = form.querySelector('[data-stemcount]');
+          if (ta && out) { out.textContent = X.fmtInt(String(ta.value || '').length) + ' из 10 000 знаков'; }
+        }
+        updQuote(); updStem();
+        form.addEventListener('input', function (e) {
+          var name = e.target && e.target.getAttribute('data-v');
+          if (name === 'quote') { updQuote(); }
+          if (name === 'stem') { updStem(); }
+        });
+        form.addEventListener('click', function (e) {
+          var t = e.target;
+          if (t.closest && t.closest('[data-optadd]')) {
+            var box = form.querySelector('[data-opts]');
+            if (box.querySelectorAll('[data-optrow]').length >= 7) { X.toast('Больше семи вариантов не бывает.'); return; }
+            box.insertAdjacentHTML('beforeend', optRowHtml({}));
+            renumber(form);
+            return;
+          }
+          var del = t.closest && t.closest('[data-optdel]');
+          if (del) { del.closest('[data-optrow]').parentNode.removeChild(del.closest('[data-optrow]')); renumber(form); }
+        });
+      },
+      validate: function (body) {
+        var form = body.querySelector('#exbVer');
+        var r = collectVersion(form, q);
+        if (r.error) { warnSig = ''; return r.error; }
+        // Предупреждения не запрещают сохранение: показываем один раз, повторное нажатие сохраняет
+        var sig = r.warnings.join('|');
+        if (sig && sig !== warnSig) {
+          warnSig = sig;
+          return 'Проверьте: ' + r.warnings.join(' ') + ' Если всё верно, нажмите «Сохранить версию» ещё раз.';
+        }
+        collected = r.data;
+        return '';
+      }
+    }).then(function (body) {
+      if (!body || !collected) { return; }
+      saveVersion(q, collected, btn);
+    });
+  }
+
+  function saveVersion(q, d, btn) {
+    var oldId = q.new_examquestionid;
+    if (S.working[oldId]) { return; }
+    S.working[oldId] = true;
+    X.busy(btn, true, 'Сохраняем…');
+    var examRef = '/new_exams(' + EXAM_ID + ')';
+    var moduleRef = '/new_exammodules(' + lid(q._new_module_value) + ')';
+    var parentRef = '/new_examquestions(' + oldId + ')';
+    var qType = X.CODE.typeValue[d.type];
+    var qDiff = X.CODE.difficultyValue[d.diff];
+    var points = X.POINTS[d.type];
+    var nextVersion = versionOf(q) + 1;
+    var hash = flowHash(d.stem);   // формула потока F-B3 — см. flowHash
+    var created = false, newId = '';
+    // Старая версия ещё «На проверке» (окно открыто только для зависшей проверки) — после вывода перепроверим
+    var oldWasReview = q.new_status === V.Q_REVIEW;
+    // Без new_job: только так поток F-B5 отправит новую версию рецензенту
+    X.post('new_examquestions', {
+      'new_exam@odata.bind': examRef,
+      'new_module@odata.bind': moduleRef,
+      new_type: qType,
+      new_difficulty: qDiff,
+      new_stem: d.stem,
+      new_optionsjson: d.optionsJson,
+      new_explanation: d.expl,
+      new_reference: d.ref,
+      new_rubricjson: d.rubricJson,
+      new_points: points,
+      new_slides: '',
+      new_sourcequote: d.quote,
+      new_status: V.Q_REVIEW,
+      new_source: V.SRC_MANUAL,
+      new_version: nextVersion,
+      'new_parentquestion@odata.bind': parentRef,
+      new_contenthash: hash,
+      new_exposures: 0
+    }).then(function (res) {
+      created = true;
+      if (res && res.id) { return res.id; }
+      // Портал не вернул id созданной записи — находим её по ссылке на предыдущую версию
+      return X.api('/_api/new_examquestions?$select=new_examquestionid&$filter=_new_parentquestion_value eq ' + oldId + '&$orderby=createdon desc&$top=1')
+        .then(function (j) { return j.value && j.value[0] ? j.value[0].new_examquestionid : ''; });
+    }).then(function (id) {
+      newId = lid(id);
+      if (q.new_status === V.Q_RETIRED) { return true; }
+      // Методичка: старая версия выводится сразу, чтобы в банке не было двух вариантов одного вопроса
+      return X.patch('new_examquestions', oldId, { new_status: V.Q_RETIRED }).then(function () {
+        q.new_status = V.Q_RETIRED;
+        delete S.lateReview[oldId];
+        if (oldWasReview) { recheckRetired(oldId, 'version'); }
+        return true;
+      }, function () { return false; });
+    }).then(function (oldRetired) {
+      // Итог «старую версию вывести не удалось» показываем в последнем сообщении и в карточке старой
+      // версии: второе всплывающее сообщение затёрло бы первое, и два варианта вопроса остались бы незамеченными
+      if (!oldRetired) { S.retireFailed[oldId] = true; }
+      if (!newId) { return { nq: null, oldRetired: oldRetired }; }
+      return fetchQuestion(newId).then(function (nq) { return { nq: nq, oldRetired: oldRetired }; },
+        function () { return { nq: null, oldRetired: oldRetired }; });
+    }).then(function (r) {
+      var nq = r.nq;
+      var retireMsg = r.oldRetired ? '' : ' Но предыдущую версию вывести из банка не удалось — выведите её вручную кнопкой «Вывести из банка» в её карточке.';
+      delete S.working[oldId];
+      X.busy(btn, false);
+      if (!nq) {
+        refreshViews();
+        X.toast('Новая версия создана и ушла рецензенту. Обновите страницу, чтобы увидеть её.' + retireMsg, r.oldRetired ? 'ok' : 'err');
+        return;
+      }
+      upsertQuestion(nq);
+      S.open[oldId] = !r.oldRetired;
+      S.open[nq.new_examquestionid] = true;
+      var p = waitForReview(nq.new_examquestionid);
+      refreshViews();
+      focusQuestion(nq.new_examquestionid);
+      X.toast('Версия v' + nextVersion + ' создана (' + (nq.new_name || 'новый номер') + ') и отправлена рецензенту.' + retireMsg, r.oldRetired ? 'ok' : 'err');
+      return p;
+    }).catch(function (e) {
+      delete S.working[oldId];
+      X.busy(btn, false);
+      if (created) {
+        refreshViews();
+        X.toast('Новая версия создана, но страницу обновить не удалось. Обновите её вручную.', 'err');
+        return;
+      }
+      // Запись не создана — возвращаем форму с тем, что администратор уже ввёл, и причиной ошибки
+      var why = 'Не удалось сохранить новую версию. ' + (e && e.message ? e.message : 'Проверьте соединение и попробуйте ещё раз.');
+      X.toast(why, 'err');
+      openVersion(q, btn, { data: d, error: why });
+    });
+  }
+
+  /* ── События (без атрибутов onclick: их блокирует политика безопасности портала) ────── */
+  function toggle(id) {
+    S.open[id] = !S.open[id];
+    rerenderItem(id);
+  }
+  root.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t.closest) { return; }
+    var b;
+    if ((b = t.closest('[data-act]'))) {
+      var item = b.closest('[data-item]'), q = item ? S.byId[item.getAttribute('data-item')] : null;
+      if (!q || b.disabled) { return; }
+      var act = b.getAttribute('data-act');
+      if (act === 'retire') { doRetire(q, b); }
+      else if (act === 'rereview') { doRereview(q, b); }
+      else if (act === 'version') { openVersion(q, b); }
+      return;
+    }
+    if ((b = t.closest('[data-goto]'))) { focusQuestion(b.getAttribute('data-goto')); return; }
+    if ((b = t.closest('[data-toggle]'))) { toggle(b.getAttribute('data-toggle')); return; }
+    if ((b = t.closest('[data-cov]'))) {
+      var parts = b.getAttribute('data-cov').split('|');
+      F = { lesson: parts[0], type: parts[1], diff: parts[2], status: '', source: '', job: '', q: '' };
+      syncFilterInputs();
+      applyFilters();
+      el('exbListCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    if ((b = t.closest('[data-kstatus]'))) {
+      var s = b.getAttribute('data-kstatus');
+      F.status = F.status === s ? '' : s;
+      syncFilterInputs();
+      applyFilters();
+      return;
+    }
+    if (t.closest('#exbMoreBtn')) { S.shown += PAGE; renderList(); return; }
+    if (t.closest('#exbReset')) {
+      F = { lesson: '', type: '', diff: '', status: '', source: '', job: '', q: '' };
+      syncFilterInputs();
+      applyFilters();
+    }
+  });
+  root.addEventListener('keydown', function (e) {
+    var t = e.target;
+    if ((e.key === 'Enter' || e.key === ' ') && t && t.getAttribute && t.getAttribute('data-toggle')) {
+      e.preventDefault();
+      toggle(t.getAttribute('data-toggle'));
+    }
+  });
+  el('exbFilters').addEventListener('change', function (e) {
+    var name = e.target && e.target.getAttribute('data-filter');
+    if (!name) { return; }
+    F[name] = e.target.value;
+    applyFilters();
+  });
+  var qTimer = null;
+  el('exbFQ').addEventListener('input', function () {
+    clearTimeout(qTimer);
+    qTimer = setTimeout(function () { F.q = String(el('exbFQ').value || '').trim(); applyFilters(); }, 200);
+  });
+
+  // Подсветить пункт «Экзамены» в админском меню: страница банка — его подраздел
+  (function () { var a = document.querySelector('.fv-adm-link[href="/admin/exams"]'); if (a) { a.classList.add('active'); } })();
+
+  load();
+})();
+</script>
+
+{% endunless %}

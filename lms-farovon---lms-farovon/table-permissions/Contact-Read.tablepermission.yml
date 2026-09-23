@@ -1,0 +1,28 @@
+# Чтение справочника контактов для всех авторизованных.
+#
+# Зачем: без этого права обычный сотрудник не видит ничьих имён — в рейтинге, у авторов тем
+# форума, у наставника; везде подставляется дефолт «Участник»/«Аноним».
+#
+# Ap/At (append/appendto) здесь ВАЖНЕЕ чтения. Чтобы связать создаваемую запись с контактом
+# (new_user@odata.bind при сохранении прогресса урока и при покупке в магазине), Power Pages
+# требует append на создаваемой таблице И appendto на contact. Без appendto POST падает
+# с отказом в правах — то есть у сотрудника молча не сохраняется прогресс и не оформляется покупка.
+#
+# Запись/создание/удаление НЕ даём: правка контактов идёт через Contacts Admin Manage
+# (администраторы, HR, наставники, руководители).
+adx_accountrelationship:
+adx_append: true
+adx_appendto: true
+adx_contactrelationship:
+adx_create: false
+adx_delete: false
+adx_entitylogicalname: contact
+adx_entityname: Contact Read
+adx_entitypermission_webrole:
+- 2ccfddf9-a538-f111-88b5-7ced8d76b3cc
+adx_entitypermissionid: a1b2c3d4-3333-4444-5555-00000000000f
+adx_parententitypermission:
+adx_parentrelationship:
+adx_read: true
+adx_scope: 756150000
+adx_write: false

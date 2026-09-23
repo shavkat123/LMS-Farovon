@@ -1,0 +1,481 @@
+{% comment %}
+  Admin Exams — список экзаменов аттестации и создание нового (/admin/exams).
+
+  Доступ только у роли «Аттестация: администратор». Общий админский гейт (HR, Наставник и т.д.)
+  здесь нельзя: наставники как раз сдают этот экзамен.
+
+  Данные тянем на клиенте через Web API (общий include Exam Admin Common, window.ExamAdm):
+  после создания экзамена страница уходит на настройку, а список должен быть свежим без кеша.
+  Счётчики (уроки, одобренные вопросы, попытки, сертификаты) считаются в браузере по минимальным
+  выборкам — по одному полю связи с экзаменом, до 5000 строк на таблицу.
+
+  Удаления нет нигде: у роли нет права удалять экзамены. Один экзамен — один цикл аттестации.
+  Новый экзамен всегда создаётся черновиком: поток публикации срабатывает только на смену статуса,
+  и экзамен, созданный сразу опубликованным, остался бы без снимка вопросов.
+{% endcomment %}
+{% assign ex_is_admin = false %}
+{% if user and user.roles contains 'Аттестация: администратор' %}{% assign ex_is_admin = true %}{% endif %}
+{% unless ex_is_admin %}
+<div class="container py-5 text-center" style="font-family:'Inter',ui-sans-serif,sans-serif;">
+  <i class="bi bi-shield-lock" style="font-size:52px;color:#64748B;"></i>
+  <h2 style="font-size:18px;font-weight:700;color:#0B1220;margin:14px 0 6px;">Доступ запрещён</h2>
+  <p style="font-size:13px;color:#64748B;">Раздел доступен только роли «Аттестация: администратор».</p>
+  <a href="/" class="btn btn-primary mt-3" style="border-radius:8px;">На главную</a>
+</div>
+{% else %}
+{% include 'Exam Admin Common' %}
+
+<style>
+  .exl-top { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; justify-content: space-between; }
+  .exl-top .exad-head { flex: 1 1 320px; min-width: 0; }
+  .exl-top .exad-head { margin-bottom: 16px; }
+  .exl-top > .adm-btn { margin-bottom: 16px; }
+  .exl-stats { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .exad-scroll > .adm-table.exl-table { min-width: 980px; }
+  .exl-name { display: block; word-break: break-word; }
+  .exl-course { display: block; font-size: 12px; color: var(--adm-fg-2); margin-top: 2px; }
+  .exl-sub { display: block; font-size: 11px; color: var(--adm-fg-3); margin-top: 2px; white-space: nowrap; }
+  .exl-window { font-size: 12px; line-height: 1.5; white-space: nowrap; }
+  .exl-acts { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; font-size: 12px; white-space: nowrap; }
+  .exl-acts .exl-dot { color: var(--adm-fg-3); }
+  .exl-foot { padding: 10px 16px; font-size: 12px; color: var(--adm-fg-2); border-top: 1px solid var(--adm-border-1); }
+  .exl-empty i { display: block; font-size: 36px; color: #CBD5E1; margin-bottom: 10px; }
+  .exl-empty p { margin: 0 0 12px; }
+  .exl-note-list { margin: 6px 0 0; padding-left: 18px; }
+  /* В общем стиле колонки формы не уже 320px — на экране 360px диалог уже, форма вылезала бы вбок */
+  #exadModalBody .exad-grid--2 { grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); }
+</style>
+
+<div class="container adm-scope exad" id="exlPage">
+
+  <div class="exl-top">
+    <div class="exad-head">
+      <span class="adm-eyebrow">Аттестация</span>
+      <h1>Экзамены</h1>
+      <p>Все экзамены аттестации наставников: состояние, сроки, банк вопросов и результаты. Отсюда же создаётся новый экзамен.</p>
+    </div>
+    <button type="button" class="adm-btn adm-btn--primary" data-exl-action="create" id="exlCreateBtn">
+      <i class="bi bi-plus-lg" aria-hidden="true"></i> Создать экзамен
+    </button>
+  </div>
+
+  <div class="exad-stats exl-stats" id="exlKpis">
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Всего экзаменов</span><i class="bi bi-journal-check" aria-hidden="true"></i></div>
+      <div class="adm-stat-val" id="exlKpiTotal">—</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">циклов аттестации</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Опубликовано</span><i class="bi bi-broadcast" aria-hidden="true"></i></div>
+      <div class="adm-stat-val" id="exlKpiPub">—</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">доступны участникам</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Черновики</span><i class="bi bi-pencil-square" aria-hidden="true"></i></div>
+      <div class="adm-stat-val" id="exlKpiDraft">—</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">в подготовке</span></div>
+    </div>
+    <div class="adm-card adm-stat">
+      <div class="adm-stat-top"><span class="adm-eyebrow">Закрыто</span><i class="bi bi-lock" aria-hidden="true"></i></div>
+      <div class="adm-stat-val" id="exlKpiClosed">—</div>
+      <div class="adm-stat-foot"><span class="adm-stat-sub">срок проведения прошёл</span></div>
+    </div>
+  </div>
+
+  <div id="exlNotes" aria-live="polite"></div>
+
+  <div class="adm-card exad-section">
+    <div class="adm-cardhead"><span class="adm-cardhead-title">Список экзаменов</span></div>
+    <div id="exlBody">
+      <div class="exad-empty"><span class="exad-spin"></span> Загружаем экзамены…</div>
+    </div>
+    <div class="exl-foot">
+      Один экзамен — один цикл аттестации. Для нового цикла создайте новый экзамен: у прошлых остаются свои результаты и сертификаты. Удалить экзамен нельзя.
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var A = window.ExamAdm;
+  if (!A) { return; }
+  var V = A.V, esc = A.esc;
+
+  var bodyEl = document.getElementById('exlBody');
+  var notesEl = document.getElementById('exlNotes');
+  var createBtn = document.getElementById('exlCreateBtn');
+  var pageEl = document.getElementById('exlPage');
+
+  /* Потолок выборок для счётчиков: столько отдаёт Web API за один запрос без постраничности */
+  var CAP = 5000;
+  var creating = false;
+
+  /*
+    Курсы нужны дважды: подпись в таблице и список в форме. Сбой не критичен — поле просто скрываем.
+    Удачный ответ запоминаем, а после сбоя спрашиваем снова: иначе «Повторить» и перезагрузка
+    списка так и оставили бы курсы пустыми до обновления страницы.
+  */
+  var coursesCache = null;
+  function getCourses() {
+    if (coursesCache) { return Promise.resolve(coursesCache); }
+    return A.api('/_api/msdynce_courses?$select=msdynce_courseid,msdynce_coursename&$orderby=msdynce_coursename asc&$top=500')
+      .then(function (j) { coursesCache = j.value || []; return coursesCache; }, function () { return null; });
+  }
+
+  /* ── Загрузка ──────────────────────────────────────────────────────────────────────── */
+  /*
+    total — основной счётчик по экзамену; extra/other — дополнительные подписи под числом.
+    skip — строки, которые в total не входят, но считаются в other (для попыток с ошибкой).
+  */
+  function countBy(rows, extra, skip) {
+    var out = { total: {}, extra: {}, other: {}, capped: rows.length >= CAP };
+    rows.forEach(function (r) {
+      var id = String(r._new_exam_value || '').toLowerCase();
+      if (!id) { return; }
+      if (skip && skip(r)) { out.other[id] = (out.other[id] || 0) + 1; return; }
+      out.total[id] = (out.total[id] || 0) + 1;
+      if (extra && extra(r)) { out.extra[id] = (out.extra[id] || 0) + 1; }
+    });
+    return out;
+  }
+  /* Ошибка одного счётчика не должна ломать весь список — вернём null и покажем «—» */
+  function soft(p) { return p.then(function (x) { return x; }, function () { return null; }); }
+
+  function load() {
+    bodyEl.innerHTML = '<div class="exad-empty"><span class="exad-spin"></span> Загружаем экзамены…</div>';
+    var examsP = A.api('/_api/new_exams?$select=new_examid,new_name,new_status,new_opens,new_closes,new_publishedon,_new_course_value&$orderby=new_name asc&$top=500')
+      .then(function (j) { return j.value || []; });
+    var modulesP = soft(A.apiAll('/_api/new_exammodules?$select=_new_exam_value&$top=5000', CAP)
+      .then(function (rows) { return countBy(rows); }));
+    var questionsP = soft(A.apiAll('/_api/new_examquestions?$select=_new_exam_value,new_status&$filter=new_status eq ' + V.Q_APPROVED + '&$top=5000', CAP)
+      .then(function (rows) { return countBy(rows); }));
+    /*
+      Попытка со статусом «Ошибка» не состоялась: участнику отказали при допуске (вне срока, нет согласия
+      и т.п.) или билет не собрался. Поток такие записи не удаляет, поэтому в «Попыток» их не включаем,
+      а показываем отдельной подписью.
+    */
+    var attemptsP = soft(A.apiAll('/_api/new_examattempts?$select=_new_exam_value,new_status,new_result&$top=5000', CAP)
+      .then(function (rows) {
+        return countBy(rows,
+          function (r) { return r.new_result === V.RES_PASSED; },
+          function (r) { return r.new_status === V.ATT_ERROR; });
+      }));
+    /* 100000000 = «Действует» (порядок значений из exam-schema.json) */
+    var certsP = soft(A.apiAll('/_api/new_certifications?$select=_new_exam_value,new_status&$top=5000', CAP)
+      .then(function (rows) { return countBy(rows, function (r) { return r.new_status === 100000000; }); }));
+
+    return Promise.all([examsP, modulesP, questionsP, attemptsP, certsP, getCourses()]).then(function (res) {
+      render(res[0], { modules: res[1], questions: res[2], attempts: res[3], certs: res[4] }, res[5]);
+    }, function (e) {
+      renderKpis(null);
+      bodyEl.innerHTML =
+        '<div class="exad-empty">' +
+          '<p style="margin:0 0 10px;">Не удалось загрузить список экзаменов. Проверьте соединение и попробуйте ещё раз.</p>' +
+          '<p class="exad-muted" style="margin:0 0 12px;">Для поддержки: ' + esc(e && e.message ? e.message : 'неизвестная ошибка') + '</p>' +
+          '<button type="button" class="adm-btn adm-btn--ghost" data-exl-action="reload"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Повторить</button>' +
+        '</div>';
+    });
+  }
+
+  /* ── Сортировка: опубликованные (свежие сверху) → черновики по названию → закрытые ─── */
+  function rank(s) { return s === V.EXAM_PUBLISHED ? 0 : s === V.EXAM_DRAFT ? 1 : s === V.EXAM_CLOSED ? 2 : 3; }
+  function pubTime(e) { var t = e.new_publishedon ? new Date(e.new_publishedon).getTime() : NaN; return isNaN(t) ? -Infinity : t; }
+  function byName(a, b) { return String(a.new_name || '').localeCompare(String(b.new_name || ''), 'ru'); }
+  function sortExams(list) {
+    return list.slice().sort(function (a, b) {
+      var ra = rank(a.new_status), rb = rank(b.new_status);
+      if (ra !== rb) { return ra - rb; }
+      if (ra === 1) { return byName(a, b); }
+      return (pubTime(b) - pubTime(a)) || byName(a, b);
+    });
+  }
+
+  /* ── Отрисовка ─────────────────────────────────────────────────────────────────────── */
+  function renderKpis(list) {
+    function set(id, v) { var el = document.getElementById(id); if (el) { el.textContent = v; } }
+    if (!list) { set('exlKpiTotal', '—'); set('exlKpiPub', '—'); set('exlKpiDraft', '—'); set('exlKpiClosed', '—'); return; }
+    var pub = 0, draft = 0, closed = 0;
+    list.forEach(function (e) {
+      if (e.new_status === V.EXAM_PUBLISHED) { pub++; } else if (e.new_status === V.EXAM_DRAFT) { draft++; } else if (e.new_status === V.EXAM_CLOSED) { closed++; }
+    });
+    set('exlKpiTotal', A.fmtInt(list.length)); set('exlKpiPub', A.fmtInt(pub));
+    set('exlKpiDraft', A.fmtInt(draft)); set('exlKpiClosed', A.fmtInt(closed));
+  }
+
+  /*
+    Страница участника /certification берёт ОДИН экзамен: статус «Опубликован», сортировка по дате
+    публикации по убыванию, первая запись. Остальные опубликованные участникам не видны.
+  */
+  function renderNotes(sorted, counts) {
+    var pub = sorted.filter(function (e) { return e.new_status === V.EXAM_PUBLISHED; });
+    var html = '';
+    if (pub.length > 1) {
+      var shown = pub[0], hidden = pub.slice(1);
+      html +=
+        '<div class="exad-note exad-note--warn" role="alert">' +
+          '<b>Опубликовано несколько экзаменов одновременно.</b> ' +
+          'Участники на странице «Аттестация» видят только один — опубликованный последним: ' +
+          '<b>«' + esc(shown.new_name || 'Без названия') + '»</b>' +
+          (shown.new_publishedon ? ' (опубликован ' + esc(A.dt(shown.new_publishedon)) + ')' : '') + '. ' +
+          'Эти экзамены опубликованы, но участникам не показываются:' +
+          '<ul class="exl-note-list">' + hidden.map(function (e) {
+            return '<li>«' + esc(e.new_name || 'Без названия') + '»' +
+              (e.new_publishedon ? ' — опубликован ' + esc(A.dt(e.new_publishedon)) : ' — дата публикации не записана') + '</li>';
+          }).join('') + '</ul>' +
+          '<div style="margin-top:6px;">Если это не задумано, оставьте опубликованным только нужный экзамен.</div>' +
+        '</div>';
+    } else if (pub.length === 0 && sorted.length > 0) {
+      html +=
+        '<div class="exad-note exad-note--info">' +
+          'Сейчас нет опубликованного экзамена, поэтому участники не могут начать аттестацию. ' +
+          'Экзамен публикуется на странице его настройки, когда готовы уроки и банк вопросов.' +
+        '</div>';
+    }
+    var capped = [];
+    if (counts.modules && counts.modules.capped) { capped.push('уроков'); }
+    if (counts.questions && counts.questions.capped) { capped.push('вопросов'); }
+    if (counts.attempts && counts.attempts.capped) { capped.push('попыток'); }
+    if (counts.certs && counts.certs.capped) { capped.push('сертификатов'); }
+    var failed = [];
+    if (!counts.modules) { failed.push('уроков'); }
+    if (!counts.questions) { failed.push('вопросов'); }
+    if (!counts.attempts) { failed.push('попыток'); }
+    if (!counts.certs) { failed.push('сертификатов'); }
+    if (capped.length) {
+      html += '<div class="exad-note exad-note--info">Записей очень много, поэтому счётчики ' + esc(capped.join(', ')) +
+        ' показаны не полностью (со знаком «+»). Точные числа — на страницах экзамена.</div>';
+    }
+    if (failed.length) {
+      html += '<div class="exad-note exad-note--warn">Не удалось посчитать число ' + esc(failed.join(', ')) +
+        ' — в таблице стоит «—». Обновите страницу чуть позже.</div>';
+    }
+    notesEl.innerHTML = html;
+  }
+
+  function num(c, id) {
+    if (!c) { return '—'; }
+    return A.fmtInt(c.total[id] || 0) + (c.capped ? '+' : '');
+  }
+  function extraNum(c, id) { return c ? A.fmtInt(c.extra[id] || 0) : '—'; }
+
+  function windowCell(e) {
+    var o = e.new_opens, c = e.new_closes;
+    if (!o && !c) { return '<span class="exad-muted">не задано</span>'; }
+    if (o && c) { return esc(A.dt(o)) + ' –<br>' + esc(A.dt(c)); }
+    return o ? 'с ' + esc(A.dt(o)) : 'до ' + esc(A.dt(c));
+  }
+
+  function render(exams, counts, courses) {
+    var sorted = sortExams(exams);
+    renderKpis(sorted);
+    renderNotes(sorted, counts);
+
+    if (!sorted.length) {
+      bodyEl.innerHTML =
+        '<div class="exad-empty exl-empty">' +
+          '<i class="bi bi-journal-plus" aria-hidden="true"></i>' +
+          '<p>Экзаменов пока нет. Создайте первый: после создания откроется его настройка — уроки, параметры билета и публикация.</p>' +
+          '<button type="button" class="adm-btn adm-btn--primary" data-exl-action="create"><i class="bi bi-plus-lg" aria-hidden="true"></i> Создать первый экзамен</button>' +
+        '</div>';
+      return;
+    }
+
+    var courseName = {};
+    (courses || []).forEach(function (c) { courseName[String(c.msdynce_courseid).toLowerCase()] = c.msdynce_coursename || ''; });
+
+    var rows = sorted.map(function (e) {
+      var id = String(e.new_examid).toLowerCase();
+      var q = '?id=' + encodeURIComponent(id);
+      var cid = String(e._new_course_value || '').toLowerCase();
+      var course = cid ? (courseName[cid] || '') : '';
+      var passed = extraNum(counts.attempts, id);
+      var failedAtt = counts.attempts ? (counts.attempts.other[id] || 0) : 0;
+      var active = extraNum(counts.certs, id);
+      return '<tr>' +
+        '<td><a class="exad-link exl-name" href="/admin/exam-setup' + q + '">' + esc(e.new_name || 'Без названия') + '</a>' +
+          (course ? '<span class="exl-course">Курс: ' + esc(course) + '</span>' : '') + '</td>' +
+        '<td>' + A.pill('examStatus', e.new_status) + '</td>' +
+        '<td class="exl-window">' + windowCell(e) + '</td>' +
+        '<td class="exl-window">' + esc(A.dt(e.new_publishedon)) + '</td>' +
+        '<td class="adm-r adm-num">' + num(counts.modules, id) + '</td>' +
+        '<td class="adm-r adm-num">' + num(counts.questions, id) + '</td>' +
+        '<td class="adm-r adm-num">' + num(counts.attempts, id) +
+          (counts.attempts ? '<span class="exl-sub">сдали: ' + passed + '</span>' : '') +
+          (failedAtt ? '<span class="exl-sub" title="Отказ при допуске или билет не собрался">не состоялись: ' + A.fmtInt(failedAtt) + '</span>' : '') + '</td>' +
+        '<td class="adm-r adm-num">' + num(counts.certs, id) +
+          (counts.certs ? '<span class="exl-sub">действуют: ' + active + '</span>' : '') + '</td>' +
+        '<td><div class="exl-acts">' +
+          '<a class="exad-link" href="/admin/exam-setup' + q + '">Настройка</a><span class="exl-dot" aria-hidden="true">·</span>' +
+          '<a class="exad-link" href="/admin/exam-bank' + q + '">Банк</a><span class="exl-dot" aria-hidden="true">·</span>' +
+          '<a class="exad-link" href="/admin/exam-results' + q + '">Результаты</a>' +
+        '</div></td>' +
+      '</tr>';
+    }).join('');
+
+    bodyEl.innerHTML =
+      '<div class="exad-scroll">' +
+        '<table class="adm-table exl-table">' +
+          '<thead><tr>' +
+            '<th>Название</th><th>Статус</th><th>Окно проведения</th><th>Опубликован</th>' +
+            '<th class="adm-r" title="Уроки, по которым составляются вопросы">Уроков</th>' +
+            '<th class="adm-r" title="Вопросы банка в статусе «Одобрен»">Одобренных вопросов</th>' +
+            '<th class="adm-r" title="Попытки, которые начались. Отказы при допуске и сбои сборки билета показаны отдельной подписью">Попыток</th><th class="adm-r">Сертификатов</th><th>Разделы</th>' +
+          '</tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
+      '</div>';
+  }
+
+  /* ── Создание экзамена ─────────────────────────────────────────────────────────────── */
+  function formHtml(courses, v) {
+    v = v || {};
+    var courseField = '';
+    if (courses) {
+      courseField =
+        '<div class="exad-field">' +
+          '<label for="exlfCourse">Курс</label>' +
+          '<select class="adm-input" id="exlfCourse">' +
+            '<option value="">Без курса</option>' +
+            courses.map(function (c) {
+              var cid = String(c.msdynce_courseid).toLowerCase();
+              return '<option value="' + esc(cid) + '"' + (cid === v.course ? ' selected' : '') + '>' + esc(c.msdynce_coursename || 'Без названия') + '</option>';
+            }).join('') +
+          '</select>' +
+          '<span class="exad-hint">Необязательно. Курс, по материалам которого проводится аттестация.</span>' +
+        '</div>';
+    }
+    return '' +
+      '<div class="exad-note exad-note--info">Экзамен создаётся черновиком: участники его не увидят, пока вы не опубликуете его на странице настройки.</div>' +
+      '<div class="exad-grid exad-grid--2">' +
+        '<div class="exad-field" style="grid-column:1/-1;">' +
+          '<label for="exlfName">Название <span aria-hidden="true">*</span></label>' +
+          '<input type="text" class="adm-input" id="exlfName" maxlength="200" autocomplete="off" placeholder="Например: Наставничество — осень 2026" value="' + esc(v.name || '') + '">' +
+        '</div>' +
+        (courseField ? '<div style="grid-column:1/-1;">' + courseField + '</div>' : '') +
+        '<div class="exad-field">' +
+          '<label for="exlfOpens">Начало</label>' +
+          '<input type="datetime-local" class="adm-input" id="exlfOpens" value="' + esc(v.opensRaw || '') + '">' +
+          '<span class="exad-hint">Время по Душанбе (UTC+5). Можно задать позже.</span>' +
+        '</div>' +
+        '<div class="exad-field">' +
+          '<label for="exlfCloses">Окончание</label>' +
+          '<input type="datetime-local" class="adm-input" id="exlfCloses" value="' + esc(v.closesRaw || '') + '">' +
+          '<span class="exad-hint">После окончания экзамен закроется сам.</span>' +
+        '</div>' +
+        '<div class="exad-field">' +
+          '<label for="exlfMonths">Срок действия сертификата, мес.</label>' +
+          '<input type="number" class="adm-input" id="exlfMonths" min="1" max="120" step="1" inputmode="numeric" value="' + esc(v.monthsRaw != null ? v.monthsRaw : '12') + '">' +
+          '<span class="exad-hint">От 1 до 120. Столько сертификат будет действовать после сдачи.</span>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function val(body, id) { var el = body.querySelector('#' + id); return el ? String(el.value || '') : ''; }
+
+  function readForm(body) {
+    var monthsRaw = val(body, 'exlfMonths').trim();
+    return {
+      name: val(body, 'exlfName').trim(),
+      course: val(body, 'exlfCourse'),
+      opensRaw: val(body, 'exlfOpens'),
+      closesRaw: val(body, 'exlfCloses'),
+      monthsRaw: monthsRaw,
+      months: /^\d+$/.test(monthsRaw) ? parseInt(monthsRaw, 10) : NaN
+    };
+  }
+
+  function validateForm(body) {
+    var d = readForm(body);
+    if (!d.name) { return 'Укажите название экзамена.'; }
+    if (d.name.length > 200) { return 'Название длиннее 200 знаков — сократите его.'; }
+    if (d.opensRaw && !A.fromInput(d.opensRaw)) { return 'Дата начала заполнена не полностью.'; }
+    if (d.closesRaw && !A.fromInput(d.closesRaw)) { return 'Дата окончания заполнена не полностью.'; }
+    if (d.opensRaw && d.closesRaw && new Date(A.fromInput(d.opensRaw)).getTime() >= new Date(A.fromInput(d.closesRaw)).getTime()) {
+      return 'Окончание должно быть позже начала.';
+    }
+    if (isNaN(d.months) || d.months < 1 || d.months > 120) { return 'Срок действия сертификата — целое число месяцев от 1 до 120.'; }
+    return '';
+  }
+
+  function friendlyError(e) {
+    if (e && e.status === 403) {
+      return 'Нет прав на создание экзамена. Проверьте, что вам выдана роль «Аттестация: администратор».';
+    }
+    return 'Не удалось создать экзамен. ' + (e && e.message ? 'Подробности для поддержки: ' + e.message : 'Попробуйте ещё раз.');
+  }
+
+  function openCreate(prefill, errText) {
+    if (creating) { return; }
+    getCourses().then(function (courses) {
+      return A.modal({
+        title: 'Новый экзамен',
+        okText: 'Создать черновик',
+        html: formHtml(courses, prefill),
+        validate: validateForm,
+        onOpen: function () {
+          if (errText) { var er = document.getElementById('exadModalErr'); if (er) { er.textContent = errText; } }
+        }
+      });
+    }).then(function (body) {
+      if (body) { createExam(readForm(body)); }
+    });
+  }
+
+  function createExam(d) {
+    if (creating) { return; }
+    creating = true;
+    A.busy(createBtn, true, 'Создаём…');
+    /*
+      Все параметры записываем явно (normalizeParams): у потоков свои умолчания, и они расходятся
+      с методичкой. Уроки и раскладка билета пустые — их задают на странице настройки.
+    */
+    var paramsText = JSON.stringify(A.normalizeParams({}));
+    /* Без курса ключ привязки остаётся undefined, и JSON.stringify его просто не отправит */
+    var courseBind = d.course && A.isGuid(d.course) ? '/msdynce_courses(' + d.course + ')' : undefined;
+    /* Статус задаём явно: у столбцов выбора нет значения по умолчанию. Только «Черновик» (100000000) */
+    A.post('new_exams', {
+      new_name: d.name,
+      new_status: V.EXAM_DRAFT,
+      new_paramsjson: paramsText,
+      new_certvalidmonths: d.months,
+      new_consentversion: '1',
+      new_opens: A.fromInput(d.opensRaw),
+      new_closes: A.fromInput(d.closesRaw),
+      'new_course@odata.bind': courseBind
+    }).then(function (r) {
+      if (A.isGuid(r.id)) {
+        A.toast('Черновик создан. Открываем настройку…', 'ok');
+        location.href = '/admin/exam-setup?id=' + encodeURIComponent(r.id);
+        return;
+      }
+      /* Портал не вернул id созданной записи — экзамен есть, просто найдём его в списке */
+      creating = false;
+      A.busy(createBtn, false);
+      A.toast('Черновик создан. Откройте его в списке, чтобы продолжить настройку.', 'ok');
+      load();
+    }, function (e) {
+      creating = false;
+      A.busy(createBtn, false);
+      var msg = friendlyError(e);
+      A.toast(msg, 'err');
+      /* Возвращаем форму с введёнными данными, чтобы не набирать заново */
+      openCreate(d, msg);
+    });
+  }
+
+  /* ── События (без inline-обработчиков: их блокирует политика безопасности портала) ─── */
+  pageEl.addEventListener('click', function (ev) {
+    var t = ev.target && ev.target.closest ? ev.target.closest('[data-exl-action]') : null;
+    if (!t) { return; }
+    var action = t.getAttribute('data-exl-action');
+    if (action === 'create') { ev.preventDefault(); openCreate(null, ''); }
+    else if (action === 'reload') { ev.preventDefault(); load(); }
+  });
+
+  load();
+})();
+</script>
+
+{% endunless %}

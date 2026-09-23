@@ -1,0 +1,368 @@
+{% comment %}
+  Результат попытки (/exam-result?attempt=<id>).
+
+  Страница ничего не считает: процент, итог и разбор записывает поток финализации. Пока его
+  нет (попытка «Сдан» или «Проверяется»), показываем ожидание и опрашиваем.
+
+  Правильные ответы участник впервые видит здесь — они лежат в new_revealjson задания и
+  появляются только после финализации. До неё их нет нигде, куда у участника есть доступ.
+  Эталонное решение письменных заданий не показываем никогда: кейсы используются повторно.
+{% endcomment %}
+
+<style>
+  .exr-wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  .exr-h1 { font-size: 28px; font-weight: 700; color: #0F172A; margin: 0 0 20px; }
+  .exr-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; padding: 20px 22px; margin-bottom: 16px; }
+  .exr-card h2 { font-size: 18px; font-weight: 600; color: #0F172A; margin: 0 0 12px; }
+
+  .exr-verdict { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .exr-pct { font-size: 44px; font-weight: 800; color: #0F172A; line-height: 1; font-variant-numeric: tabular-nums; }
+  .exr-badge { border-radius: 999px; padding: 6px 16px; font-weight: 700; font-size: 15px; }
+  .exr-badge--ok { background: #DCFCE7; color: #15803D; }
+  .exr-badge--no { background: #FEE2E2; color: #B91C1C; }
+  .exr-badge--void { background: #F1F5F9; color: #64748B; }
+
+  .exr-blocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 16px; }
+  .exr-block { border: 1px solid #F1F5F9; border-radius: 10px; padding: 12px; }
+  .exr-block dt { font-size: 12px; color: #64748B; text-transform: uppercase; letter-spacing: .04em; }
+  .exr-block dd { margin: 4px 0 0; font-weight: 600; color: #0F172A; }
+  .exr-bar { height: 6px; background: #F1F5F9; border-radius: 3px; margin-top: 8px; overflow: hidden; }
+  .exr-bar > span { display: block; height: 100%; background: #15803D; }
+
+  .exr-item { border-top: 1px solid #F1F5F9; padding: 16px 0; }
+  .exr-item:first-child { border-top: 0; padding-top: 0; }
+  .exr-item h3 { font-size: 13px; color: #94A3B8; text-transform: uppercase; letter-spacing: .04em; margin: 0 0 6px; font-weight: 600; }
+  .exr-stem { white-space: pre-wrap; line-height: 1.6; color: #0F172A; margin: 0 0 10px; }
+  .exr-opt { padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; line-height: 1.5; border: 1px solid #F1F5F9; }
+  .exr-opt--right { background: #F0FDF4; border-color: #BBF7D0; }
+  .exr-opt--wrong { background: #FEF2F2; border-color: #FECACA; }
+  .exr-opt small { color: #64748B; margin-left: 6px; }
+  .exr-expl { background: #F8FAFC; border-radius: 10px; padding: 10px 12px; color: #334155; line-height: 1.6; margin-top: 8px; }
+  .exr-score { font-weight: 600; color: #0F172A; }
+  .exr-crit { margin: 8px 0 0; padding-left: 18px; color: #334155; line-height: 1.6; }
+
+  .exr-form textarea { width: 100%; min-height: 120px; border: 1px solid #CBD5E1; border-radius: 10px; padding: 10px; font: inherit; }
+  .exr-check { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; }
+  .exr-btn { border: 0; border-radius: 10px; background: #15803D; color: #fff; font-weight: 600; padding: 11px 20px; cursor: pointer; }
+  .exr-btn[disabled] { background: #CBD5E1; color: #64748B; cursor: not-allowed; }
+  .exr-btn-ghost { background: #fff; color: #15803D; border: 1px solid #15803D; text-decoration: none; display: inline-block; }
+
+  .exr-muted { color: #64748B; }
+  .exr-note { color: #B45309; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px; padding: 10px 12px; line-height: 1.5; }
+  .exr-err { color: #B91C1C; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; padding: 10px 12px; line-height: 1.5; }
+  .exr-center { text-align: center; color: #64748B; padding: 60px 20px; }
+</style>
+
+<div class="exr-wrap">
+  <h1 class="exr-h1">Результат экзамена</h1>
+  <div id="exrRoot" class="exr-center">Загружаем результат…</div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var ATTEMPT_ID = (function () {
+    var m = /[?&]attempt=([^&]+)/.exec(window.location.search);
+    return m ? decodeURIComponent(m[1]) : '';
+  })();
+  var CONTACT = '{{ user.id }}';
+  var POLL_MS = parseInt('{{ settings["Exam/PollIntervalMs"] | default: 3000 }}', 10) || 3000;
+
+  var STATUS = { prepare: 100000000, running: 100000001, submitted: 100000002,
+                 grading: 100000003, graded: 100000004, voided: 100000005, failed: 100000006 };
+  var RESULT = { passed: 100000000, failed: 100000001, voided: 100000002 };
+  var TYPE = { single: 100000000, multi: 100000001, kase: 100000002, control: 100000003 };
+  var APPEAL = { filed: 100000000, rejected: 100000001, working: 100000002, decided: 100000003, failed: 100000004 };
+  var BLOCK_NAMES = { single: 'Один верный вариант', multi: 'Несколько верных', 'case': 'Кейсы', control: 'Контрольные вопросы' };
+
+  var root = document.getElementById('exrRoot');
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function api(url) {
+    return fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' }).then(function (r) { return r.json(); });
+  }
+  function fmt(n) { return (Number(n) || 0).toFixed(2).replace('.', ','); }
+  function dt(v) {
+    if (!v) { return '—'; }
+    var d = new Date(new Date(v).getTime() + 5 * 3600 * 1000);
+    return d.getUTCDate() + '.' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '.' + d.getUTCFullYear() +
+           ', ' + ('0' + d.getUTCHours()).slice(-2) + ':' + ('0' + d.getUTCMinutes()).slice(-2);
+  }
+
+  function loadAttempt() {
+    return api("/_api/new_examattempts(" + ATTEMPT_ID + ")?$select=new_examattemptid,new_name,new_status," +
+      "new_percent,new_casepercent,new_passed,new_result,new_blockscores,new_isfinal,new_finalizedon," +
+      "new_appealuntil,new_errortext,_new_exam_value");
+  }
+
+  function waitForResult(a) {
+    var label = a.new_status === STATUS.grading
+      ? 'Письменные ответы проверяются. Обычно это занимает до нескольких часов.'
+      : 'Подсчитываем результат…';
+    root.className = 'exr-center';
+    root.innerHTML = '<p style="font-size:17px;color:#0F172A">' + esc(label) + '</p>' +
+      '<p>Страницу можно закрыть — результат сохранится и будет доступен в разделе ' +
+      '<a href="/certification">Аттестация</a>.</p>';
+    // Письменная проверка может идти часами — опрашиваем реже, чем при сборке билета.
+    var delay = a.new_status === STATUS.grading ? Math.max(POLL_MS * 10, 30000) : POLL_MS;
+    setTimeout(function () {
+      loadAttempt().then(route).catch(function () { waitForResult(a); });
+    }, delay);
+  }
+
+  function route(a) {
+    if (a.error) { throw new Error(a.error.message); }
+    if (a.new_status === STATUS.graded || a.new_status === STATUS.voided) { return renderResult(a); }
+    if (a.new_status === STATUS.running || a.new_status === STATUS.prepare) {
+      window.location.href = '/exam?attempt=' + ATTEMPT_ID; return;
+    }
+    if (a.new_status === STATUS.failed) {
+      root.className = '';
+      root.innerHTML = '<div class="exr-err">' + esc(a.new_errortext || 'Попытка завершилась ошибкой.') + '</div>';
+      return;
+    }
+    waitForResult(a);
+  }
+
+  function renderResult(a) {
+    Promise.all([
+      api("/_api/new_exams(" + a._new_exam_value + ")?$select=new_name,new_paramsjson"),
+      api("/_api/new_examticketitems?$select=new_examticketitemid,new_order,new_type,new_modulename,new_stem," +
+          "new_optionsjson,new_points,new_earned,new_neutralized,new_revealjson" +
+          "&$filter=_new_attempt_value eq " + ATTEMPT_ID + "&$orderby=new_order asc"),
+      api("/_api/new_examappeals?$select=new_examappealid,new_name,new_status,new_reason,new_outcomejson,createdon" +
+          "&$filter=_new_attempt_value eq " + ATTEMPT_ID + "&$orderby=createdon desc"),
+      api("/_api/new_certifications?$select=new_certificationid,new_name,new_status" +
+          "&$filter=_new_attempt_value eq " + ATTEMPT_ID)
+    ]).then(function (res) {
+      var exam = res[0];
+      var items = res[1].value || [];
+      var appeals = res[2].value || [];
+      var cert = (res[3].value || [])[0];
+      var params = {};
+      try { params = JSON.parse(exam.new_paramsjson || '{}'); } catch (e) { params = {}; }
+
+      var html = '';
+      html += verdictCard(a, exam, cert);
+      html += reviewCard(items, params);
+      html += appealCard(a, items, appeals);
+
+      root.className = '';
+      root.innerHTML = html;
+      bindAppeal(a);
+    });
+  }
+
+  function verdictCard(a, exam, cert) {
+    var badge;
+    if (a.new_status === STATUS.voided || a.new_result === RESULT.voided) {
+      badge = '<span class="exr-badge exr-badge--void">Попытка аннулирована</span>';
+    } else if (a.new_passed) {
+      badge = '<span class="exr-badge exr-badge--ok">Экзамен сдан</span>';
+    } else {
+      badge = '<span class="exr-badge exr-badge--no">Экзамен не сдан</span>';
+    }
+
+    var blocks = [];
+    try { blocks = JSON.parse(a.new_blockscores || '[]'); } catch (e) { blocks = []; }
+
+    var html = '<div class="exr-card">';
+    html += '<h2>' + esc(exam.new_name || 'Экзамен') + ' · попытка ' + esc(a.new_name) + '</h2>';
+    html += '<div class="exr-verdict"><span class="exr-pct">' + fmt(a.new_percent) + ' %</span>' + badge + '</div>';
+    if (a.new_isfinal) {
+      html += '<p class="exr-muted" style="margin:8px 0 0">Эта попытка определяет итог аттестации.</p>';
+    }
+
+    if (blocks.length) {
+      html += '<dl class="exr-blocks">';
+      blocks.forEach(function (b) {
+        var pct = b.max > 0 ? Math.round(b.earned / b.max * 100) : 0;
+        html += '<div class="exr-block"><dt>' + esc(BLOCK_NAMES[b.type] || b.type) + '</dt>' +
+                '<dd>' + fmt(b.earned) + ' из ' + fmt(b.max) + '</dd>' +
+                '<div class="exr-bar"><span style="width:' + pct + '%"></span></div></div>';
+      });
+      html += '</dl>';
+    }
+
+    if (cert) {
+      html += '<p style="margin:16px 0 0"><a class="exr-btn exr-btn-ghost" href="/certificate?id=' +
+              esc(cert.new_certificationid) + '">Открыть сертификат ' + esc(cert.new_name) + '</a></p>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function reviewCard(items, params) {
+    var correctnessOnly = params.revealMode === 'correctnessOnly';
+    var html = '<div class="exr-card"><h2>Разбор заданий</h2>';
+
+    items.forEach(function (it) {
+      var reveal = {};
+      try { reveal = JSON.parse(it.new_revealjson || '{}'); } catch (e) { reveal = {}; }
+      var earned = it.new_earned || 0;
+      var points = it.new_points || 0;
+
+      html += '<div class="exr-item">';
+      html += '<h3>Задание ' + it.new_order + (it.new_modulename ? ' · ' + esc(it.new_modulename) : '') + '</h3>';
+      html += '<p class="exr-stem">' + esc(it.new_stem) + '</p>';
+
+      if (it.new_neutralized) {
+        html += '<div class="exr-note">Задание исключено из подсчёта решением администратора.</div></div>';
+        return;
+      }
+
+      html += '<p class="exr-score">Баллы: ' + fmt(earned) + ' из ' + fmt(points) + '</p>';
+
+      var isChoice = it.new_type === TYPE.single || it.new_type === TYPE.multi;
+      if (isChoice) {
+        var opts = [];
+        try { opts = JSON.parse(it.new_optionsjson || '[]'); } catch (e) { opts = []; }
+        var picked = String(reveal.selected || '').split('|').filter(Boolean);
+        var right = (reveal.correct || []).map(function (c) { return c.id; });
+
+        if (correctnessOnly) {
+          html += '<p>' + (earned >= points && points > 0 ? 'Ответ верный.' : 'Ответ неверный или неполный.') + '</p>';
+        } else {
+          opts.forEach(function (o) {
+            var isRight = right.indexOf(o.id) >= 0;
+            var isPicked = picked.indexOf(o.id) >= 0;
+            var cls = isRight ? ' exr-opt--right' : (isPicked ? ' exr-opt--wrong' : '');
+            var note = [];
+            if (isPicked) { note.push('ваш выбор'); }
+            if (isRight) { note.push('верный'); }
+            html += '<div class="exr-opt' + cls + '">' + esc(o.text) +
+                    (note.length ? '<small>— ' + note.join(', ') + '</small>' : '') + '</div>';
+          });
+          if (!picked.length) { html += '<p class="exr-muted">Ответа не было.</p>'; }
+          if (reveal.explanation) {
+            html += '<div class="exr-expl">' + esc(reveal.explanation) + '</div>';
+          }
+        }
+      } else {
+        var crit = reveal.criteria || [];
+        if (!crit.length) {
+          html += '<p class="exr-muted">' + (earned > 0 ? '' : 'Ответа не было или он не прошёл проверку.') + '</p>';
+        } else if (!correctnessOnly) {
+          html += '<ul class="exr-crit">';
+          crit.forEach(function (c) {
+            html += '<li><strong>' + esc(c.code || '') + '</strong> — ' + esc(c.score) + ' из 5' +
+                    (c.justification_ru || c.justification ? ': ' + esc(c.justification_ru || c.justification) : '') + '</li>';
+          });
+          html += '</ul>';
+        }
+      }
+      html += '</div>';
+    });
+
+    if (!items.length) { html += '<p class="exr-muted">Заданий нет.</p>'; }
+    html += '</div>';
+    return html;
+  }
+
+  function appealCard(a, items, appeals) {
+    var html = '<div class="exr-card"><h2>Апелляция</h2>';
+    var written = items.filter(function (it) {
+      return (it.new_type === TYPE.kase || it.new_type === TYPE.control) && !it.new_neutralized;
+    });
+
+    if (appeals.length) {
+      var ap = appeals[0];
+      var st = { 100000000: 'подана', 100000001: 'отклонена', 100000002: 'в работе',
+                 100000003: 'рассмотрена', 100000004: 'не обработана из-за сбоя' }[ap.new_status] || '—';
+      html += '<p>Апелляция ' + esc(ap.new_name) + ' ' + st + '.</p>';
+      if (ap.new_status === APPEAL.decided) {
+        html += '<p class="exr-muted">Если результат изменился, он уже отражён выше.</p>';
+      }
+      html += '</div>';
+      return html;
+    }
+
+    var until = a.new_appealuntil ? new Date(a.new_appealuntil).getTime() : 0;
+    if (a.new_status === STATUS.voided) {
+      html += '<p class="exr-muted">По аннулированной попытке апелляция не подаётся.</p></div>';
+      return html;
+    }
+    if (!written.length) {
+      html += '<p class="exr-muted">Апелляция касается только письменных заданий, а в этой попытке их нет. ' +
+              'Вопросы с выбором оцениваются автоматически.</p></div>';
+      return html;
+    }
+    if (!until || Date.now() > until) {
+      html += '<p class="exr-muted">Срок подачи апелляции истёк' + (until ? ' ' + dt(a.new_appealuntil) : '') + '.</p></div>';
+      return html;
+    }
+
+    html += '<p class="exr-muted">Если вы не согласны с оценкой письменного задания, подайте апелляцию до ' +
+            dt(a.new_appealuntil) + '. Её рассмотрит независимая повторная проверка.</p>';
+    html += '<form class="exr-form" id="exrAppeal">';
+    written.forEach(function (it) {
+      html += '<label class="exr-check"><input type="checkbox" value="' + esc(it.new_examticketitemid) + '">' +
+              '<span>Задание ' + it.new_order + ': ' + esc(String(it.new_stem || '').slice(0, 90)) + '…</span></label>';
+    });
+    html += '<textarea id="exrReason" placeholder="Почему вы не согласны с оценкой — не короче 20 знаков"></textarea>';
+    html += '<p><button class="exr-btn" type="submit">Подать апелляцию</button></p>';
+    html += '<div id="exrAppealMsg"></div></form></div>';
+    return html;
+  }
+
+  function bindAppeal(a) {
+    var form = document.getElementById('exrAppeal');
+    if (!form) { return; }
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var msg = document.getElementById('exrAppealMsg');
+      var ids = [];
+      form.querySelectorAll('input:checked').forEach(function (c) { ids.push(c.value); });
+      var reason = (document.getElementById('exrReason').value || '').trim();
+      if (!ids.length) { msg.innerHTML = '<div class="exr-note">Отметьте хотя бы одно задание.</div>'; return; }
+      if (reason.length < 20) { msg.innerHTML = '<div class="exr-note">Опишите причину подробнее — не короче 20 знаков.</div>'; return; }
+
+      var btn = form.querySelector('button');
+      btn.disabled = true;
+      fetch('/_layout/tokenhtml', { credentials: 'same-origin' })
+        .then(function (r) { return r.text(); })
+        .then(function (t) {
+          var m = t.match(/value="([^"]+)"/);
+          return fetch('/_api/new_examappeals', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', '__RequestVerificationToken': m ? m[1] : '' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              new_items: ids.join('|'),
+              new_reason: reason,
+              new_idempotencykey: ATTEMPT_ID + ':appeal',
+              'new_attempt@odata.bind': '/new_examattempts(' + ATTEMPT_ID + ')',
+              'new_contact@odata.bind': '/contacts(' + CONTACT + ')'
+            })
+          });
+        })
+        .then(function (r) {
+          if (r.status !== 204 && r.status !== 201) {
+            return r.text().then(function (t) { throw new Error(t.slice(0, 200)); });
+          }
+          msg.innerHTML = '<div class="exr-note">Апелляция подана. Результат рассмотрения появится на этой странице.</div>';
+          form.querySelectorAll('input, textarea, button').forEach(function (el) { el.disabled = true; });
+        })
+        .catch(function (e) {
+          btn.disabled = false;
+          msg.innerHTML = '<div class="exr-err">Не удалось подать апелляцию: ' + esc(e.message) + '</div>';
+        });
+    });
+  }
+
+  if (!ATTEMPT_ID) {
+    root.className = '';
+    root.innerHTML = '<div class="exr-err">Не указана попытка. Откройте результат из раздела <a href="/certification">Аттестация</a>.</div>';
+    return;
+  }
+  loadAttempt().then(route).catch(function (e) {
+    root.className = '';
+    root.innerHTML = '<div class="exr-err">Не удалось загрузить результат: ' + esc(e.message) + '</div>';
+  });
+})();
+</script>

@@ -26,3 +26,7 @@
   adx_authenticatedusersrole: false
   adx_name: Новый сотрудник
   adx_webroleid: a1b2c3d4-1111-2222-3333-000000000004
+- adx_anonymoususersrole: false
+  adx_authenticatedusersrole: false
+  adx_name: 'Аттестация: администратор'
+  adx_webroleid: a1b2c3d4-1111-2222-3333-000000000005

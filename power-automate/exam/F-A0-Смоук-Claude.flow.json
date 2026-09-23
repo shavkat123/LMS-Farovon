@@ -1,0 +1,186 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedcommondataserviceforapps_73c39"
+        },
+        "api": { "name": "shared_commondataserviceforapps" }
+      },
+      "shared_new-5fanthropic-2dclaude-2dlms-2dexam-5f94b9addf05db1db1": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "new_AnthropicClaudeLMSExam"
+        },
+        "api": { "name": "shared_new-5fanthropic-2dclaude-2dlms-2dexam-5f94b9addf05db1db1" }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": { "defaultValue": {}, "type": "Object" },
+        "$authentication": { "defaultValue": {}, "type": "SecureObject" }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "Button",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "title": "model",
+                  "type": "string",
+                  "description": "Идентификатор модели, например claude-sonnet-5",
+                  "x-ms-dynamically-added": true
+                }
+              },
+              "required": [ "text" ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Модель": {
+          "type": "Compose",
+          "runAfter": {},
+          "inputs": "@if(empty(coalesce(triggerBody()?['text'], '')), 'claude-sonnet-5', triggerBody()?['text'])"
+        },
+        "Try": {
+          "type": "Scope",
+          "runAfter": { "Модель": [ "Succeeded" ] },
+          "actions": {
+            "Вызов_модели": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_new-5fanthropic-2dclaude-2dlms-2dexam-5f94b9addf05db1db1",
+                  "operationId": "CreateMessage",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_new-5fanthropic-2dclaude-2dlms-2dexam-5f94b9addf05db1db1"
+                },
+                "parameters": {
+                  "anthropic-version": "2023-06-01",
+                  "body": {
+                    "model": "@outputs('Модель')",
+                    "max_tokens": 200,
+                    "system": "Отвечай строго одним JSON-объектом без пояснений.",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "Проверка связи. Ответь ровно так: {\"ok\": true, \"note\": \"связь есть\"}"
+                      }
+                    ]
+                  }
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runtimeConfiguration": {
+                "secureData": { "properties": [ "inputs", "outputs" ] }
+              }
+            },
+            "Текст_ответа": {
+              "type": "Compose",
+              "runAfter": { "Вызов_модели": [ "Succeeded" ] },
+              "inputs": "@if(greater(length(coalesce(body('Вызов_модели')?['content'], json('[]'))), 0), coalesce(first(body('Вызов_модели')?['content'])?['text'], ''), '')"
+            },
+            "Журнал_успеха": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Текст_ответа": [ "Succeeded" ] },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "CreateRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examlogs",
+                  "item/new_event": "AI_CALL",
+                  "item/new_actor": "F-A0 Смоук Claude",
+                  "item/new_subjectid": "@{workflow()?['run']?['name']}",
+                  "item/new_payload": "@{concat('{\"model\":\"', outputs('Модель'), '\",\"ответ\":', string(outputs('Текст_ответа')), ',\"входных_токенов\":', string(coalesce(body('Вызов_модели')?['usage']?['input_tokens'], 0)), ',\"выходных_токенов\":', string(coalesce(body('Вызов_модели')?['usage']?['output_tokens'], 0)), '}')}"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Ответ": {
+              "type": "Response",
+              "kind": "Http",
+              "runAfter": { "Журнал_успеха": [ "Succeeded" ] },
+              "inputs": {
+                "statusCode": 200,
+                "body": {
+                  "ok": true,
+                  "model": "@outputs('Модель')",
+                  "text": "@outputs('Текст_ответа')",
+                  "inputTokens": "@coalesce(body('Вызов_модели')?['usage']?['input_tokens'], 0)",
+                  "outputTokens": "@coalesce(body('Вызов_модели')?['usage']?['output_tokens'], 0)"
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "model": { "type": "string" },
+                    "text": { "type": "string" },
+                    "inputTokens": { "type": "integer" },
+                    "outputTokens": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "Catch": {
+          "type": "Scope",
+          "runAfter": { "Try": [ "Failed", "TimedOut" ] },
+          "actions": {
+            "Журнал_сбоя": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "CreateRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_examlogs",
+                  "item/new_event": "AI_CALL_FAILED",
+                  "item/new_actor": "F-A0 Смоук Claude",
+                  "item/new_subjectid": "@{workflow()?['run']?['name']}",
+                  "item/new_payload": "@{string(result('Try'))}"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Ответ_с_ошибкой": {
+              "type": "Response",
+              "kind": "Http",
+              "runAfter": { "Журнал_сбоя": [ "Succeeded" ] },
+              "inputs": {
+                "statusCode": 200,
+                "body": { "ok": false, "model": "@outputs('Модель')", "text": "", "inputTokens": 0, "outputTokens": 0 },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "model": { "type": "string" },
+                    "text": { "type": "string" },
+                    "inputTokens": { "type": "integer" },
+                    "outputTokens": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}
